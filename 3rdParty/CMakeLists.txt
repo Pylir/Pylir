@@ -6,6 +6,8 @@ include(CPM)
 
 CPMAddPackage("gh:catchorg/Catch2@3.3.0")
 CPMAddPackage("gh:fmtlib/fmt#7.1.3")
+# Use the same C++ version everywhere.
+set(CTRE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 CPMAddPackage("gh:hanickadot/compile-time-regular-expressions#v3.8")
 CPMAddPackage(
   NAME libtommath
@@ -24,17 +26,17 @@ CPMAddPackage(
   SYSTEM
 )
 
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 # utf8proc
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 
 add_library(utf8proc STATIC EXCLUDE_FROM_ALL ${utf8proc_SOURCE_DIR}/utf8proc.c)
 target_compile_definitions(utf8proc PUBLIC UTF8PROC_STATIC)
 target_include_directories(utf8proc SYSTEM PUBLIC ${utf8proc_SOURCE_DIR})
 
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 # libtommath
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 
 file(GLOB tommath_srcs "${libtommath_SOURCE_DIR}/*.c")
 add_library(tommath STATIC EXCLUDE_FROM_ALL ${tommath_srcs})
@@ -42,16 +44,16 @@ target_include_directories(tommath SYSTEM PUBLIC ${libtommath_SOURCE_DIR})
 target_compile_definitions(tommath
   PUBLIC MP_NO_ZERO_ON_FREE MP_NO_FILE MP_FIXED_CUTOFFS)
 
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 # Catch2
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 
 # Workaround for https://github.com/cpm-cmake/CPM.cmake/issues/475.
 list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 # libunwind
-#==============================================================================#
+#===------------------------------------------------------------------------===#
 
 if (MSVC)
   # Workaround for cmake issue:
