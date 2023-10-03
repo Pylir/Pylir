@@ -40,16 +40,9 @@ macro(add_global_compile_options)
   # when linking a shared library (including a static into a shared).
   set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE "BOOL" "")
 
-  # Turn off exceptions entirely within the compiler. They are simply not used
-  # and there is therefore no need to pay the size cost for them.
-  if (MSVC)
-    add_compile_options(/EHs-c-)
-  else ()
-    add_compile_options(-fno-exceptions)
-  endif ()
-
   # Workaround https://github.com/llvm/llvm-project/issues/65255
   if (MSVC)
+    add_compile_options(/EHsc)
     add_compile_definitions(_SILENCE_NONFLOATING_COMPLEX_DEPRECATION_WARNING
       _CRT_SECURE_NO_WARNINGS)
   endif ()

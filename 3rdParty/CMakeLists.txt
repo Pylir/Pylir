@@ -4,9 +4,6 @@
 
 include(CPM)
 
-# Required by FMT to detect whether clang-cl is using exceptions. Since we never
-# do, just hardcode it to 0.
-add_compile_definitions(_HAS_EXCEPTIONS=0)
 CPMAddPackage("gh:catchorg/Catch2@3.3.0")
 CPMAddPackage("gh:fmtlib/fmt#7.1.3")
 # Use the same C++ version everywhere.
