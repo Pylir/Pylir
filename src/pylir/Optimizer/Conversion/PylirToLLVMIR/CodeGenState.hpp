@@ -49,22 +49,68 @@ class CodeGenState {
   PylirTypeConverter& m_typeConverter;
   mlir::SymbolTable m_symbolTable;
 
-  llvm::DenseMap<pylir::Py::ObjectAttrInterface, mlir::LLVM::GlobalOp>
-      m_globalConstants;
+  /// Mapping of all `ConcreteObjectAttribute` to the corresponding converted
+  /// LLVM global.
+  llvm::DenseMap<Py::ConcreteObjectAttribute, mlir::LLVM::GlobalOp>
+      m_constantObjects;
+  /// Mapping for any auxiliary buffers used by a `ConcreteObjectAttribute`.
+  /// The attribute to use as key is specific to the implementation. Buffers
+  /// can be reused by making equivalent data use the same key when converting
+  /// a given object attribute.
   llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalBuffers;
-  llvm::DenseMap<pylir::Py::GlobalValueAttr, mlir::LLVM::GlobalOp>
-      m_globalValues;
-  llvm::DenseMap<pylir::Py::GlobalValueAttr, mlir::StringAttr>
-      m_externalGlobalValues;
+  /// Mapping of any `GlobalValueAttr` to the corresponding converted LLVM
+  /// global.
+  llvm::DenseMap<Py::GlobalValueAttr, mlir::LLVM::GlobalOp> m_globalValues;
+  /// Mapping of any `GlobalValueAttr` that occur directly in a `py.external`
+  /// operation to the symbol name of that operation.
+  llvm::DenseMap<Py::GlobalValueAttr, mlir::StringAttr> m_externalGlobalValues;
   mlir::LLVM::LLVMFuncOp m_globalInit;
   mlir::LLVM::TBAARootAttr m_tbaaRoot;
 
   void appendToGlobalInit(mlir::OpBuilder& builder,
                           llvm::function_ref<void()> section);
 
+  /// Gets or converts the given `objectAttr` to an LLVM global.
   mlir::LLVM::GlobalOp
-  createGlobalConstant(mlir::OpBuilder& builder,
-                       pylir::Py::ConstObjectAttrInterface objectAttr);
+  getConstantObject(mlir::OpBuilder& builder,
+                    Py::ConcreteObjectAttribute objectAttr);
+
+  /// Generates code to create the initializer region for 'global' with the
+  /// compile time constant 'objectAttr'.
+  void initializeGlobal(mlir::LLVM::GlobalOp global, mlir::OpBuilder& builder,
+                        Py::ConcreteObjectAttribute objectAttr);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::StrAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::TupleAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::ListAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::FloatAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::IntAttrInterface attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::DictAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::TypeAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
+
+  mlir::Value initialize(mlir::Location loc, mlir::OpBuilder& builder,
+                         Py::FunctionAttr attr, mlir::Value undef,
+                         mlir::LLVM::GlobalOp global);
 
 public:
   CodeGenState(PylirTypeConverter& typeConverter, mlir::ModuleOp module)
@@ -118,19 +164,15 @@ public:
   mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder,
                                 Runtime func, mlir::ValueRange args);
 
-  /// Generates code to create the initializer region for 'global' with the
-  /// compile time constant 'objectAttr'.
-  void initializeGlobal(mlir::LLVM::GlobalOp global, mlir::OpBuilder& builder,
-                        pylir::Py::ConstObjectAttrInterface objectAttr);
-
   /// Generates code to translate the compile time constant 'attribute' to an
   /// PyObject pointer in LLVM and returns it. Attribute may be any kind of
   /// attribute from the 'py' dialect.
   mlir::Value getConstant(mlir::Location loc, mlir::OpBuilder& builder,
                           mlir::Attribute attribute);
 
-  /// Get or lower 'globalValueAttr' to a LLVM global variable using 'builder'.
-  /// Once lowered, the same global is returned for the same 'globalValueAttr'.
+  /// Gets or lowers 'globalValueAttr' to a LLVM global variable using
+  /// 'builder'. Once lowered, the same global is returned for the same
+  /// 'globalValueAttr'.
   mlir::LLVM::GlobalOp getGlobalValue(mlir::OpBuilder& builder,
                                       Py::GlobalValueAttr globalValueAttr);
 
