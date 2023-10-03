@@ -43,6 +43,10 @@ public:
   }
 
   static bool classof(mlir::Attribute attribute);
+
+  static ConcreteObjectAttribute getFromOpaquePointer(const void* ptr) {
+    return ConcreteObjectAttribute(reinterpret_cast<const ImplType*>(ptr));
+  }
 };
 
 } // namespace pylir::Py
