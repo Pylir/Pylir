@@ -1,9 +1,6 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
 #builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 // CHECK: #[[$TUPLE:.*]] = #py.globalValue<builtins.tuple{{.*}}>
 

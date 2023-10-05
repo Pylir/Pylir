@@ -62,12 +62,7 @@ py.func @test(%c: i1) -> i1 {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 #builtins_None = #py.globalValue<builtins.None, initializer = #py.type>
-py.external @builtins.None, #builtins_None
 
 py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = constant(#builtins_None)

@@ -1,10 +1,5 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     %2 = tuple_copy %arg0 : %arg1
     %3 = tuple_copy %2 : %arg2
@@ -17,6 +12,8 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> 
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
 // CHECK-NEXT: %[[COPY:.*]] = tuple_copy %[[ARG0]] : %[[ARG2]]
 // CHECK-NEXT: return %[[COPY]]
+
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
 
 py.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = makeTuple (%arg0)

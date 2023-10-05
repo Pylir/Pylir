@@ -1,14 +1,5 @@
 // RUN: pylir-opt -pass-pipeline="builtin.module(any(pylir-sroa))" %s --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-
 py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = constant(#py.str<"Hello">)
     %1 = constant(#py.str<" ">)
@@ -35,15 +26,6 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK: return %[[R]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
 
 py.func @test(%arg0 : !py.dynamic, %hash : index) -> (!py.dynamic, index) {
     %0 = constant(#py.str<"Hello">)
@@ -82,15 +64,6 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> (!py.dynamic, index) {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-
 py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = constant(#py.str<"Hello">)
     %zero = constant(#py.int<0>)
@@ -105,13 +78,6 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK: return %[[U]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.func @test(%arg0 : !py.dynamic, %hash : index) -> (i1, index) {
     %0 = makeDict ()
@@ -154,15 +120,6 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> (i1, index) {
 // CHECK-NEXT: return %[[EXISTED]], %[[NEW_SIZE]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
-py.external @builtins.float, #builtins_float
 
 py.func @test(%arg0 : !py.dynamic, %hash : index) -> i1 {
     %0 = makeDict ()
