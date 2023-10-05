@@ -1,12 +1,5 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-
 py.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
     %1 = constant(#py.int<3>)
@@ -21,13 +14,6 @@ py.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[RESULT]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
 
 py.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -44,13 +30,6 @@ py.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-
 py.func @make_set_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
     %1 = constant(#py.int<3>)
@@ -65,15 +44,6 @@ py.func @make_set_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[RESULT]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 py.func @make_tuple_op_constant(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = constant(#py.tuple<(#py.int<3>, #py.str<"test">)>)

@@ -1,10 +1,5 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-
 py.func @entry_block(%arg0 : !py.dynamic) -> i1 {
     %0 = isUnboundValue %arg0
     return %0 : i1
@@ -15,11 +10,6 @@ py.func @entry_block(%arg0 : !py.dynamic) -> i1 {
 // CHECK: return %[[CONST]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 py.global @a : !py.dynamic
 
@@ -42,11 +32,6 @@ py.func @block_argument(%arg0 : i1) -> i1 {
 // CHECK: return %[[I1]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 py.global @a : !py.dynamic
 

@@ -1,11 +1,6 @@
 // RUN: pylir-opt %s --test-inliner-interface --split-input-file | FileCheck %s
 // RUN: pylir-opt %s --test-inliner-interface --split-input-file -mlir-print-debuginfo -mlir-print-local-scope  | FileCheck %s --check-prefix INLINE-LOC
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-
 py.func private @create_exception() -> !py.dynamic
 
 py.func @inline_foo(%arg0 : i1) -> !py.dynamic {
@@ -64,15 +59,6 @@ py.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: return %[[EX]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_dict= #py.globalValue<builtins.dict, const, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
 
 #function = #py.globalValue<function>
 
@@ -138,16 +124,7 @@ py.func @__init__() -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_dict= #py.globalValue<builtins.dict, const, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
 #builtins_BaseException = #py.globalValue<builtins.BaseException, initializer = #py.type>
-py.external @builtins.BaseException, #builtins_BaseException
 
 #function = #py.globalValue<function>
 
@@ -169,16 +146,7 @@ py.func @test_loc() -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_dict= #py.globalValue<builtins.dict, const, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
 #builtins_BaseException = #py.globalValue<builtins.BaseException, initializer = #py.type>
-py.external @builtins.BaseException, #builtins_BaseException
 
 #function = #py.globalValue<function>
 

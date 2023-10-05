@@ -1,12 +1,5 @@
 // RUN: pylir-opt %s -p 'builtin.module(any(pylir-expand-py-dialect))' --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-
 py.func private @pylir__call__(!py.dynamic, !py.dynamic, !py.dynamic) ->  !py.dynamic
 
 py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic) {
@@ -91,13 +84,6 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-
 py.func private @pylir__call__(!py.dynamic, !py.dynamic, !py.dynamic) ->  !py.dynamic
 
 py.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic) {
@@ -174,13 +160,6 @@ py.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.
 // CHECK: return %[[A]], %[[B]], %[[C]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
 
 py.func private @pylir__call__(!py.dynamic, !py.dynamic, !py.dynamic) ->  !py.dynamic
 

@@ -1,11 +1,5 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-// Stubs
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-
 // CHECK-LABEL: @same_value
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
@@ -16,12 +10,6 @@ py.func @same_value() -> i1 {
 }
 
 // -----
-
-// Stubs
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @two_allocs
 // CHECK: %[[RES:.*]] = arith.constant false
@@ -35,11 +23,8 @@ py.func @two_allocs(%arg0 : !py.dynamic) -> i1 {
 
 // -----
 
-// Stubs
 #builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
 #builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @singletons
 // CHECK: %[[RES:.*]] = arith.constant true
@@ -63,11 +48,7 @@ py.func @singletons_not() -> i1 {
 
 // -----
 
-// Stubs
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
 #builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @alloca_symbol
 // CHECK: %[[RES:.*]] = arith.constant false

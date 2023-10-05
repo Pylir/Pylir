@@ -1,12 +1,5 @@
 // RUN: pylir-opt %s -pass-pipeline='builtin.module(any(pylir-global-load-store-elimination))' --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 py.global @foo : !py.dynamic
 
 py.func @test() -> !py.dynamic {
@@ -22,13 +15,6 @@ py.func @test() -> !py.dynamic {
 // CHECK-NEXT: return %[[C]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.global @foo : !py.dynamic
 
@@ -48,13 +34,6 @@ py.func @test() -> !py.dynamic {
 // CHECK-NEXT: return %[[C]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.func private @clobber()
 
@@ -76,13 +55,6 @@ py.func @test() -> !py.dynamic {
 // CHECK-NEXT: return %[[LOAD]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.global @foo : !py.dynamic
 
@@ -126,13 +98,6 @@ py.func @test() -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 py.global @foo : !py.dynamic
 
 py.func private @clobber()
@@ -168,13 +133,6 @@ py.func @test() -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 py.global @foo : !py.dynamic
 
 py.func @test() -> !py.dynamic {
@@ -205,13 +163,6 @@ py.func @test() -> !py.dynamic {
 // CHECK: return %[[ARG]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.global @foo : !py.dynamic
 
@@ -246,13 +197,6 @@ py.func @test() -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 py.global @foo : !py.dynamic
 
 py.func @test() -> !py.dynamic {
@@ -283,13 +227,6 @@ py.func @test() -> !py.dynamic {
 // CHECK: return %[[ARG]]
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.global @foo : !py.dynamic
 

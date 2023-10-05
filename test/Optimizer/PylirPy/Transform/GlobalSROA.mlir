@@ -1,14 +1,5 @@
 // RUN: pylir-opt %s --pylir-global-sroa --split-input-file | FileCheck %s
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 #thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @test(%hash: index) -> !py.dynamic {
@@ -40,15 +31,6 @@ py.func @foo(%hash: index, %arg0 : !py.dynamic) {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 #thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @store_only(%hash: index, %arg0 : !py.dynamic) {
@@ -68,15 +50,6 @@ py.func @store_only(%hash: index, %arg0 : !py.dynamic) {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-
 #thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @load_only(%hash: index) -> !py.dynamic {
@@ -94,17 +67,6 @@ py.func @load_only(%hash: index) -> !py.dynamic {
 // CHECK: global "private" @[[$DES]] : !py.dynamic
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
 
 #thing = #py.globalValue<thing, initializer = #py.dict<{#py.str<"lol"> to #py.int<5>}>>
 
@@ -126,17 +88,6 @@ py.func @init_attr(%hash: index) -> !py.dynamic {
 
 // -----
 
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
-
 #thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @sub_attr(%hash: index) -> !py.dynamic {
@@ -150,17 +101,6 @@ py.func @sub_attr(%hash: index) -> !py.dynamic {
 // CHECK: constant(#py.dict<{#py.int<5> to #thing}>)
 
 // -----
-
-#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
-py.external @builtins.type, #builtins_type
-#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
-py.external @builtins.dict, #builtins_dict
-#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
-py.external @builtins.float, #builtins_float
-#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
-py.external @builtins.int, #builtins_int
 
 #thing = #py.globalValue<thing, initializer = #py.dict<{#py.int<3> to #py.int<5>}>>
 

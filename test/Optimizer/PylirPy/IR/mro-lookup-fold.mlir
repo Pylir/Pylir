@@ -2,10 +2,6 @@
 
 #foo = #py.globalValue<foo, const, initializer = #py.tuple<(#py.str<"__slots__">)>>
 #builtins_type = #py.globalValue<builtins.type, const, initializer = #py.type<instance_slots = <(#py.str<"__slots__">)>, slots = { __slots__ = #foo }>>
-#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
-py.external @builtins.tuple, #builtins_tuple
-#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
-py.external @builtins.str, #builtins_str
 
 py.func @test1() -> !py.dynamic {
     %0 = constant(#py.tuple<(#builtins_type)>)
