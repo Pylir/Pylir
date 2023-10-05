@@ -197,7 +197,7 @@ pylir::PylirTypeConverter::getLayoutType(mlir::Attribute attr) {
 
 mlir::LLVM::LLVMStructType
 pylir::PylirTypeConverter::typeOf(pylir::Py::ObjectAttrInterface objectAttr) {
-  unsigned count = dyn_cast<TypeAttrInterface>(objectAttr.getTypeObject())
+  unsigned count = cast<TypeAttrInterface>(objectAttr.getTypeObject())
                        .getInstanceSlots()
                        .size();
   return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface,
