@@ -25,28 +25,6 @@ class PylirHIR_Op<string mneomic, list<Trait> traits = []>
 // Basics
 //===----------------------------------------------------------------------===//
 
-def PylirHIR_BuiltinsRefOp : PylirHIR_Op<"builtinsRef", [Pure]> {
-  let arguments = (ins FlatSymbolRefAttr:$reference);
-
-  let results = (outs DynamicType:$result);
-
-  let description = [{
-    Op used to refer to objects in Pythons `builtins` module.
-    Returns a reference to that object.
-    Unlike most ops using symbol references, this op does not verify, nor care
-    whether the symbol exists.
-    Symbol names should be fully qualified.
-
-    Example:
-    ```
-    %0 = pyHIR.builtinsRef @builtins.None
-    ```
-  }];
-
-  let assemblyFormat = [{
-    $reference attr-dict
-  }];
-}
 
 //===----------------------------------------------------------------------===//
 // Functions
