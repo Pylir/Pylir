@@ -164,7 +164,8 @@ private:
       m_builder.setInsertionPointToEnd(&function.getBody().front());
       visit(funcDef.suite);
       if (m_builder.getInsertionBlock()) {
-        auto ref = m_builder.create<HIR::BuiltinsRefOp>(Builtins::None.name);
+        auto ref = m_builder.create<Py::ConstantOp>(Py::GlobalValueAttr::get(
+            m_builder.getContext(), Builtins::None.name));
         m_builder.create<HIR::ReturnOp>(ref);
       }
     }

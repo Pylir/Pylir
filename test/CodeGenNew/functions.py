@@ -1,5 +1,7 @@
 # RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
 
+# CHECK: #[[$NONE:.*]] = #py.globalValue<builtins.None{{>|,}}
+
 # CHECK-LABEL: pyHIR.init "__main__"
 
 def test1():
@@ -7,7 +9,7 @@ def test1():
 
 
 # CHECK: func "test1"() {
-# CHECK-NEXT: %[[REF:.*]] = builtinsRef @builtins.None
+# CHECK-NEXT: %[[REF:.*]] = py.constant(#[[$NONE]])
 # CHECK-NEXT: return %[[REF]]
 
 def test2(arg, arg2, /):
