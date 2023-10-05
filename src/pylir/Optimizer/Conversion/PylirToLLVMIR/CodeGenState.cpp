@@ -267,7 +267,7 @@ void CodeGenState::initializeGlobal(LLVM::GlobalOp global, OpBuilder& builder,
 
   DictionaryAttr initMap = constObjectAttrInterface.getSlots();
   for (auto [index, slotName] : llvm::enumerate(
-           dyn_cast<TypeAttrInterface>(typeObject).getInstanceSlots())) {
+           cast<TypeAttrInterface>(typeObject).getInstanceSlots())) {
     Value value;
     Attribute element = initMap.get(slotName.cast<Py::StrAttr>().getValue());
     if (!element)
@@ -477,7 +477,7 @@ Value CodeGenState::initialize(Location loc, OpBuilder& builder, DictAttr attr,
     for (const auto& [key, value] : attr.getKeyValuePairs()) {
       Value keyValue = getConstant(loc, builder, key);
       std::optional<Mem::LayoutType> layoutType = m_typeConverter.getLayoutType(
-          dyn_cast<ObjectAttrInterface>(key).getTypeObject());
+          cast<ObjectAttrInterface>(key).getTypeObject());
       Value hash;
       if (layoutType == Mem::LayoutType::String) {
         hash = createRuntimeCall(loc, builder, Runtime::pylir_str_hash,

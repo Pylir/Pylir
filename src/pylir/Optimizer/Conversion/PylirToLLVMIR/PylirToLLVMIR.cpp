@@ -1630,9 +1630,45 @@ protected:
 public:
   using Base::Base;
 };
+} // namespace
+
+/// Explicitly checks the preconditions of this pass, returning failure and
+/// emitting and error message otherwise.
+[[maybe_unused]] static LogicalResult
+checkPassPreconditions(ModuleOp moduleOp) {
+  AttrTypeWalker walker;
+
+  Operation* currentOperation;
+
+  walker.addWalk([&](ObjectAttrInterface objectAttrInterface) {
+    auto typeAttr =
+        dyn_cast<TypeAttrInterface>(objectAttrInterface.getTypeObject());
+    if (typeAttr)
+      return WalkResult::advance();
+
+    currentOperation->emitError("type-object of '")
+        << objectAttrInterface << "' is not an instance of '"
+        << Py::TypeAttr::getMnemonic() << "'";
+    return WalkResult::interrupt();
+  });
+
+  WalkResult result = moduleOp.walk([&](Operation* op) {
+    currentOperation = op;
+    return walker.walk(op->getAttrDictionary());
+  });
+
+  return failure(/*isFailure=*/result.wasInterrupted());
+}
+
+namespace {
 
 void ConvertPylirToLLVMPass::runOnOperation() {
-  auto module = getOperation();
+  ModuleOp module = getOperation();
+
+#ifndef NDEBUG
+  if (failed(checkPassPreconditions(module)))
+    return signalPassFailure();
+#endif
 
   PylirTypeConverter converter(&getContext(), llvm::Triple(m_targetTripleCLI),
                                llvm::DataLayout(m_dataLayoutCLI),
