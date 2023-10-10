@@ -32,4 +32,14 @@ def ConvertPylirPyToPylirMemPass : Pass<"convert-pylirPy-to-pylirMem",
   ];
 }
 
+def ConvertPylirHIRToPylirPyPass : Pass<"convert-pylirHIR-to-pylirPy",
+  "::mlir::ModuleOp"> {
+  let summary = "Convert PylirHIR dialect to PylirPy dialect";
+
+  let dependentDialects = [
+    "::pylir::Py::PylirPyDialect",
+    "::mlir::arith::ArithDialect"
+  ];
+}
+
 #endif

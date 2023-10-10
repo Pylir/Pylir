@@ -4,5 +4,6 @@
 
 add_pylir_passes(Passes Conversion PREFIX Pylir)
 
+add_subdirectory(PylirHIRToPylirPy)
 add_subdirectory(PylirPyToPylirMem)
 add_subdirectory(PylirToLLVMIR)
