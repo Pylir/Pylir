@@ -42,7 +42,7 @@ def Test_C : Test_Op<"c", [DeclareOpInterfaceMethods<TestInterface>]> {
 
 // CHECK-LABEL: int A::lol()
 // CHECK-NEXT: int i = 0;
-// CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest2Mutable()).getBeginOperandIndex(), getTest2Mutable().size())) {
+// CHECK: for (::mlir::OpOperand& tblGenOdsIter : llvm::MutableArrayRef<::mlir::OpOperand>(getTest2Mutable())) {
 // CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
 // CHECK-NEXT: }
 // CHECK: return i;
@@ -62,10 +62,10 @@ def Test_D : Test_Op<"d", [DeclareOpInterfaceMethods<TestInterface>]> {
 
 // CHECK-LABEL: int D::lol()
 // CHECK-NEXT: int i = 0;
-// CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest1Mutable()).getBeginOperandIndex(), getTest1Mutable().size())) {
+// CHECK: for (::mlir::OpOperand& tblGenOdsIter : llvm::MutableArrayRef<::mlir::OpOperand>(getTest1Mutable())) {
 // CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
 // CHECK-NEXT: }
-// CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest2Mutable()).getBeginOperandIndex(), getTest2Mutable().size())) {
+// CHECK: for (::mlir::OpOperand& tblGenOdsIter : llvm::MutableArrayRef<::mlir::OpOperand>(getTest2Mutable())) {
 // CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
 // CHECK-NEXT: }
 // CHECK: return i;
