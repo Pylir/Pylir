@@ -176,7 +176,7 @@ collectExtendableInterfaceMethods(const mlir::tblgen::Operator& op) {
 
         constexpr auto iterName = "tblGenOdsIter";
         constexpr auto loop = R"(
-for (::mlir::OpOperand& {2} : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>({0}Mutable()).getBeginOperandIndex(), {0}Mutable().size())) {{
+for (::mlir::OpOperand& {2} : llvm::MutableArrayRef<::mlir::OpOperand>({0}Mutable())) {{
     {1}
 }
 )";
