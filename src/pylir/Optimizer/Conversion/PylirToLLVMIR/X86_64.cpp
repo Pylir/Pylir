@@ -150,7 +150,7 @@ pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
     auto size = getSizeOf(returnType);
     if (size > 16) {
       adjustments.returnType = PointerToTemporary{};
-      argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(returnType));
+      argumentTypes.push_back(builder.getType<mlir::LLVM::LLVMPointerType>());
       retType = mlir::LLVM::LLVMVoidType::get(builder.getContext());
     } else {
       bool wasStruct = returnType.isa<mlir::LLVM::LLVMStructType>();
@@ -173,7 +173,7 @@ pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
   for (auto inputType : parameterTypes) {
     if (getSizeOf(inputType) > 16) {
       adjustments.arguments.emplace_back(OnStack{});
-      argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(inputType));
+      argumentTypes.push_back(builder.getType<mlir::LLVM::LLVMPointerType>());
       continue;
     }
     std::pair<mlir::Type, mlir::Type> types;
@@ -182,7 +182,7 @@ pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
         inputType, &takenIntegerRegisters, &takenFloatingPointRegisters);
     adjustments.arguments.push_back(dest);
     if (std::holds_alternative<OnStack>(dest)) {
-      argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(inputType));
+      argumentTypes.push_back(builder.getType<mlir::LLVM::LLVMPointerType>());
     } else if (std::holds_alternative<MultipleArgs>(dest)) {
       argumentTypes.push_back(types.first);
       if (types.second)
@@ -236,7 +236,8 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder,
     auto one = builder.create<mlir::LLVM::ConstantOp>(
         loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
     returnSlot = builder.create<mlir::LLVM::AllocaOp>(
-        loc, func.getFunctionType().getParams().front(), one, 1);
+        loc, func.getFunctionType().getParams().front(),
+        adjustments.originalRetType, one, 1);
     transformedArgs.push_back(returnSlot);
   }
 
@@ -248,7 +249,8 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder,
       auto one = builder.create<mlir::LLVM::ConstantOp>(
           loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
       auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(
-          loc, mlir::LLVM::LLVMPointerType::get((*iter).getType()), one, 1);
+          loc, builder.getType<mlir::LLVM::LLVMPointerType>(),
+          (*iter).getType(), one, 1);
       builder.create<mlir::LLVM::StoreOp>(loc, *iter, tempAlloca);
       return tempAlloca;
     };
@@ -262,9 +264,9 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder,
             auto paramType =
                 func.getFunctionType().getParamType(arguments.size());
             auto casted = builder.create<mlir::LLVM::BitcastOp>(
-                loc, mlir::LLVM::LLVMPointerType::get(paramType), address);
+                loc, builder.getType<mlir::LLVM::LLVMPointerType>(), address);
             transformedArgs.push_back(
-                builder.create<mlir::LLVM::LoadOp>(loc, casted));
+                builder.create<mlir::LLVM::LoadOp>(loc, paramType, casted));
             return;
           }
           auto firstType =
@@ -276,15 +278,15 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder,
           auto one = builder.create<mlir::LLVM::ConstantOp>(
               loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
           auto firstValue = builder.create<mlir::LLVM::GEPOp>(
-              loc, mlir::LLVM::LLVMPointerType::get(firstType), address,
-              mlir::ValueRange{zero, zero});
+              loc, builder.getType<mlir::LLVM::LLVMPointerType>(),
+              (*iter).getType(), address, mlir::ValueRange{zero, zero});
           auto secondValue = builder.create<mlir::LLVM::GEPOp>(
-              loc, mlir::LLVM::LLVMPointerType::get(secondType), address,
-              mlir::ValueRange{zero, one});
+              loc, builder.getType<mlir::LLVM::LLVMPointerType>(),
+              (*iter).getType(), address, mlir::ValueRange{zero, one});
           transformedArgs.push_back(
-              builder.create<mlir::LLVM::LoadOp>(loc, firstValue));
+              builder.create<mlir::LLVM::LoadOp>(loc, firstType, firstValue));
           transformedArgs.push_back(
-              builder.create<mlir::LLVM::LoadOp>(loc, secondValue));
+              builder.create<mlir::LLVM::LoadOp>(loc, secondType, secondValue));
         });
   }
 
@@ -298,19 +300,18 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder,
         return {};
       },
       [&](PointerToTemporary) -> mlir::Value {
-        return builder.create<mlir::LLVM::LoadOp>(loc, returnSlot);
+        return builder.create<mlir::LLVM::LoadOp>(
+            loc, adjustments.originalRetType, returnSlot);
       },
       [&](Flattened) -> mlir::Value {
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
         auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(
-            loc, mlir::LLVM::LLVMPointerType::get(adjustments.originalRetType),
-            one, 1);
-        auto casted = builder.create<mlir::LLVM::BitcastOp>(
-            loc, mlir::LLVM::LLVMPointerType::get(call.getResult().getType()),
-            tempAlloca);
-        builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(), casted);
-        return builder.create<mlir::LLVM::LoadOp>(loc, tempAlloca);
+            loc, builder.getType<mlir::LLVM::LLVMPointerType>(),
+            adjustments.originalRetType, one, 1);
+        builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(), tempAlloca);
+        return builder.create<mlir::LLVM::LoadOp>(
+            loc, adjustments.originalRetType, tempAlloca);
       });
 }
 

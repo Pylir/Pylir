@@ -40,6 +40,10 @@ target_link_libraries(pylir-opt
   MLIROptLib
   MLIRReconcileUnrealizedCasts
   MLIRTransforms
+
+  # TODO: Required due to a bug upstream where TableGen generated header files
+  # are being used without a dependency.
+  MLIRArmSMEToLLVM
 )
 target_include_directories(pylir-opt SYSTEM PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(pylir-opt TestPassIncGen)

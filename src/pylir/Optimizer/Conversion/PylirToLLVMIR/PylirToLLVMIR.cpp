@@ -792,8 +792,8 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<Py::GetSlotOp> {
     auto ptrType = adaptor.getObject().getType();
     auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), ptrType, ptrType,
                                                   adaptor.getObject(), index);
-    auto slot = rewriter.create<mlir::LLVM::LoadOp>(
-        op.getLoc(), gep.getSourceElementType(), gep);
+    auto slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(),
+                                                    gep.getElemType(), gep);
     slot.setTbaaAttr(codeGenState.getTBAAAccess(TbaaAccessType::Slots));
 
     rewriter.replaceOp(op, mlir::Value(slot));
