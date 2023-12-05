@@ -44,7 +44,6 @@
 
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/CodeGenNew/CodeGenNew.hpp>
-#include <pylir/LLVM/MarkSanitizersGCLeafs.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
@@ -309,16 +308,6 @@ mlir::ModuleOp buildModuleIfNecessary(std::unique_ptr<mlir::Block>&& block,
   return mlirModule;
 }
 
-void markDefinitionsForSanitizer(llvm::Module& module,
-                                 llvm::Attribute::AttrKind kind) {
-  for (llvm::Function& function : module.getFunctionList()) {
-    if (function.isDeclaration())
-      continue;
-
-    function.addFnAttr(kind);
-  }
-}
-
 } // namespace
 
 mlir::LogicalResult pylir::CompilerInvocation::compilation(
@@ -491,13 +480,6 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
     m_fileInputs.clear();
     m_documents.clear();
 
-    // Traditionally frontends would set this function attribute, but its more
-    // work to pipe this through to the MLIR conversion pass than just marking
-    // them all here.
-    if (toolchain.useAddressSanitizer())
-      markDefinitionsForSanitizer(*llvmModule,
-                                  llvm::Attribute::SanitizeAddress);
-
     [[fallthrough]];
   }
   case FileType::LLVM: {
@@ -551,27 +533,6 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
     options.MergeFunctions = true;
     llvm::PassBuilder passBuilder(m_targetMachine.get(), options, std::nullopt,
                                   &pic);
-
-    // The codegen output of both ASAN and TSAN are tightly coupled to the LLVM
-    // version used, and technically only configurations where both the runtime
-    // version and the compiler version match are supported. Since this is
-    // currently unlikely due to LLVM versions used it is currently an opt-in
-    // flag. This is mostly relevant for ASAN as TSAN is currently not supported
-    // for pointers with address spaces in upstream LLVM, nor does the compiler
-    // currently support multithreaded code.
-    if (args.hasArg(cli::OPT_Xsanitize_codegen) &&
-        toolchain.useAddressSanitizer()) {
-      passBuilder.registerOptimizerLastEPCallback(
-          [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel) {
-            if (toolchain.useAddressSanitizer()) {
-              llvm::AddressSanitizerOptions options;
-              mpm.addPass(llvm::AddressSanitizerPass(options));
-            }
-            mpm.addPass(
-                llvm::RequireAnalysisPass<llvm::GlobalsAA, llvm::Module>{});
-            mpm.addPass(MarkSanitizersGCLeafsPass{});
-          });
-    }
 
     passBuilder.registerOptimizerLastEPCallback(
         [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel) {
