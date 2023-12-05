@@ -17,9 +17,9 @@
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/Support/ErrorOr.h>
 #include <llvm/Support/FileSystem.h>
-#include <llvm/Support/Host.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/Threading.h>
+#include <llvm/TargetParser/Host.h>
 #include <llvm/TargetParser/Triple.h>
 
 static pylir::Distro::DistroType detectOsRelease() {

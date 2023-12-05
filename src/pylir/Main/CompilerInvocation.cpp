@@ -128,10 +128,10 @@ void llvmDataLayoutToMLIRDataLayout(mlir::ModuleOp moduleOp,
               ? mlir::DLTIDialect::kDataLayoutEndiannessBig
               : mlir::DLTIDialect::kDataLayoutEndiannessLittle)));
   // Index size.
-  auto i32 = mlir::IntegerType::get(moduleOp.getContext(), 32);
+  auto i64 = mlir::IntegerType::get(moduleOp.getContext(), 64);
   entries.emplace_back(mlir::DataLayoutEntryAttr::get(
       mlir::IndexType::get(moduleOp.getContext()),
-      mlir::IntegerAttr::get(i32, dataLayout.getIndexSizeInBits(0))));
+      mlir::IntegerAttr::get(i64, dataLayout.getIndexSizeInBits(0))));
 
   // Only integer types we actually care about (probably even more than what we
   // care about to be honest. We only really use whatever is index).
@@ -143,11 +143,9 @@ void llvmDataLayoutToMLIRDataLayout(mlir::ModuleOp moduleOp,
     auto abiAlign = dataLayout.getABITypeAlign(llvmIntegerType);
     auto prefAlign = dataLayout.getPrefTypeAlign(llvmIntegerType);
     entries.emplace_back(mlir::DataLayoutEntryAttr::get(
-        mlirIntegerType,
-        mlir::DenseIntElementsAttr::get(
-            mlir::VectorType::get({2}, i32),
-            {static_cast<std::int32_t>(abiAlign.value()) * 8,
-             static_cast<std::int32_t>(prefAlign.value()) * 8})));
+        mlirIntegerType, mlir::DenseIntElementsAttr::get<std::uint64_t>(
+                             mlir::VectorType::get({2}, i64),
+                             {abiAlign.value() * 8, prefAlign.value() * 8})));
   }
 
   // Only really care about Double at the moment.
@@ -155,28 +153,19 @@ void llvmDataLayoutToMLIRDataLayout(mlir::ModuleOp moduleOp,
       llvm::Type::getFloatingPointTy(context, llvm::APFloat::IEEEdouble());
   entries.emplace_back(mlir::DataLayoutEntryAttr::get(
       mlir::FloatType::getF64(moduleOp->getContext()),
-      mlir::DenseIntElementsAttr::get(
-          mlir::VectorType::get({2}, i32),
-          llvm::ArrayRef<std::int32_t>{
-              static_cast<std::int32_t>(
-                  dataLayout.getABITypeAlign(llvm64).value()) *
-                  8,
-              static_cast<std::int32_t>(
-                  dataLayout.getPrefTypeAlign(llvm64).value()) *
-                  8})));
+      mlir::DenseIntElementsAttr::get<std::uint64_t>(
+          mlir::VectorType::get({2}, i64),
+          {dataLayout.getABITypeAlign(llvm64).value() * 8,
+           dataLayout.getPrefTypeAlign(llvm64).value() * 8})));
 
   // Pointers
   entries.emplace_back(mlir::DataLayoutEntryAttr::get(
       mlir::LLVM::LLVMPointerType::get(moduleOp.getContext()),
-      mlir::DenseIntElementsAttr::get(
-          mlir::VectorType::get({3}, i32),
-          {static_cast<std::int32_t>(dataLayout.getPointerSizeInBits(0)),
-           static_cast<std::int32_t>(
-               dataLayout.getPointerABIAlignment(0).value()) *
-               8,
-           static_cast<std::int32_t>(
-               dataLayout.getPointerPrefAlignment(0).value()) *
-               8})));
+      mlir::DenseIntElementsAttr::get<std::uint64_t>(
+          mlir::VectorType::get({3}, i64),
+          {dataLayout.getPointerSizeInBits(0),
+           dataLayout.getPointerABIAlignment(0).value() * 8,
+           dataLayout.getPointerPrefAlignment(0).value() * 8})));
 
   moduleOp->setAttr(
       mlir::DLTIDialect::kDataLayoutAttrName,
