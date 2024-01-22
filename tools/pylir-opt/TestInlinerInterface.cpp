@@ -35,7 +35,7 @@ protected:
       auto ref = iter.getCallableForCallee()
                      .dyn_cast<mlir::SymbolRefAttr>()
                      .dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-      if (!ref || !ref.getValue().startswith("inline"))
+      if (!ref || !ref.getValue().starts_with("inline"))
         continue;
       auto func = mlir::dyn_cast_or_null<mlir::CallableOpInterface>(
           iter.resolveCallable(&collection));

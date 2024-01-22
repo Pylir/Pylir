@@ -1109,7 +1109,7 @@ struct FoldOnlyReadsValueOfCopy
   matchAndRewrite(pylir::Py::CopyObjectInterface op,
                   mlir::PatternRewriter& rewriter) const override {
     bool changed = false;
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
     for (mlir::OpResult iter : op->getResults()) {
       bool replaced = false;
       iter.replaceUsesWithIf(
@@ -1123,9 +1123,9 @@ struct FoldOnlyReadsValueOfCopy
     }
 
     if (changed)
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
     else
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
 
     return mlir::success(changed);
   }

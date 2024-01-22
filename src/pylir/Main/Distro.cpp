@@ -37,7 +37,7 @@ static pylir::Distro::DistroType detectOsRelease() {
 
   // Obviously this can be improved a lot.
   for (llvm::StringRef line : lines) {
-    if (version != pylir::Distro::UnknownDistro || !line.startswith("ID="))
+    if (version != pylir::Distro::UnknownDistro || !line.starts_with("ID="))
       continue;
 
     version = llvm::StringSwitch<pylir::Distro::DistroType>(line.substr(3))
@@ -66,7 +66,7 @@ static pylir::Distro::DistroType detectLsbRelease() {
 
   for (llvm::StringRef line : lines) {
     if (version != pylir::Distro::UnknownDistro ||
-        !line.startswith("DISTRIB_CODENAME="))
+        !line.starts_with("DISTRIB_CODENAME="))
       continue;
     version = llvm::StringSwitch<pylir::Distro::DistroType>(line.substr(17))
                   .Case("hardy", pylir::Distro::UbuntuHardy)
@@ -123,11 +123,11 @@ static pylir::Distro::DistroType detectDistro() {
 
   if (file) {
     llvm::StringRef data = file.get()->getBuffer();
-    if (data.startswith("Fedora release"))
+    if (data.starts_with("Fedora release"))
       return pylir::Distro::Fedora;
 
-    if (data.startswith("Red Hat Enterprise Linux") ||
-        data.startswith("CentOS") || data.startswith("Scientific Linux")) {
+    if (data.starts_with("Red Hat Enterprise Linux") ||
+        data.starts_with("CentOS") || data.starts_with("Scientific Linux")) {
       if (data.contains("release 7"))
         return pylir::Distro::RHEL7;
 
@@ -177,7 +177,7 @@ static pylir::Distro::DistroType detectDistro() {
     llvm::SmallVector<llvm::StringRef, 8> lines;
     data.split(lines, "\n");
     for (const llvm::StringRef& line : lines) {
-      if (!line.trim().startswith("VERSION"))
+      if (!line.trim().starts_with("VERSION"))
         continue;
 
       std::pair<llvm::StringRef, llvm::StringRef> splitLine = line.split('=');

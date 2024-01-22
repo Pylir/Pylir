@@ -183,7 +183,7 @@ void continueOntoHappyPath(pylir::Py::ExceptionHandlingInterface interface,
   } else {
     // interface is the single predecessor, and dropping its successor is really
     // an update on 'interface', not the block.
-    rewriter.updateRootInPlace(interface, [=] { happyPath->dropAllUses(); });
+    rewriter.modifyOpInPlace(interface, [=] { happyPath->dropAllUses(); });
     rewriter.mergeBlocks(happyPath, interface->getBlock(),
                          static_cast<mlir::OperandRange>(
                              interface.getNormalDestOperandsMutable()));

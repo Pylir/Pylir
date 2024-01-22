@@ -12,6 +12,8 @@ include "mlir/IR/PatternBase.td"
 
 defvar TupleRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.tuple">;
 defvar TypeRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.type">;
+defvar WrapOverflowFlag = ConstantAttr<Arith_IntegerOverflowAttr,
+  "::mlir::arith::IntegerOverflowFlags::none">;
 
 def : Pattern<(PylirPy_MakeTupleOp $args, $_), [
   (PylirPy_ConstantOp:$tupleType TupleRef),
@@ -25,7 +27,7 @@ def : Pattern<(PylirPy_TuplePrependOp $input, $tuple), [
   (PylirPy_ConstantOp:$tupleType TupleRef),
   (PylirPy_TupleLenOp:$prevSize $tuple),
   (Arith_AddIOp:$newSize $prevSize, (Arith_ConstantOp ConstantAttr<IndexAttr,
-    "1">)),
+    "1">), WrapOverflowFlag),
   (PylirMem_GCAllocObjectOp:$memory $tupleType, $newSize),
   (PylirMem_InitTuplePrependOp $memory, $input, $tuple)
 ]>;
@@ -33,7 +35,7 @@ def : Pattern<(PylirPy_TuplePrependOp $input, $tuple), [
 def : Pattern<(PylirPy_TupleDropFrontOp $count, $tuple), [
   (PylirPy_ConstantOp:$tupleType TupleRef),
   (PylirPy_TupleLenOp:$prevSize $tuple),
-  (Arith_SubIOp:$newSize $prevSize, $count),
+  (Arith_SubIOp:$newSize $prevSize, $count, WrapOverflowFlag),
   (PylirMem_GCAllocObjectOp:$memory $tupleType, $newSize),
   (PylirMem_InitTupleDropFrontOp $memory, $count, $tuple)
 ]>;

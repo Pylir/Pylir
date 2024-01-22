@@ -14,7 +14,7 @@ namespace {
 void replaceAllUsesWith(mlir::PatternRewriter& rewriter, mlir::Block* toReplace,
                         mlir::Block* replacement) {
   for (auto& iter : llvm::make_early_inc_range(toReplace->getUses()))
-    rewriter.updateRootInPlace(iter.getOwner(), [&] { iter.set(replacement); });
+    rewriter.modifyOpInPlace(iter.getOwner(), [&] { iter.set(replacement); });
 }
 
 // bb0:
@@ -63,7 +63,7 @@ struct PassthroughArgRemove
           successorOperands.getProducedOperandCount() != 0)
         continue;
       changed = true;
-      rewriter.updateRootInPlace(op, [&] {
+      rewriter.modifyOpInPlace(op, [&] {
         op->setSuccessor(brOp->getSuccessor(0), iter.index());
         op.getSuccessorOperands(iter.index())
             .append(successorOperands.getForwardedOperands());
@@ -158,7 +158,7 @@ struct TrivialBlockArgRemove
         auto operands =
             terminator.getSuccessorOperands(pred.getSuccessorIndex());
 
-        rewriter.updateRootInPlace(terminator, [&] {
+        rewriter.modifyOpInPlace(terminator, [&] {
           for (mlir::BlockArgument iter : llvm::reverse(skipList))
             operands.erase(iter.getArgNumber());
         });
