@@ -133,7 +133,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine,
 
   auto argValues = args.getAllArgValues(cli::OPT_l);
   if (std::none_of(argValues.begin(), argValues.end(), [](llvm::StringRef ref) {
-        return ref.startswith("msvcr") || ref.startswith("ucrt");
+        return ref.starts_with("msvcr") || ref.starts_with("ucrt");
       }))
     linkerInvocation.addLibrary("msvcrt");
 

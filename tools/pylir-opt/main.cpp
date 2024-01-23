@@ -2,9 +2,11 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <mlir/Conversion/Passes.h>
+#include <mlir/Conversion/ArithToLLVM/ArithToLLVM.h>
+#include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/DLTI/DLTI.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 #include <mlir/Transforms/Passes.h>
@@ -24,8 +26,8 @@
 
 int main(int argc, char** argv) {
   mlir::registerTransformsPasses();
-  mlir::registerReconcileUnrealizedCasts();
-  mlir::registerArithToLLVMConversionPass();
+  mlir::registerPass([] { return mlir::createReconcileUnrealizedCastsPass(); });
+  mlir::registerPass([] { return mlir::createArithToLLVMConversionPass(); });
 
   mlir::DialectRegistry registry;
   registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect,

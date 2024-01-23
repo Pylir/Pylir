@@ -54,12 +54,17 @@ void pylir::registerOptimizationPipelines() {
         nested->addPass(pylir::createConditionalsImplicationsPass());
         nested->addPass(mlir::createCanonicalizerPass());
         nested->addPass(createLoadForwardingPass());
-        nested->addPass(mlir::createSCCPPass());
+
+        // TODO: Upstream MLIR has a bug making SCCP that is not module
+        //  level not thread-safe. This is caught by TSAN.
+        inlinerNested.addPass(mlir::createSCCPPass());
+        nested = &inlinerNested.nestAny();
         nested->addPass(Py::createExpandPyDialectPass());
         nested->addPass(mlir::createCanonicalizerPass());
         nested->addPass(mlir::createCSEPass());
         nested->addPass(createLoadForwardingPass());
-        nested->addPass(mlir::createSCCPPass());
+        inlinerNested.addPass(mlir::createSCCPPass());
+        nested = &inlinerNested.nestAny();
         nested->addPass(mlir::createCanonicalizerPass());
 
         Py::InlinerPassOptions options{};

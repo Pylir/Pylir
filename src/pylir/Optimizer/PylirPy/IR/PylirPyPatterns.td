@@ -9,6 +9,9 @@ include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
+defvar WrapOverflowFlag = ConstantAttr<Arith_IntegerOverflowAttr,
+  "::mlir::arith::IntegerOverflowFlags::none">;
+
 def prependTupleConst
   : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
@@ -51,7 +54,7 @@ class PlusAttrs<Attr attrType, Attr resultAttr = attrType>
 
 def : Pat<(PylirPy_TupleDropFrontOp $count1,
   (PylirPy_TupleDropFrontOp $count2, $tuple)),
-      (PylirPy_TupleDropFrontOp (Arith_AddIOp $count1, $count2), $tuple)>;
+      (PylirPy_TupleDropFrontOp (Arith_AddIOp $count1, $count2, WrapOverflowFlag), $tuple)>;
 
 defvar TupleRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.tuple">;
 
