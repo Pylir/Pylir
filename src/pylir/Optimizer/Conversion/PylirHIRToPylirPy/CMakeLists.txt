@@ -14,6 +14,7 @@ target_link_libraries(PylirHIRToPylirPy
   PylirPyDialect
 
   MLIRArithDialect
+  MLIRControlFlowDialect
   MLIRPass
   MLIRTransforms
 )

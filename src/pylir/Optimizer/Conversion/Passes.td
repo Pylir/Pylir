@@ -38,7 +38,8 @@ def ConvertPylirHIRToPylirPyPass : Pass<"convert-pylirHIR-to-pylirPy",
 
   let dependentDialects = [
     "::pylir::Py::PylirPyDialect",
-    "::mlir::arith::ArithDialect"
+    "::mlir::arith::ArithDialect",
+    "::mlir::cf::ControlFlowDialect",
   ];
 }
 
