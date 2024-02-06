@@ -97,7 +97,7 @@ jobs:
         run: |
           $sanitizer_arg = ''
           if ('${{matrix.sanitizers}}') {
-            $sanitizer_arg = '-DPYLIR_SANITIZERS="${{matrix.sanitizers}}"', '-DCMAKE_CXX_FLAGS="-g1"'
+            $sanitizer_arg = '-DPYLIR_SANITIZERS=${{matrix.sanitizers}}', '-DCMAKE_CXX_FLAGS="-g1"'
           }
           $runtime_arg = ''
           if ('${{matrix.runtime_lib}}') {
