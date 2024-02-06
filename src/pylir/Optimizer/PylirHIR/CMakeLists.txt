@@ -3,3 +3,4 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_subdirectory(IR)
+add_subdirectory(Transforms)

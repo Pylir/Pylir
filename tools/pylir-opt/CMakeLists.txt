@@ -24,6 +24,7 @@ target_link_libraries(pylir-opt
   PylirExternalModels
   PylirHIRDialect
   PylirHIRToPylirPy
+  PylirHIRTransforms
   PylirMemDialect
   PylirMemTransforms
   PylirLinker

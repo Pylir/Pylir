@@ -15,6 +15,7 @@
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
 #include <pylir/Optimizer/Optimizer.hpp>
 #include <pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.hpp>
+#include <pylir/Optimizer/PylirHIR/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
@@ -40,6 +41,7 @@ int main(int argc, char** argv) {
 
   pylir::registerConversionPasses();
   pylir::registerTransformPasses();
+  pylir::HIR::registerTransformPasses();
   pylir::Py::registerTransformPasses();
   pylir::Mem::registerTransformsPasses();
   pylir::test::registerTestPasses();

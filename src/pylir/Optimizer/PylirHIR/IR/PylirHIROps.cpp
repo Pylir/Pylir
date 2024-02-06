@@ -15,22 +15,26 @@
 pylir::HIR::FunctionParameter::FunctionParameter(
     mlir::Value parameter, mlir::StringAttr optionalName,
     mlir::DictionaryAttr attrs, mlir::Value optionalDefaultValue,
-    bool isPosRest, bool isKeywordRest, bool isKeywordOnly)
+    bool isPosRest, bool isKeywordRest, bool isKeywordOnly, bool hasDefault)
     : m_parameter(parameter), m_name(optionalName), m_attrs(attrs),
       m_defaultValue(optionalDefaultValue), m_isPosRest(isPosRest),
-      m_isKeywordRest(isKeywordRest), m_isKeywordOnly(isKeywordOnly) {}
+      m_isKeywordRest(isKeywordRest), m_isKeywordOnly(isKeywordOnly),
+      m_hasDefault(hasDefault) {}
 
 pylir::HIR::FunctionParameter
 pylir::HIR::FunctionParameterRange::dereference(FunctionInterface function,
                                                 std::ptrdiff_t index) {
   mlir::ArrayAttr attr = function.getArgAttrsAttr();
+  std::optional<std::size_t> position = function.getDefaultValuePosition(index);
+  mlir::ValueRange range = function.getDefaultValues();
   return FunctionParameter(
       function->getRegion(0).getArgument(index),
       function.getParameterName(index),
       attr ? mlir::cast<mlir::DictionaryAttr>(attr[index])
            : mlir::DictionaryAttr::get(function->getContext()),
-      function.getDefaultValue(index), function.getPosRest() == index,
-      function.getKeywordRest() == index, function.isKeywordOnly(index));
+      position && !range.empty() ? range[*position] : nullptr,
+      function.getPosRest() == index, function.getKeywordRest() == index,
+      function.isKeywordOnly(index), position.has_value());
 }
 
 pylir::HIR::FunctionParameterRange::FunctionParameterRange(
@@ -63,8 +67,8 @@ void funcOpsCommonBuild(
     mlir::DenseI32ArrayAttr& parameterNameMapping,
     mlir::DenseI32ArrayAttr& keywordOnlyMapping, mlir::IntegerAttr& posRest,
     mlir::IntegerAttr& keywordRest,
-    llvm::SmallVectorImpl<mlir::Value>* defaultValues = nullptr,
-    mlir::DenseI32ArrayAttr* defaultValueMapping = nullptr) {
+    mlir::DenseI32ArrayAttr& defaultValueMapping,
+    llvm::SmallVectorImpl<mlir::Value>* defaultValues = nullptr) {
   llvm::SmallVector<mlir::Attribute> parameterNamesStorage;
   llvm::SmallVector<std::int32_t> parameterNameMappingStorage;
   llvm::SmallVector<std::int32_t> keywordOnlyMappingStorage;
@@ -75,8 +79,9 @@ void funcOpsCommonBuild(
       parameterNamesStorage.push_back(spec.getName());
       parameterNameMappingStorage.push_back(index);
     }
-    if (defaultValues && spec.getDefaultValue()) {
-      defaultValues->push_back(spec.getDefaultValue());
+    if (spec.getDefaultValue()) {
+      if (defaultValues)
+        defaultValues->push_back(spec.getDefaultValue());
       defaultValueMappingStorage.push_back(index);
     }
     if (spec.isPosRest())
@@ -93,9 +98,8 @@ void funcOpsCommonBuild(
   parameterNameMapping =
       builder.getDenseI32ArrayAttr(parameterNameMappingStorage);
   keywordOnlyMapping = builder.getDenseI32ArrayAttr(keywordOnlyMappingStorage);
-  if (defaultValueMapping)
-    *defaultValueMapping =
-        builder.getDenseI32ArrayAttr(defaultValueMappingStorage);
+  defaultValueMapping =
+      builder.getDenseI32ArrayAttr(defaultValueMappingStorage);
 }
 
 void createEntryBlock(mlir::Location loc, mlir::Region& region,
@@ -134,6 +138,8 @@ void printFunction(mlir::OpAsmPrinter& printer,
         }
         if (functionParameter.getDefaultValue())
           printer << " = " << functionParameter.getDefaultValue();
+        else if (functionParameter.hasDefault())
+          printer << " has_default";
 
         if (!functionParameter.getAttrs().empty())
           printer << ' ' << functionParameter.getAttrs();
@@ -204,15 +210,19 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser,
           argMappings.push_back(index);
         }
 
-        if (std::is_same_v<T, FuncOp> &&
-            mlir::succeeded(parser.parseOptionalEqual())) {
-          mlir::OpAsmParser::UnresolvedOperand operand;
-          if (parser.parseOperand(operand) ||
-              parser.resolveOperand(operand, arguments.back().type,
-                                    defaultValues))
-            return mlir::failure();
+        if constexpr (std::is_same_v<T, FuncOp>) {
+          if (mlir::succeeded(parser.parseOptionalEqual())) {
+            mlir::OpAsmParser::UnresolvedOperand operand;
+            if (parser.parseOperand(operand) ||
+                parser.resolveOperand(operand, arguments.back().type,
+                                      defaultValues))
+              return mlir::failure();
 
-          defaultValueMapping.push_back(index);
+            defaultValueMapping.push_back(index);
+          }
+        } else {
+          if (mlir::succeeded(parser.parseOptionalKeyword("has_default")))
+            defaultValueMapping.push_back(index);
         }
 
         mlir::NamedAttrList argDict;
@@ -279,12 +289,11 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser,
       T::getKeywordOnlyMappingAttrName(result.name),
       mlir::DenseI32ArrayAttr::get(result.getContext(), keywordOnlyMapping));
 
-  if constexpr (std::is_same_v<T, FuncOp>) {
-    result.addAttribute(
-        T::getDefaultValuesMappingAttrName(result.name),
-        mlir::DenseI32ArrayAttr::get(result.getContext(), defaultValueMapping));
+  result.addAttribute(
+      T::getDefaultValuesMappingAttrName(result.name),
+      mlir::DenseI32ArrayAttr::get(result.getContext(), defaultValueMapping));
+  if constexpr (std::is_same_v<T, FuncOp>)
     result.addOperands(defaultValues);
-  }
 
   if (posRest) {
     result.addAttribute(
@@ -318,14 +327,16 @@ void pylir::HIR::GlobalFuncOp::build(
   mlir::ArrayAttr parameterNames;
   mlir::DenseI32ArrayAttr parameterNameMapping;
   mlir::DenseI32ArrayAttr keywordOnlyMapping;
+  mlir::DenseI32ArrayAttr defaultVariableMapping;
   mlir::IntegerAttr posRest;
   mlir::IntegerAttr keywordRest;
   funcOpsCommonBuild(odsBuilder, parameters, parameterNames,
                      parameterNameMapping, keywordOnlyMapping, posRest,
-                     keywordRest);
+                     keywordRest, defaultVariableMapping);
 
   auto dynamicType = odsBuilder.getType<Py::DynamicType>();
   build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName),
+        defaultVariableMapping,
         odsBuilder.getFunctionType(
             llvm::SmallVector<mlir::Type>(parameters.size(), dynamicType),
             dynamicType),
@@ -378,7 +389,7 @@ void pylir::HIR::FuncOp::build(
   mlir::DenseI32ArrayAttr defaultValueMapping;
   funcOpsCommonBuild(odsBuilder, parameters, parameterNames,
                      parameterNameMapping, keywordOnlyMapping, posRest,
-                     keywordRest, &defaultValues, &defaultValueMapping);
+                     keywordRest, defaultValueMapping, &defaultValues);
 
   auto dynamicType = odsBuilder.getType<Py::DynamicType>();
   build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName),

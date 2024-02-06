@@ -59,12 +59,34 @@ def PylirHIR_FunctionInterface : OpInterface<"FunctionInterface",
   ];
 
   let extraSharedClassDeclaration = [{
+    /// Returns the default value of the parameter with the given index or
+    /// nullptr if the parameter doesn't have a default or the default is
+    /// unknown.
     mlir::Value getDefaultValue(unsigned index) {
+      std::optional<std::size_t> position = getDefaultValuePosition(index);
+      if (!position)
+        return nullptr;
+      mlir::ValueRange defaultValues = $_op.getDefaultValues();
+      if (defaultValues.empty())
+        return nullptr;
+      return defaultValues[*position];
+    }
+
+    /// Returns an index into 'getDefaultValuesMapping' corresponding to the
+    /// default value of the parameter with the given index.
+    /// If the parameter does not have a default value an empty optional is
+    /// returned.
+    std::optional<std::size_t> getDefaultValuePosition(unsigned index) {
       auto mapping = $_op.getDefaultValuesMapping();
       auto iter = std::lower_bound(mapping.begin(), mapping.end(), index);
       if (iter == mapping.end() || *iter != index)
-        return nullptr;
-      return $_op.getDefaultValues()[iter - mapping.begin()];
+        return std::nullopt;
+      return iter - mapping.begin();
+    }
+
+    /// Returns true if the parameter with the given index has a default value.
+    bool hasDefault(unsigned index) {
+      return getDefaultValuePosition(index).has_value();
     }
 
     mlir::StringAttr getParameterName(unsigned index) {
