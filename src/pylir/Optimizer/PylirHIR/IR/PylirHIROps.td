@@ -51,6 +51,7 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
     PylirHIR_FunctionInterface]> {
 
   let arguments = (ins StrAttr:$sym_name,
+             DenseI32ArrayAttr:$default_values_mapping,
              TypeAttrOf<PylirHIR_FunctionType>:$function_type,
              OptionalAttr<DictArrayAttr>:$arg_attrs,
              OptionalAttr<DictArrayAttr>:$res_attrs,
@@ -76,7 +77,7 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 
     Syntax:
     ```
-    arg ::= (`*` | `**`) value-def [[`only`] string-attr] [ dictionary-attr ]
+    arg ::= (`*` | `**`) value-def [[`only`] string-attr] [`has_default`] [ dictionary-attr ]
     global_func ::= `pyHIR.global_func` sym_name `(` [ <arg> { `,` <arg> } ] `)` [ `->` dictionary-attr ] attr-with-keyword
             `{` body `}`
     ```
@@ -111,10 +112,6 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
     //===------------------------------------------------------------------===//
 
     mlir::ValueRange getDefaultValues() {
-      return {};
-    }
-
-    llvm::ArrayRef<std::int32_t> getDefaultValuesMapping() {
       return {};
     }
 

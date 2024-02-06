@@ -34,6 +34,7 @@ class FunctionParameter {
   bool m_isPosRest;
   bool m_isKeywordRest;
   bool m_isKeywordOnly;
+  bool m_hasDefault;
 
 public:
   /// Constructor creating a function parameter. 'parameter' is the block
@@ -48,7 +49,7 @@ public:
   FunctionParameter(mlir::Value parameter, mlir::StringAttr optionalName,
                     mlir::DictionaryAttr attrs,
                     mlir::Value optionalDefaultValue, bool isPosRest,
-                    bool isKeywordRest, bool isKeywordOnly);
+                    bool isKeywordRest, bool isKeywordOnly, bool hasDefault);
 
   /// Returns the parameter value, used within the function body.
   mlir::Value getParameter() const {
@@ -60,15 +61,27 @@ public:
     return m_attrs;
   }
 
-  /// Returns the default value or null if this parameter has no default value.
+  /// Returns the default value or null if this parameter has either no default
+  /// value or the default value is unknown. The latter is the case for any
+  /// 'globalFunc'.
   mlir::Value getDefaultValue() const {
     return m_defaultValue;
+  }
+
+  /// Returns true if the parameter has a default value.
+  bool hasDefault() const {
+    return m_hasDefault;
   }
 
   /// Returns the name of this parameter used for parameters callable as a
   /// keyword, or null if this parameter does not have a name.
   mlir::StringAttr getName() const {
     return m_name;
+  }
+
+  /// Returns true if the parameter is a positional-only parameter.
+  bool isPositionalOnly() const {
+    return !getName();
   }
 
   /// Returns true if this parameter receives any leftover positional

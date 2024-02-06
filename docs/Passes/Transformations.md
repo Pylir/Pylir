@@ -20,3 +20,8 @@ are found in the `Transforms` directory of the dialects' directory.
 
 ```{include} ../TableGen/Passes/PylirMemTransforms.md
 ```
+
+## 'pyHIR' Transformation Passes
+
+```{include} ../TableGen/Passes/PylirHIRTransform.md
+```
