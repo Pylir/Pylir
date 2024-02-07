@@ -25,6 +25,26 @@ class CodeGenNew {
   mlir::ImplicitLocOpBuilder m_builder;
   mlir::ModuleOp m_module;
   Diag::DiagnosticsDocManager* m_docManager;
+  std::string m_qualifiers;
+
+  /// Adds 'args' as currently active qualifiers. The final qualifier consists
+  /// of each component separated by dots.
+  /// Returns an RAII object resetting the qualifier to its previous value on
+  /// destruction.
+  template <class... Args>
+  [[nodiscard]] auto addQualifiers(Args&&... args) {
+    std::string previous = m_qualifiers;
+    (m_qualifiers.append(".").append(std::forward<Args>(args)), ...);
+    return llvm::make_scope_exit(
+        [previous = std::move(previous), this]() mutable {
+          m_qualifiers = std::move(previous);
+        });
+  }
+
+  /// Qualifies 'name' by prepending the currently active qualifier to it.
+  std::string qualify(llvm::StringRef name) const {
+    return m_qualifiers + "." + name.str();
+  }
 
   template <class AST>
   mlir::Location getLoc(const AST& astObject) {
@@ -114,6 +134,7 @@ public:
     // TODO: Set qualifier to '__main__' in top level CodeGenOptions instead.
     auto init = m_builder.create<HIR::InitOp>(
         m_options.qualifier.empty() ? "__main__" : m_options.qualifier);
+    m_qualifiers = init.getName();
 
     auto* entryBlock = new mlir::Block;
     init.getBody().push_back(entryBlock);
@@ -157,9 +178,12 @@ private:
       }
     }
 
-    auto function =
-        m_builder.create<HIR::FuncOp>(funcDef.funcName.getValue(), specs);
+    auto function = m_builder.create<HIR::FuncOp>(
+        qualify(funcDef.funcName.getValue()), specs);
     {
+      auto resetQualifier =
+          addQualifiers(funcDef.funcName.getValue(), "<locals>");
+
       mlir::OpBuilder::InsertionGuard guard{m_builder};
       m_builder.setInsertionPointToEnd(&function.getBody().front());
       visit(funcDef.suite);

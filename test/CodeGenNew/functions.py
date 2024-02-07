@@ -8,29 +8,32 @@ def test1():
     pass
 
 
-# CHECK: func "test1"() {
+# CHECK: func "__main__.test1"() {
 # CHECK-NEXT: %[[REF:.*]] = py.constant(#[[$NONE]])
 # CHECK-NEXT: return %[[REF]]
 
 def test2(arg, arg2, /):
+    def nested():
+        pass
     pass
 
 
-# CHECK: func "test2"(%{{.*}}, %{{.*}})
+# CHECK: func "__main__.test2"(%{{.*}}, %{{.*}})
+# CHECK: func "__main__.test2.<locals>.nested"()
 
 def test3(arg, arg2, *restArg):
     pass
 
 
-# CHECK: func "test3"(%{{.*}} "arg", %{{.*}} "arg2", *%{{.*}})
+# CHECK: func "__main__.test3"(%{{.*}} "arg", %{{.*}} "arg2", *%{{.*}})
 
 def test4(*, arg, arg2):
     pass
 
 
-# CHECK: func "test4"(%{{.*}} only "arg", %{{.*}} only "arg2")
+# CHECK: func "__main__.test4"(%{{.*}} only "arg", %{{.*}} only "arg2")
 
 def test5(arg, arg2, **m):
     pass
 
-# CHECK: func "test5"(%{{.*}} "arg", %{{.*}} "arg2", **%{{.*}})
+# CHECK: func "__main__.test5"(%{{.*}} "arg", %{{.*}} "arg2", **%{{.*}})
