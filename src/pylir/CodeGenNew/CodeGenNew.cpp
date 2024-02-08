@@ -4,6 +4,7 @@
 
 #include "CodeGenNew.hpp"
 
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/ImplicitLocOpBuilder.h>
@@ -28,6 +29,7 @@ class CodeGenNew {
   Diag::DiagnosticsDocManager* m_docManager;
   std::string m_qualifiers;
   Value m_globalDictionary;
+  llvm::DenseMap<llvm::StringRef, Py::GlobalValueAttr> m_builtinNamespace;
 
   /// Struct representing one instance of a scope in Python.
   /// The map contains a mapping for all local and free variables used within
@@ -127,12 +129,20 @@ class CodeGenNew {
       }
     }
 
-    // TODO: Read from builtins if not contained within the global.
     Value string =
         m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
     Value hash = m_builder.create<Py::StrHashOp>(string);
-    return m_builder.create<Py::DictTryGetItemOp>(m_globalDictionary, string,
-                                                  hash);
+    Value readValue = m_builder.create<Py::DictTryGetItemOp>(m_globalDictionary,
+                                                             string, hash);
+
+    auto iter = m_builtinNamespace.find(name);
+    if (iter != m_builtinNamespace.end()) {
+      Value alternative = m_builder.create<Py::ConstantOp>(iter->second);
+      Value isUnbound = m_builder.create<Py::IsUnboundValueOp>(readValue);
+      readValue =
+          m_builder.create<arith::SelectOp>(isUnbound, alternative, readValue);
+    }
+    return readValue;
   }
 
   /// Returns true if the construct being generated is statically unreachable.
@@ -149,7 +159,18 @@ public:
         m_builder(mlir::UnknownLoc::get(context), context),
         m_module(m_builder.create<mlir::ModuleOp>()), m_docManager(&manager) {
     context->loadDialect<Py::PylirPyDialect, HIR::PylirHIRDialect,
-                         mlir::cf::ControlFlowDialect>();
+                         cf::ControlFlowDialect, arith::ArithDialect>();
+
+    for (const auto& iter : Builtins::allBuiltins) {
+      if (!iter.isPublic)
+        continue;
+
+      llvm::StringRef name = iter.name;
+      if (!name.consume_front("builtins."))
+        continue;
+      m_builtinNamespace[name] =
+          m_builder.getAttr<Py::GlobalValueAttr>(iter.name);
+    }
   }
 
   template <class T, class S, class... Args,

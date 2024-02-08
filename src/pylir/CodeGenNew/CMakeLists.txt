@@ -4,6 +4,17 @@
 
 include(PylirTablegen)
 
-add_library(CodeGenNew CodeGenNew.cpp)
-target_link_libraries(CodeGenNew PUBLIC PylirHIRDialect Parser
-  PRIVATE PylirTransformsUtils MLIRArithDialect MLIRControlFlowDialect)
+add_library(CodeGenNew
+  CodeGenNew.cpp
+)
+target_link_libraries(CodeGenNew
+  PUBLIC
+  Parser
+  PylirHIRDialect
+
+  PRIVATE
+  PylirTransformsUtils
+
+  MLIRArithDialect
+  MLIRControlFlowDialect
+)
