@@ -453,13 +453,25 @@ private:
   Value visitImpl(const Syntax::Atom& atom) {
     switch (atom.token.getTokenType()) {
     case TokenType::IntegerLiteral:
+      return m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::IntAttr>(get<BigInt>(atom.token.getValue())));
     case TokenType::FloatingPointLiteral:
+      return m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::FloatAttr>(
+          llvm::APFloat(get<double>(atom.token.getValue()))));
     case TokenType::StringLiteral:
+      return m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(
+          get<std::string>(atom.token.getValue())));
+    case TokenType::TrueKeyword:
+      return m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::BoolAttr>(true));
+    case TokenType::FalseKeyword:
+      return m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::BoolAttr>(false));
+    case TokenType::NoneKeyword:
+      return m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name));
     case TokenType::ByteLiteral:
     case TokenType::ComplexLiteral:
-    case TokenType::TrueKeyword:
-    case TokenType::FalseKeyword:
-    case TokenType::NoneKeyword:
       // TODO:
       PYLIR_UNREACHABLE;
     case TokenType::Identifier:
