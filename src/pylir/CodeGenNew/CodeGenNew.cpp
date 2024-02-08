@@ -123,7 +123,7 @@ class CodeGenNew {
                   m_builder.getLoc(), m_builder.getType<Py::DynamicType>(), map,
                   m_builder.getInsertionBlock());
             },
-            [](...) -> Value { llvm_unreachable("not yet implemented"); });
+            [](auto) -> Value { llvm_unreachable("not yet implemented"); });
       }
     }
 
