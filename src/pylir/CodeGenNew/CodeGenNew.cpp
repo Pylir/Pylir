@@ -386,9 +386,18 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::ReturnStmt& returnStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::ReturnStmt& returnStmt) {
+    Value value = visit(returnStmt.maybeExpression);
+    // TODO: Execute all finally blocks.
+    if (isUnreachable())
+      return;
+
+    if (!value)
+      value = m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name));
+
+    m_builder.create<HIR::ReturnOp>(value);
+    m_builder.clearInsertionPoint();
   }
 
   void visitImpl(const Syntax::SingleTokenStmt& singleTokenStmt) {
