@@ -98,7 +98,7 @@ class CodeGenNew {
             [&](SSABuilder::DefinitionsMap& map) {
               map[m_builder.getInsertionBlock()] = value;
             },
-            [](...) { llvm_unreachable("not yet implemented"); });
+            [](auto) { llvm_unreachable("not yet implemented"); });
         return;
       }
     }
