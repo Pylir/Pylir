@@ -19,13 +19,42 @@
 
 namespace {
 using namespace pylir;
+using namespace mlir;
 
 class CodeGenNew {
   CodeGenOptions m_options;
-  mlir::ImplicitLocOpBuilder m_builder;
-  mlir::ModuleOp m_module;
+  ImplicitLocOpBuilder m_builder;
+  ModuleOp m_module;
   Diag::DiagnosticsDocManager* m_docManager;
   std::string m_qualifiers;
+  Value m_globalDictionary;
+
+  /// Struct representing one instance of a scope in Python.
+  /// The map contains a mapping for all local and free variables used within
+  /// a function. The 'ssaBuilder' is used for reading and writing to any local
+  /// variable.
+  struct Scope {
+    using Identifier = std::variant<SSABuilder::DefinitionsMap>;
+    llvm::DenseMap<llvm::StringRef, Identifier> identifiers;
+    SSABuilder ssaBuilder;
+
+    /// Constructs a scope and uses 'builder' to create any unbound variables.
+    Scope(ImplicitLocOpBuilder& builder)
+        : ssaBuilder([&](Block* block, Type, Location loc) {
+            Location oldLoc = builder.getLoc();
+            auto resetLoc =
+                llvm::make_scope_exit([&] { builder.setLoc(oldLoc); });
+            builder.setLoc(loc);
+
+            OpBuilder::InsertionGuard guard{builder};
+            builder.setInsertionPointToStart(block);
+            return builder.create<Py::ConstantOp>(
+                builder.getAttr<Py::UnboundAttr>());
+          }) {}
+  };
+
+  /// Currently active function scope or an empty optional if at module scope.
+  std::optional<Scope> m_functionScope;
 
   /// Adds 'args' as currently active qualifiers. The final qualifier consists
   /// of each component separated by dots.
@@ -47,7 +76,7 @@ class CodeGenNew {
   }
 
   template <class AST>
-  mlir::Location getLoc(const AST& astObject) {
+  Location getLoc(const AST& astObject) {
     auto [line, col] =
         m_docManager->getDocument().getLineCol(Diag::pointLoc(astObject));
     return mlir::OpaqueLoc::get(
@@ -57,8 +86,64 @@ class CodeGenNew {
             line, col));
   }
 
+  /// Writes 'value' to the identifier given by 'name'. This abstracts the
+  /// different procedures required to write to local, nonlocal and global
+  /// variables.
+  void writeToIdentifier(Value value, llvm::StringRef name) {
+    if (m_functionScope) {
+      auto iter = m_functionScope->identifiers.find(name);
+      if (iter != m_functionScope->identifiers.end()) {
+        match(
+            iter->second,
+            [&](SSABuilder::DefinitionsMap& map) {
+              map[m_builder.getInsertionBlock()] = value;
+            },
+            [](...) { llvm_unreachable("not yet implemented"); });
+        return;
+      }
+    }
+
+    Value string =
+        m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+    Value hash = m_builder.create<Py::StrHashOp>(string);
+    m_builder.create<Py::DictSetItemOp>(m_globalDictionary, string, hash,
+                                        value);
+  }
+
+  /// Reads the identifier given by 'name'. Currently returns a '#py.unbound' if
+  /// the identifier is unbound, but is subject to change.
+  Value readFromIdentifier(llvm::StringRef name) {
+    if (m_functionScope) {
+      auto iter = m_functionScope->identifiers.find(name);
+      if (iter != m_functionScope->identifiers.end()) {
+        return match(
+            iter->second,
+            [&](SSABuilder::DefinitionsMap& map) -> Value {
+              return m_functionScope->ssaBuilder.readVariable(
+                  m_builder.getLoc(), m_builder.getType<Py::DynamicType>(), map,
+                  m_builder.getInsertionBlock());
+            },
+            [](...) -> Value { llvm_unreachable("not yet implemented"); });
+      }
+    }
+
+    // TODO: Read from builtins if not contained within the global.
+    Value string =
+        m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+    Value hash = m_builder.create<Py::StrHashOp>(string);
+    return m_builder.create<Py::DictTryGetItemOp>(m_globalDictionary, string,
+                                                  hash);
+  }
+
+  /// Returns true if the construct being generated is statically unreachable.
+  /// This is most commonly the case if previously generated code throws an
+  /// exception.
+  bool isUnreachable() const {
+    return !m_builder.getInsertionBlock();
+  }
+
 public:
-  CodeGenNew(mlir::MLIRContext* context, Diag::DiagnosticsDocManager& manager,
+  CodeGenNew(MLIRContext* context, Diag::DiagnosticsDocManager& manager,
              CodeGenOptions&& options)
       : m_options(std::move(options)),
         m_builder(mlir::UnknownLoc::get(context), context),
@@ -83,43 +168,61 @@ public:
                                     std::forward<Args>(args)...);
   }
 
-  template <class T,
+  /// Overload of visit for any subclass of 'AbstractIntrusiveVariant'.
+  /// Forwards to 'visit' calls for each alternative with 'args' as additional
+  /// call arguments.
+  template <class T, class... Args,
             std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
-  decltype(auto) visit(const T& variant) {
-    return variant.match(
-        [=](const auto& sub) -> decltype(auto) { return visit(sub); });
+  decltype(auto) visit(const T& variant, Args&&... args) {
+    return variant.match([&](const auto& sub) -> decltype(auto) {
+      return visit(sub, std::forward<Args>(args)...);
+    });
   }
 
-  template <class... Args>
-  decltype(auto) visit(const std::variant<Args...>& variant) {
-    return pylir::match(
-        variant, [=](const auto& sub) -> decltype(auto) { return visit(sub); });
+  /// Overload of visit for any 'std::variant'.
+  /// Forwards to 'visit' calls for each alternative with 'args' as additional
+  /// call arguments.
+  template <class... Args, class... Args2>
+  decltype(auto) visit(const std::variant<Args...>& variant, Args2&&... args) {
+    return pylir::match(variant, [=](const auto& sub) -> decltype(auto) {
+      return visit(sub, std::forward<Args2>(args)...);
+    });
   }
 
-  template <class T, class Deleter>
-  decltype(auto) visit(const std::unique_ptr<T, Deleter>& ptr) {
-    using Ret = decltype(visit(*ptr));
+  /// Overload of visit for a 'std::unique_ptr'.
+  /// Forwards to 'visit' with the pointer dereferenced. Returns a default
+  /// constructed instance of the type returned by 'visit' if 'ptr' is null.
+  template <class T, class Deleter, class... Args>
+  decltype(auto) visit(const std::unique_ptr<T, Deleter>& ptr, Args&&... args) {
+    using Ret = decltype(visit(*ptr, std::forward<Args>(args)...));
     if (!ptr) {
       if constexpr (std::is_void_v<Ret>)
         return;
       else
         return Ret{};
     }
-    return visit(*ptr);
+    return visit(*ptr, std::forward<Args>(args)...);
   }
 
-  template <class T,
+  /// Top-level 'visit' method that should be called by users to visit an AST
+  /// construct. This implements logic common to all visit implementations such
+  /// as changing the location of the builder or skipping the visit call if
+  /// unreachable.
+  /// Calls 'visitImpl' with 'object' and 'args...' forwarded as is.
+  template <class T, class... Args,
             std::enable_if_t<!IsAbstractVariantConcrete<T>{}>* = nullptr>
-  decltype(auto) visit(const T& object) {
-    auto lambda = [&] { return visitImpl(object); };
+  decltype(auto) visit(const T& object, Args&&... args) {
+    auto lambda = [&] {
+      return visitImpl(object, std::forward<Args>(args)...);
+    };
     using Ret = decltype(lambda());
-    if (!m_builder.getInsertionBlock()) {
+    if (isUnreachable()) {
       if constexpr (std::is_void_v<Ret>)
         return;
       else
         return Ret{};
     }
-    auto currLoc = m_builder.getLoc();
+    Location currLoc = m_builder.getLoc();
     auto exit = llvm::make_scope_exit([=] { m_builder.setLoc(currLoc); });
     if constexpr (Diag::hasLocationProvider_v<T>)
       m_builder.setLoc(getLoc(object));
@@ -140,25 +243,32 @@ public:
     init.getBody().push_back(entryBlock);
     m_builder.setInsertionPointToEnd(entryBlock);
 
-    auto moduleNamespace = m_builder.create<Py::MakeDictOp>();
+    m_globalDictionary = m_builder.create<Py::MakeDictOp>();
 
     visit(fileInput.input);
 
     if (m_builder.getInsertionBlock())
-      m_builder.create<HIR::InitReturnOp>(moduleNamespace);
+      m_builder.create<HIR::InitReturnOp>(m_globalDictionary);
 
     return m_module;
   }
 
 private:
+  //===--------------------------------------------------------------------===//
+  // Statements
+  //===--------------------------------------------------------------------===//
+
   void visitImpl(const Syntax::Suite& suite) {
     for (const auto& iter : suite.statements)
       visit(iter);
   }
 
-  void visitImpl(const Syntax::FuncDef& funcDef) {
+  Value visitFunction(llvm::ArrayRef<Syntax::Decorator>,
+                      llvm::ArrayRef<Syntax::Parameter> parameterList,
+                      llvm::StringRef funcName, const Syntax::Scope& scope,
+                      llvm::function_ref<void()> emitFunctionBody) {
     llvm::SmallVector<HIR::FunctionParameterSpec> specs;
-    for (const Syntax::Parameter& iter : funcDef.parameterList) {
+    for (const Syntax::Parameter& iter : parameterList) {
       switch (iter.kind) {
       case Syntax::Parameter::Normal:
         specs.emplace_back(m_builder.getStringAttr(iter.name.getValue()),
@@ -178,21 +288,52 @@ private:
       }
     }
 
-    auto function = m_builder.create<HIR::FuncOp>(
-        qualify(funcDef.funcName.getValue()), specs);
+    auto function = m_builder.create<HIR::FuncOp>(qualify(funcName), specs);
     {
-      auto resetQualifier =
-          addQualifiers(funcDef.funcName.getValue(), "<locals>");
+      auto resetQualifier = addQualifiers(funcName, "<locals>");
+
+      ValueReset functionScopeReset(std::move(m_functionScope));
+      m_functionScope.emplace(m_builder);
 
       mlir::OpBuilder::InsertionGuard guard{m_builder};
       m_builder.setInsertionPointToEnd(&function.getBody().front());
-      visit(funcDef.suite);
+
+      // First, initialize all locals and non-locals in the function scope.
+      // This makes it known to all subsequent reads and writes that the
+      // identifier is a local rather than a global.
+      for (auto&& [identifier, kind] : scope.identifiers) {
+        switch (kind) {
+        case Syntax::Scope::Local:
+          m_functionScope->identifiers[identifier.getValue()] =
+              SSABuilder::DefinitionsMap{};
+          break;
+        case Syntax::Scope::Cell:
+        case Syntax::Scope::NonLocal: llvm_unreachable("not-yet-implemented");
+        default: llvm_unreachable("not possible");
+        }
+      }
+
+      // Initialize the parameters by initializing them with the arguments.
+      for (auto&& [param, arg] :
+           llvm::zip(parameterList, function.getBody().getArguments()))
+        writeToIdentifier(arg, param.name.getValue());
+
+      emitFunctionBody();
+
       if (m_builder.getInsertionBlock()) {
         auto ref = m_builder.create<Py::ConstantOp>(Py::GlobalValueAttr::get(
             m_builder.getContext(), Builtins::None.name));
         m_builder.create<HIR::ReturnOp>(ref);
       }
     }
+    return function;
+  }
+
+  void visitImpl(const Syntax::FuncDef& funcDef) {
+    Value function = visitFunction(funcDef.decorators, funcDef.parameterList,
+                                   funcDef.funcName.getValue(), funcDef.scope,
+                                   [&] { visit(funcDef.suite); });
+    writeToIdentifier(function, funcDef.funcName.getValue());
   }
 
   void visitImpl([[maybe_unused]] const Syntax::IfStmt& ifStmt) {
@@ -225,10 +366,19 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void
-  visitImpl([[maybe_unused]] const Syntax::AssignmentStmt& assignmentStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::AssignmentStmt& assignmentStmt) {
+    Value rhs = visit(assignmentStmt.maybeExpression);
+    if (!rhs)
+      return;
+
+    for (const auto& [target, token] : assignmentStmt.targets) {
+      switch (token.getTokenType()) {
+      case TokenType::Assignment: visit(target, rhs); continue;
+      default:
+        // TODO:
+        PYLIR_UNREACHABLE;
+      }
+    }
   }
 
   void visitImpl([[maybe_unused]] const Syntax::RaiseStmt& raiseStmt) {
@@ -280,6 +430,10 @@ private:
     PYLIR_UNREACHABLE;
   }
 
+  //===--------------------------------------------------------------------===//
+  // Expressions
+  //===--------------------------------------------------------------------===//
+
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Yield& yield) {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -296,9 +450,22 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::Atom& atom) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Atom& atom) {
+    switch (atom.token.getTokenType()) {
+    case TokenType::IntegerLiteral:
+    case TokenType::FloatingPointLiteral:
+    case TokenType::StringLiteral:
+    case TokenType::ByteLiteral:
+    case TokenType::ComplexLiteral:
+    case TokenType::TrueKeyword:
+    case TokenType::FalseKeyword:
+    case TokenType::NoneKeyword:
+      // TODO:
+      PYLIR_UNREACHABLE;
+    case TokenType::Identifier:
+      return readFromIdentifier(pylir::get<std::string>(atom.token.getValue()));
+    default: PYLIR_UNREACHABLE;
+    }
   }
 
   mlir::Value visitImpl(
@@ -367,6 +534,59 @@ private:
   mlir::Value
   visitImpl([[maybe_unused]] const Syntax::DictDisplay& dictDisplay) {
     // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Target assignment overloads
+  //===--------------------------------------------------------------------===//
+
+  void visitImpl(const Syntax::Atom& atom, Value value) {
+    writeToIdentifier(value, get<std::string>(atom.token.getValue()));
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::Subscription& subscription,
+                 [[maybe_unused]] Value value) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::Slice& slice,
+                 [[maybe_unused]] Value value) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::AttributeRef& attributeRef,
+                 [[maybe_unused]] Value value) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  void
+  visitImpl([[maybe_unused]] llvm::ArrayRef<Syntax::StarredItem> starredItems,
+            [[maybe_unused]] Value value) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::TupleConstruct& tupleConstruct,
+                 [[maybe_unused]] Value value) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::ListDisplay& listDisplay,
+                 [[maybe_unused]] Value value) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  /// Overload for any construct that is a possible alternative for 'Target' in
+  /// C++, but not allowed by Python's syntax. These are known unreachable.
+  template <class T, std::enable_if_t<std::is_base_of_v<Syntax::Target, T> &&
+                                      !Syntax::validTargetType<T>()>* = nullptr>
+  void visitImpl(const T&, Value) {
     PYLIR_UNREACHABLE;
   }
 };
