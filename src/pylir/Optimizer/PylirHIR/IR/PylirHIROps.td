@@ -53,6 +53,11 @@ def PylirHIR_CallOp : PylirHIR_Op<"call"> {
                             $kind_internal)^ `)` )? attr-dict
   }];
 
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$callable,
+                   "llvm::ArrayRef<CallArgument>":$arguments)>
+  ];
+
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
