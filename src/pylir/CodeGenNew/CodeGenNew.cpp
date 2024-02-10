@@ -547,9 +547,41 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::Call& call) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Call& call) {
+    Value callable = visit(call.expression);
+    if (!callable)
+      return nullptr;
+
+    return match(
+        call.variant,
+        [&]([[maybe_unused]] const Syntax::Comprehension& comprehension)
+            -> Value {
+          // TODO:
+          PYLIR_UNREACHABLE;
+        },
+        [&](ArrayRef<Syntax::Argument> arguments) -> Value {
+          SmallVector<HIR::CallArgument> callArguments;
+          for (const Syntax::Argument& arg : arguments) {
+            Value value = visit(arg.expression);
+            if (!value)
+              return nullptr;
+
+            if (arg.maybeName)
+              callArguments.push_back(
+                  {value, m_builder.getStringAttr(arg.maybeName->getValue())});
+            else if (!arg.maybeExpansionsOrEqual)
+              callArguments.push_back(
+                  {value, HIR::CallArgument::PositionalTag{}});
+            else if (arg.maybeExpansionsOrEqual->getTokenType() ==
+                     TokenType::Star)
+              callArguments.push_back(
+                  {value, HIR::CallArgument::PosExpansionTag{}});
+            else
+              callArguments.push_back(
+                  {value, HIR::CallArgument::MapExpansionTag{}});
+          }
+          return m_builder.create<HIR::CallOp>(callable, callArguments);
+        });
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Lambda& lambda) {
