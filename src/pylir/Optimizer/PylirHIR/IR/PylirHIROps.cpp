@@ -81,35 +81,6 @@ void printCallArguments(OpAsmPrinter& printer, CallOp callOp, ArrayAttr,
 }
 } // namespace
 
-void pylir::HIR::CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
-                               Value callable,
-                               ArrayRef<CallArgument> arguments) {
-  SmallVector<std::int32_t> kindInternal;
-  SmallVector<Value> argOperands;
-  SmallVector<Attribute> keywords;
-  for (const CallArgument& argument : arguments) {
-    argOperands.push_back(argument.value);
-    match(
-        argument.kind,
-        [&](CallArgument::PosExpansionTag) {
-          kindInternal.push_back(PosExpansion);
-        },
-        [&](CallArgument::MapExpansionTag) {
-          kindInternal.push_back(MapExpansion);
-        },
-        [&](CallArgument::PositionalTag) {
-          kindInternal.push_back(Positional);
-        },
-        [&](StringAttr stringAttr) {
-          kindInternal.push_back(-static_cast<std::int32_t>(keywords.size()));
-          keywords.push_back(stringAttr);
-        });
-  }
-
-  build(odsBuilder, odsState, callable, argOperands,
-        odsBuilder.getArrayAttr(keywords), kindInternal);
-}
-
 LogicalResult pylir::HIR::CallOp::verify() {
   if (getArguments().size() != getKindInternal().size())
     return emitOpError() << getKindInternalAttrName()
