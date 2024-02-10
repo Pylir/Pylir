@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout Repo for Actions
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: Pylir
 
@@ -62,7 +62,7 @@ jobs:
 
       - name: Check LLVM Cache
         id: check-llvm-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             llvm-build 

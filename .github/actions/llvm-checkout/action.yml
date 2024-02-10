@@ -10,7 +10,7 @@ runs:
         "LLVM_REVISION=$(Get-Content -Path ./Pylir/.pinned-llvm-revision)" >> $Env:GITHUB_ENV
 
     - name: Checkout LLVM
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: ${{ env.LLVM_REVISION }}

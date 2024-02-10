@@ -18,7 +18,7 @@ runs:
       uses:  ./Pylir/.github/actions/llvm-checkout
 
     - name: Restore LLVM Build
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: |
           llvm-build 
