@@ -169,7 +169,41 @@ public:
   }
 };
 
+/// Struct representing an argument of a call operation.
+struct CallArgument {
+  struct PositionalTag {};
+  struct PosExpansionTag {};
+  struct MapExpansionTag {};
+
+  mlir::Value value;
+  std::variant<PositionalTag, PosExpansionTag, MapExpansionTag,
+               mlir::StringAttr>
+      kind;
+};
+
 } // namespace pylir::HIR
 
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIROps.h.inc"
+
+namespace pylir::HIR {
+
+/// Range adaptor allowing easy iteration over the arguments of a call op.
+class CallArgumentRange
+    : public llvm::indexed_accessor_range<
+          CallArgumentRange, CallOp, CallArgument, CallArgument, CallArgument> {
+  using Base =
+      llvm::indexed_accessor_range<CallArgumentRange, CallOp, CallArgument,
+                                   CallArgument, CallArgument>;
+
+  friend Base;
+
+  // dereference function required by indexed_accessor_range.
+  static CallArgument dereference(CallOp call, std::ptrdiff_t index);
+
+public:
+  explicit CallArgumentRange(CallOp call)
+      : Base(call, 0, call.getArguments().size()) {}
+};
+
+} // namespace pylir::HIR
