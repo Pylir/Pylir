@@ -6,7 +6,117 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
-#include "pylir/Support/Macros.hpp"
+#include <pylir/Support/Macros.hpp>
+#include <pylir/Support/Variant.hpp>
+
+using namespace mlir;
+using namespace pylir;
+using namespace pylir::HIR;
+
+//===----------------------------------------------------------------------===//
+// CallOp
+//===----------------------------------------------------------------------===//
+
+/// arg ::= [`*` | `**` | string-attr `=`] value-use
+/// call-arguments ::= <arg> { `,` <arg> }
+ParseResult pylir::HIR::parseCallArguments(
+    OpAsmParser& parser, ArrayAttr& keywords,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand>& arguments,
+    DenseI32ArrayAttr& kindInternal) {
+  SmallVector<Attribute> keywordsStorage;
+  SmallVector<std::int32_t> kindInternalStorage;
+
+  bool first = true;
+  while (true) {
+    if (first)
+      first = false;
+    else if (failed(parser.parseOptionalComma()))
+      break;
+
+    if (succeeded(parser.parseOptionalStar())) {
+      if (succeeded(parser.parseOptionalStar())) {
+        kindInternalStorage.push_back(CallOp::MapExpansion);
+      } else {
+        kindInternalStorage.push_back(CallOp::PosExpansion);
+      }
+    } else {
+      StringAttr temp;
+      OptionalParseResult result = parser.parseOptionalAttribute(temp);
+      if (result.has_value()) {
+        if (*result || parser.parseEqual())
+          return failure();
+
+        kindInternalStorage.push_back(
+            -static_cast<std::int32_t>(keywordsStorage.size()));
+        keywordsStorage.push_back(temp);
+      } else {
+        kindInternalStorage.push_back(CallOp::Positional);
+      }
+    }
+
+    if (parser.parseOperand(arguments.emplace_back()))
+      return failure();
+  }
+
+  keywords = parser.getBuilder().getArrayAttr(keywordsStorage);
+  kindInternal = parser.getBuilder().getDenseI32ArrayAttr(kindInternalStorage);
+  return success();
+}
+
+namespace {
+
+void printCallArguments(OpAsmPrinter& printer, CallOp callOp, ArrayAttr,
+                        ValueRange, DenseI32ArrayAttr) {
+  llvm::interleaveComma(
+      CallArgumentRange(callOp), printer.getStream(),
+      [&](const CallArgument& argument) {
+        match(
+            argument.kind,
+            [&](CallArgument::PosExpansionTag) { printer << "*"; },
+            [&](CallArgument::MapExpansionTag) { printer << "**"; },
+            [&](CallArgument::PositionalTag) {},
+            [&](StringAttr stringAttr) { printer << stringAttr << "="; });
+        printer << argument.value;
+      });
+}
+} // namespace
+
+LogicalResult pylir::HIR::CallOp::verify() {
+  if (getArguments().size() != getKindInternal().size())
+    return emitOpError() << getKindInternalAttrName()
+                         << " must be the same size as argument operands";
+
+  for (std::int32_t value : getKindInternal()) {
+    switch (value) {
+    case Positional:
+    case PosExpansion:
+    case MapExpansion: continue;
+    default:
+      if (value > 0)
+        return emitOpError() << "invalid value " << value << " in "
+                             << getKindInternalAttrName() << " array";
+
+      if (static_cast<std::uint32_t>(-value) >= getKeywords().size())
+        return emitOpError()
+               << "out-of-bounds index " << -value
+               << " into keywords array with size " << getKeywords().size();
+    }
+  }
+
+  return success();
+}
+
+CallArgument CallArgumentRange::dereference(CallOp call, std::ptrdiff_t index) {
+  Value value = call.getArguments()[index];
+  if (call.isPosExpansion(index))
+    return CallArgument{value, CallArgument::PosExpansionTag{}};
+  if (call.isMapExpansion(index))
+    return CallArgument{value, CallArgument::MapExpansionTag{}};
+  if (StringAttr keyword = call.getKeyword(index))
+    return CallArgument{value, keyword};
+
+  return CallArgument{value, CallArgument::PositionalTag{}};
+}
 
 //===----------------------------------------------------------------------===//
 // GlobalFuncOp and FuncOp implementation utilities

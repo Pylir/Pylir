@@ -25,6 +25,72 @@ class PylirHIR_Op<string mneomic, list<Trait> traits = []>
 // Basics
 //===----------------------------------------------------------------------===//
 
+def PylirHIR_CallOp : PylirHIR_Op<"call"> {
+  let arguments = (ins DynamicType:$callable,
+    Variadic<DynamicType>:$arguments,
+    DefaultValuedAttr<StrArrayAttr, "{}">:$keywords,
+    DefaultValuedAttr<DenseI32ArrayAttr, "{}">:$kind_internal
+  );
+
+  let results = (outs DynamicType:$result);
+
+  let description = [{
+    Operation representing a call operation in Python.
+
+    TODO: Explain call resolution.
+
+    Syntax:
+    ```
+    arg ::= [`*` | `**` | string-attr `=`] value-use
+    global_func ::= `pyHIR.call` value-use `(` [ <arg> { `,` <arg> } ] `)`
+    ```
+  }];
+
+  let assemblyFormat = [{
+    $callable `(` (`)`) : ( ``
+      custom<CallArguments>($keywords,
+                            $arguments,
+                            $kind_internal)^ `)` )? attr-dict
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+  private:
+    friend mlir::ParseResult parseCallArguments(mlir::OpAsmParser& parser,
+      mlir::ArrayAttr& keywords,
+      llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& arguments,
+      mlir::DenseI32ArrayAttr& kindInternal);
+
+    enum Kind {
+      Positional = 1,
+      PosExpansion = 2,
+      MapExpansion = 3,
+      Keyword = 0, // zero and any kind of negative value in reality.
+    };
+
+  public:
+
+    /// Returns true if the argument at the given index is a positional
+    /// expansion.
+    bool isPosExpansion(std::size_t index) {
+      return getKindInternal()[index] == Kind::PosExpansion;
+    }
+
+    /// Returns true if the argument at the given index is a map expansion.
+    bool isMapExpansion(std::size_t index) {
+      return getKindInternal()[index] == Kind::MapExpansion;
+    }
+
+    /// Returns the keyword of the argument at the given index.
+    /// Returns a null attribute if the argument is not a keyword argument.
+    mlir::StringAttr getKeyword(std::size_t index) {
+      if (getKindInternal()[index] > 0)
+        return nullptr;
+      return mlir::cast<mlir::StringAttr>(getKeywords()[-getKindInternal()[index]]);
+    }
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // Functions
@@ -143,7 +209,7 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface,
   PylirHIR_FunctionInterface]> {
 
-  let arguments = (ins StrAttr:$name, Variadic<AnyType>:$default_values,
+  let arguments = (ins StrAttr:$name, Variadic<DynamicType>:$default_values,
              DenseI32ArrayAttr:$default_values_mapping,
              TypeAttrOf<PylirHIR_FunctionType>:$function_type,
              OptionalAttr<DictArrayAttr>:$arg_attrs,

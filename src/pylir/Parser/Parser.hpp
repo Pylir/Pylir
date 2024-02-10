@@ -260,10 +260,11 @@ public:
    *                        |  keywords_arguments
    * positional_arguments ::=  positional_item { "," positional_item }
    * positional_item      ::=  assignment_expression | "*" expression
-   * starred_and_keywords ::=  ("*" expression | keyword_item) { "," "*"
-   * expression | "," keyword_item } keywords_arguments   ::=  (keyword_item |
-   * "**" expression) { "," keyword_item | "," "**" expression } keyword_item
-   * ::=  identifier "=" expression
+   * starred_and_keywords ::=  ("*" expression | keyword_item)
+   *                           { "," "*" expression | "," keyword_item }
+   * keywords_arguments   ::=  (keyword_item | "**" expression)
+   *                           { "," keyword_item | "," "**" expression }
+   * keyword_item ::=  identifier "=" expression
    */
   std::optional<std::vector<Syntax::Argument>>
   parseArgumentList(IntrVarPtr<Syntax::Expression>&& firstAssignment = nullptr);
