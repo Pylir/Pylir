@@ -199,7 +199,7 @@ class CallArgumentRange
   friend Base;
 
   // dereference function required by indexed_accessor_range.
-  static CallArgument dereference(CallOp function, std::ptrdiff_t index);
+  static CallArgument dereference(CallOp call, std::ptrdiff_t index);
 
 public:
   explicit CallArgumentRange(CallOp call)
