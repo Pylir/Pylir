@@ -7,8 +7,9 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Support/BigInt.hpp>
+
+#include "PylirPyOps.hpp"
 
 namespace pylir {
 class PyBuilder : public mlir::OpBuilder {

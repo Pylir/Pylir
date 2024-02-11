@@ -11,6 +11,7 @@
 #include <llvm/ADT/ScopeExit.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PyBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
@@ -21,7 +22,6 @@
 #include <unordered_map>
 
 #include "CodeGenOptions.hpp"
-#include "PyBuilder.hpp"
 
 namespace pylir {
 
