@@ -4,14 +4,14 @@
 
 include(CPM)
 
-CPMAddPackage("gh:catchorg/Catch2@3.3.0")
-CPMAddPackage("gh:fmtlib/fmt#7.1.3")
+CPMAddPackage("gh:catchorg/Catch2@3.5.2")
+CPMAddPackage("gh:fmtlib/fmt#10.2.1")
 # Use the same C++ version everywhere.
 set(CTRE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 CPMAddPackage("gh:hanickadot/compile-time-regular-expressions#v3.8")
 CPMAddPackage(
   NAME libtommath
-  GIT_TAG eda0bd6ae5705ab90b866dfb52c5f15c23687f81
+  GIT_TAG 8314bde5e5c8e5d9331460130a9d1066e324f091
   GITHUB_REPOSITORY libtom/libtommath
   DOWNLOAD_ONLY YES
   EXCLUDE_FROM_ALL
@@ -19,7 +19,7 @@ CPMAddPackage(
 )
 CPMAddPackage(
   NAME utf8proc
-  VERSION 2.8.0
+  VERSION 2.9.0
   GITHUB_REPOSITORY JuliaStrings/utf8proc
   DOWNLOAD_ONLY YES
   EXCLUDE_FROM_ALL

@@ -13,6 +13,7 @@
 
 #include <fmt/color.h>
 #include <fmt/format.h>
+#include <fmt/xchar.h>
 
 void pylir::Diag::Diagnostic::printLine(llvm::raw_ostream& os,
                                         std::size_t width,
