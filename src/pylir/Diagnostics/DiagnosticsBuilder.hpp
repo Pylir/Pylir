@@ -520,3 +520,12 @@ DiagnosticsBuilder(DiagnosticsNoDocManager&, Severity, const S&, Args&&...)
     -> DiagnosticsBuilder<DiagnosticsNoDocManager>;
 
 } // namespace pylir::Diag
+
+template <>
+struct fmt::formatter<llvm::StringRef> : formatter<string_view> {
+  template <class Context>
+  auto format(llvm::StringRef string, Context& ctx) const {
+    return fmt::formatter<string_view>::format({string.data(), string.size()},
+                                               ctx);
+  }
+};

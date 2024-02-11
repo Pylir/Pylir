@@ -50,15 +50,6 @@ createToolchainForTriple(pylir::cli::CommandLine& commandLine,
 
 } // namespace
 
-template <>
-struct fmt::formatter<llvm::StringRef> : formatter<string_view> {
-  template <class Context>
-  auto format(const llvm::StringRef& string, Context& ctx) {
-    return fmt::formatter<string_view>::format({string.data(), string.size()},
-                                               ctx);
-  }
-};
-
 int pylir::main(int argc, char** argv) {
   llvm::InitializeAllTargetInfos();
   llvm::InitializeAllTargets();
