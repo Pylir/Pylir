@@ -526,9 +526,48 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::BinOp& binOp) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::BinOp& binOp) {
+    auto implementUsualBinOp =
+        [&](HIR::BinaryOperation binaryOperation) -> Value {
+      Value lhs = visit(binOp.lhs);
+      if (!lhs)
+        return nullptr;
+
+      Value rhs = visit(binOp.rhs);
+      if (!rhs)
+        return nullptr;
+
+      return m_builder.create<HIR::BinOp>(binaryOperation, lhs, rhs);
+    };
+
+    switch (binOp.operation.getTokenType()) {
+    case TokenType::OrKeyword:
+    case TokenType::AndKeyword:
+      // TODO:
+      PYLIR_UNREACHABLE;
+    case TokenType::Plus: return implementUsualBinOp(HIR::BinaryOperation::Add);
+    case TokenType::Minus:
+      return implementUsualBinOp(HIR::BinaryOperation::Sub);
+    case TokenType::BitOr: return implementUsualBinOp(HIR::BinaryOperation::Or);
+    case TokenType::BitXor:
+      return implementUsualBinOp(HIR::BinaryOperation::Xor);
+    case TokenType::BitAnd:
+      return implementUsualBinOp(HIR::BinaryOperation::And);
+    case TokenType::ShiftLeft:
+      return implementUsualBinOp(HIR::BinaryOperation::LShift);
+    case TokenType::ShiftRight:
+      return implementUsualBinOp(HIR::BinaryOperation::RShift);
+    case TokenType::Star: return implementUsualBinOp(HIR::BinaryOperation::Mul);
+    case TokenType::Divide:
+      return implementUsualBinOp(HIR::BinaryOperation::Div);
+    case TokenType::IntDivide:
+      return implementUsualBinOp(HIR::BinaryOperation::FloorDiv);
+    case TokenType::Remainder:
+      return implementUsualBinOp(HIR::BinaryOperation::Mod);
+    case TokenType::AtSign:
+      return implementUsualBinOp(HIR::BinaryOperation::MatMul);
+    default: PYLIR_UNREACHABLE;
+    }
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::UnaryOp& unaryOp) {
