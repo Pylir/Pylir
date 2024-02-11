@@ -12,6 +12,7 @@
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.hpp>
 #include <pylir/Optimizer/PylirHIR/IR/PylirHIROps.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PyBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
@@ -19,6 +20,7 @@ using namespace mlir;
 using namespace pylir;
 using namespace pylir::HIR;
 using namespace pylir::Py;
+using namespace pylir::Builtins;
 
 namespace pylir {
 #define GEN_PASS_DEF_CONVERTPYLIRHIRTOPYLIRPYPASS
@@ -33,6 +35,50 @@ protected:
 
 public:
   using Base::Base;
+};
+
+//===----------------------------------------------------------------------===//
+// Call Conversion Patterns
+//===----------------------------------------------------------------------===//
+
+struct CallOpConversionPattern : OpRewritePattern<HIR::CallOp> {
+  using OpRewritePattern<HIR::CallOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(HIR::CallOp op,
+                                PatternRewriter& rewriter) const override {
+    SmallVector<Py::IterArg> iterArgs;
+    SmallVector<Py::DictArg> dictArgs;
+    for (const CallArgument& argument : CallArgumentRange(op)) {
+      pylir::match(
+          argument.kind,
+          [&](CallArgument::PositionalTag) {
+            iterArgs.emplace_back(argument.value);
+          },
+          [&](CallArgument::PosExpansionTag) {
+            iterArgs.emplace_back(Py::IterExpansion{argument.value});
+          },
+          [&](CallArgument::MapExpansionTag) {
+            dictArgs.emplace_back(Py::MappingExpansion{argument.value});
+          },
+          [&](StringAttr keyword) {
+            Value key = rewriter.create<Py::ConstantOp>(
+                op.getLoc(), rewriter.getAttr<Py::StrAttr>(keyword));
+            Value hash = rewriter.create<Py::StrHashOp>(op.getLoc(), key);
+            dictArgs.emplace_back(Py::DictEntry{key, hash, argument.value});
+          });
+    }
+
+    Value tuple = rewriter.create<Py::MakeTupleOp>(op.getLoc(), iterArgs);
+    Value dict =
+        dictArgs.empty()
+            ? (Value)rewriter.create<Py::ConstantOp>(
+                  op.getLoc(), rewriter.getAttr<Py::DictAttr>())
+            : (Value)rewriter.create<Py::MakeDictOp>(op.getLoc(), dictArgs);
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__call__",
+        ValueRange{op.getCallable(), tuple, dict});
+    return success();
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -180,7 +226,7 @@ Py::FuncOp buildFunctionCC(OpBuilder& builder, GlobalFuncOp implementation,
                                                           keyword, hash);
       builder.create<cf::BranchOp>(loc, afterDefault, lookup);
     } else {
-      Value index = builder.create<mlir::arith::ConstantIndexOp>(
+      Value index = builder.create<arith::ConstantIndexOp>(
           loc, positionalDefaultArgsSeen++);
       Value lookup =
           builder.create<Py::TupleGetItemOp>(loc, defaultTuple, index);
@@ -284,9 +330,130 @@ struct ReturnOpLowering : OpRewritePattern<OpT> {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Compiler helper functions
+//===----------------------------------------------------------------------===//
+
+Value buildException(PyBuilder& builder, std::string_view kind,
+                     std::vector<Py::IterArg> args, Block* exceptionHandler) {
+  auto typeObj = builder.createConstant(
+      Py::GlobalValueAttr::get(builder.getContext(), kind));
+  args.emplace(args.begin(), typeObj);
+  Value tuple = builder.createMakeTuple(args, exceptionHandler);
+  auto dict = builder.createConstant(builder.getDictAttr());
+  auto mro = builder.createTypeMRO(typeObj);
+  auto newMethod =
+      builder.createMROLookup(mro, Builtins::TypeSlots::New).getResult();
+
+  auto obj = builder.createFunctionCall(newMethod, {newMethod, tuple, dict});
+  auto context = builder.createNoneRef();
+  builder.createSetSlot(obj, Builtins::BaseExceptionSlots::Context, context);
+  auto cause = builder.createNoneRef();
+  builder.createSetSlot(obj, Builtins::BaseExceptionSlots::Cause, cause);
+  return obj;
+}
+
+void implementBlock(OpBuilder& builder, Block* block) {
+  PYLIR_ASSERT(block);
+  if (auto* next = builder.getBlock()->getNextNode())
+    block->insertBefore(next);
+  else
+    builder.getBlock()->getParent()->push_back(block);
+
+  builder.setInsertionPointToStart(block);
+}
+
+Value buildTrySpecialMethodCall(PyBuilder& builder, TypeSlots method,
+                                Value args, Value kws, Block* notFoundPath,
+                                Block* callIntrException = nullptr) {
+  auto element = builder.createTupleGetItem(
+      args, builder.create<arith::ConstantIndexOp>(0));
+  auto elementType = builder.createTypeOf(element);
+  auto mroTuple = builder.createTypeMRO(elementType);
+  auto lookup = builder.createMROLookup(mroTuple, method);
+  auto failure = builder.createIsUnboundValue(lookup);
+  auto* exec = new Block;
+  builder.create<cf::CondBranchOp>(builder.getCurrentLoc(), failure,
+                                   notFoundPath, exec);
+
+  implementBlock(builder, exec);
+  mroTuple = builder.createTypeMRO(builder.createTypeOf(lookup.getResult()));
+  auto getMethod = builder.createMROLookup(mroTuple, TypeSlots::Get);
+  failure = builder.createIsUnboundValue(getMethod);
+  auto* isDescriptor = new Block;
+  auto* mergeBlock = new Block;
+  mergeBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+  builder.create<cf::CondBranchOp>(builder.getCurrentLoc(), failure, mergeBlock,
+                                   ValueRange{lookup.getResult()}, isDescriptor,
+                                   ValueRange{});
+
+  implementBlock(builder, isDescriptor);
+  auto tuple = builder.createMakeTuple({element, elementType}, nullptr);
+  auto result = builder.createPylirCallIntrinsic(getMethod.getResult(), tuple,
+                                                 builder.createMakeDict(),
+                                                 callIntrException);
+  builder.create<cf::BranchOp>(builder.getCurrentLoc(), mergeBlock, result);
+
+  implementBlock(builder, mergeBlock);
+  // TODO: This is incorrect. One should be passing all but args[0], as args[0]
+  // will already be bound by the __get__ descriptor of function. We haven't yet
+  // implemented this however, hence this is the stop gap solution.
+  return builder.createPylirCallIntrinsic(mergeBlock->getArgument(0), args, kws,
+                                          callIntrException);
+}
+
+Value buildSpecialMethodCall(PyBuilder& builder, TypeSlots method, Value args,
+                             Value kws, Block* callIntrException = nullptr) {
+  auto* notFound = new Block;
+  auto result = buildTrySpecialMethodCall(builder, method, args, kws, notFound,
+                                          callIntrException);
+  OpBuilder::InsertionGuard guard{builder};
+  implementBlock(builder, notFound);
+  auto exception = buildException(builder, TypeError.name, {}, nullptr);
+  builder.createRaise(exception);
+  return result;
+}
+
+void buildCallOpCompilerBuiltin(PyBuilder& builder,
+                                llvm::StringRef functionName) {
+  auto func = builder.create<pylir::Py::FuncOp>(
+      functionName, builder.getFunctionType({builder.getDynamicType(),
+                                             builder.getDynamicType(),
+                                             builder.getDynamicType()},
+                                            builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+
+  auto self = func.getArgument(0);
+  auto args = func.getArgument(1);
+  auto kws = func.getArgument(2);
+
+  auto selfType = builder.createTypeOf(self);
+  // We have to somehow break this recursion by detecting a function type and
+  // calling it directly.
+  auto isFunction = builder.createIs(selfType, builder.createFunctionRef());
+  auto* isFunctionBlock = new Block;
+  auto* notFunctionBlock = new Block;
+  builder.create<cf::CondBranchOp>(isFunction, isFunctionBlock,
+                                   notFunctionBlock);
+
+  implementBlock(builder, isFunctionBlock);
+  Value result = builder.createFunctionCall(self, {self, args, kws});
+  builder.create<Py::ReturnOp>(result);
+
+  implementBlock(builder, notFunctionBlock);
+  result = buildSpecialMethodCall(builder, TypeSlots::Call,
+                                  builder.createTuplePrepend(self, args), kws);
+  builder.create<Py::ReturnOp>(result);
+}
+
 } // namespace
 
 void ConvertPylirHIRToPylirPy::runOnOperation() {
+  PyBuilder builder(&getContext());
+  builder.setInsertionPointToEnd(getOperation().getBody());
+  buildCallOpCompilerBuiltin(builder, "pylir__call__");
+
   ConversionTarget target(getContext());
   target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
@@ -294,8 +461,8 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
 
   RewritePatternSet patterns(&getContext());
   patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
-               ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern>(
-      &getContext());
+               ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
+               CallOpConversionPattern>(&getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
