@@ -18,3 +18,4 @@ target_link_libraries(CodeGenNew
   MLIRArithDialect
   MLIRControlFlowDialect
 )
+add_dependencies(CodeGenNew CodeGenIntrIncGen)

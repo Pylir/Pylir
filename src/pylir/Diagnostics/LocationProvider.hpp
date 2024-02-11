@@ -5,6 +5,7 @@
 #pragma once
 
 #include <pylir/Support/Macros.hpp>
+#include <pylir/Support/Variant.hpp>
 
 #include <type_traits>
 #include <utility>
@@ -124,5 +125,39 @@ template <class T>
 constexpr bool hasLocationProvider_v =
     std::disjunction_v<HasLocationProviderRangeOneArg<T>,
                        HasLocationProviderRangeTwoArg<T>>;
+
+/// Location provider specialization for any range where the value type has a
+/// location provider and the range's iterators are bidirectional iterators.
+template <class Range>
+struct LocationProvider<
+    Range,
+    std::enable_if_t<
+        std::is_base_of_v<std::bidirectional_iterator_tag,
+                          typename std::iterator_traits<
+                              typename Range::iterator>::iterator_category> &&
+        HasLocationProviderRangeOneArg<typename std::iterator_traits<
+            typename Range::iterator>::value_type>::value>> {
+  static std::pair<std::size_t, std::size_t>
+  getRange(const Range& range) noexcept {
+    PYLIR_ASSERT(range.begin() != range.end() &&
+                 "cannot get location from empty range");
+
+    return {rangeLoc(*range.begin()).first,
+            rangeLoc(*std::prev(range.end())).second};
+  }
+};
+
+/// Location provider specialization for variants where every alternative
+/// has a location provider specialization.
+template <class... Args>
+struct LocationProvider<
+    std::variant<Args...>,
+    std::enable_if_t<(HasLocationProviderRangeOneArg<Args>::value && ...)>> {
+  static std::pair<std::size_t, std::size_t>
+  getRange(const std::variant<Args...>& variant) noexcept {
+    return match(variant,
+                 [](const auto& alternative) { return rangeLoc(alternative); });
+  }
+};
 
 } // namespace pylir::Diag

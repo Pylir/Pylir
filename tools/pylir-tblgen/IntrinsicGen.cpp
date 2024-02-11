@@ -62,10 +62,12 @@ genOutputTypeConversion(std::string inputValue,
     return inputValue;
   }
   if (fromType.getDefName() == "Index") {
-    return llvm::formatv("m_builder.createIntFromUnsigned({0})", inputValue);
+    return llvm::formatv(
+        "m_builder.create<::pylir::Py::IntFromUnsignedOp>({0})", inputValue);
   }
   assert(fromType.getDefName() == "I1");
-  return llvm::formatv("m_builder.createBoolFromI1({0})", inputValue);
+  return llvm::formatv("m_builder.create<::pylir::Py::BoolFromI1Op>({0})",
+                       inputValue);
 }
 
 std::string genInputTypeConversion(std::string inputValue,
@@ -74,10 +76,12 @@ std::string genInputTypeConversion(std::string inputValue,
     return inputValue;
   }
   if (toType.getDefName() == "Index") {
-    return llvm::formatv("m_builder.createIntToIndex({0})", inputValue);
+    return llvm::formatv("m_builder.create<::pylir::Py::IntToIndexOp>({0})",
+                         inputValue);
   }
   assert(toType.getDefName() == "I1");
-  return llvm::formatv("m_builder.createBoolToI1({0})", inputValue);
+  return llvm::formatv("m_builder.create<::pylir::Py::BoolToI1Op>({0})",
+                       inputValue);
 }
 
 std::string genAttrConversion(mlir::raw_indented_ostream& os,
@@ -210,7 +214,11 @@ bool emitIntrinsics(const llvm::RecordKeeper& records,
         op.getQualCppClassName(),
         op.getNumResults() == 0 ? "::mlir::TypeRange{}, " : "");
     switch (op.getNumResults()) {
-    case 0: os << "return m_builder.createNoneRef();\n"; continue;
+    case 0:
+      os << "return "
+            "m_builder.create<::pylir::Py::ConstantOp>(m_builder.getAttr<::"
+            "pylir::Py::GlobalValueAttr>(::pylir::Builtins::None.name));\n";
+      continue;
     case 1:
       os << llvm::formatv("return {0};\n", genOutputTypeConversion(
                                                "op->getResult(0)",
@@ -223,8 +231,9 @@ bool emitIntrinsics(const llvm::RecordKeeper& records,
             llvm::formatv("op->getResult({0})", iter.index()),
             iter.value().constraint));
       }
-      os << llvm::formatv("return m_builder.createMakeTuple({{ {0} });\n",
-                          llvm::join(results, ", "));
+      os << llvm::formatv(
+          "return m_builder.create<pylir::Py::MakeTupleOp>({{ {0} });\n",
+          llvm::join(results, ", "));
       continue;
     }
     }

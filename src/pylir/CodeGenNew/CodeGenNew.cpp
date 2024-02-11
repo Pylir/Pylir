@@ -11,6 +11,7 @@
 
 #include <llvm/ADT/ScopeExit.h>
 
+#include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirHIR/IR/PylirHIROps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -586,7 +587,63 @@ private:
     PYLIR_UNREACHABLE;
   }
 
+  struct Intrinsic {
+    /// Name of the intrinsic. These are all identifier joined with dots.
+    /// Includes the 'pylir.intr' prefix.
+    std::string name;
+    /// All identifier tokens making up the name. Main use-case is for the
+    /// purpose of the location in the source code.
+    SmallVector<IdentifierToken> identifiers;
+  };
+
+  /// Checks whether 'expression' is a reference to an intrinsic. An intrinsic
+  /// consists of a series of attribute references resulting in the syntax:
+  /// "pylir" `.` "intr" { `.` identifier }.
+  /// Returns an empty optional if the expression is not an intrinsic reference.
+  std::optional<Intrinsic>
+  checkForIntrinsic(const Syntax::Expression& expression) {
+    // Collect all the chained attribute references and their identifiers up
+    // until the atom.
+    SmallVector<IdentifierToken> identifiers;
+    const Syntax::Expression* current = &expression;
+    while (const auto* ref = current->dyn_cast<Syntax::AttributeRef>()) {
+      identifiers.push_back(ref->identifier);
+      current = ref->object.get();
+    }
+
+    // If its not an atom or not an identifier its not an intrinsic.
+    const auto* atom = current->dyn_cast<Syntax::Atom>();
+    if (!atom || atom->token.getTokenType() != TokenType::Identifier)
+      return std::nullopt;
+
+    identifiers.emplace_back(atom->token);
+    std::reverse(identifiers.begin(), identifiers.end());
+    // Intrinsics always start with 'pylir' and 'intr'.
+    if (identifiers.size() < 2 || identifiers[0].getValue() != "pylir" ||
+        identifiers[1].getValue() != "intr")
+      return std::nullopt;
+
+    std::string name = llvm::join(
+        llvm::map_range(identifiers, std::mem_fn(&IdentifierToken::getValue)),
+        ".");
+    return Intrinsic{std::move(name), std::move(identifiers)};
+  }
+
   Value visitImpl(const Syntax::Call& call) {
+    if (std::optional<Intrinsic> intr = checkForIntrinsic(*call.expression)) {
+      const auto* args =
+          std::get_if<std::vector<Syntax::Argument>>(&call.variant);
+      if (!args) {
+        createError(call.variant,
+                    Diag::INTRINSICS_DO_NOT_SUPPORT_COMPREHENSION_ARGUMENTS)
+            .addHighlight(call.variant)
+            .addHighlight(intr->identifiers, Diag::flags::secondaryColour);
+        return nullptr;
+      }
+
+      return callIntrinsic(std::move(*intr), *args, call);
+    }
+
     Value callable = visit(call.expression);
     if (!callable)
       return nullptr;
@@ -621,6 +678,65 @@ private:
           }
           return m_builder.create<HIR::CallOp>(callable, callArguments);
         });
+  }
+
+  /// Performs the associated action for calling 'intrinsic' using 'arguments'.
+  /// Returns a null value if an error occurred.
+  Value callIntrinsic(Intrinsic&& intrinsic,
+                      ArrayRef<Syntax::Argument> arguments,
+                      const Syntax::Call& call) {
+    std::string_view intrName = intrinsic.name;
+    SmallVector<Value> args;
+    bool errorsOccurred = false;
+    for (const Syntax::Argument& iter : arguments) {
+      if (iter.maybeName) {
+        createError(iter, Diag::INTRINSICS_DO_NOT_SUPPORT_KEYWORD_ARGUMENTS)
+            .addHighlight(iter)
+            .addHighlight(intrinsic.identifiers, Diag::flags::secondaryColour);
+        errorsOccurred = true;
+        continue;
+      }
+
+      if (iter.maybeExpansionsOrEqual) {
+        if (iter.maybeExpansionsOrEqual->getTokenType() == TokenType::PowerOf) {
+          createError(
+              iter,
+              Diag::INTRINSICS_DO_NOT_SUPPORT_DICTIONARY_UNPACKING_ARGUMENTS)
+              .addHighlight(iter)
+              .addHighlight(intrinsic.identifiers,
+                            Diag::flags::secondaryColour);
+        } else {
+          createError(
+              iter,
+              Diag::INTRINSICS_DO_NOT_SUPPORT_ITERABLE_UNPACKING_ARGUMENTS)
+              .addHighlight(iter)
+              .addHighlight(intrinsic.identifiers,
+                            Diag::flags::secondaryColour);
+        }
+        errorsOccurred = true;
+        continue;
+      }
+
+      // Stop emitting expressions if error occurred, but do continue checking
+      // for valid arguments.
+      if (errorsOccurred)
+        continue;
+
+      Value arg = visit(iter.expression);
+      if (!arg) {
+        errorsOccurred = true;
+        continue;
+      }
+      args.push_back(arg);
+    }
+    if (errorsOccurred)
+      return {};
+
+#include <pylir/CodeGen/CodeGenIntr.cpp.inc>
+
+    createError(intrinsic.identifiers, Diag::UNKNOWN_INTRINSIC_N, intrName)
+        .addHighlight(intrinsic.identifiers);
+    return {};
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Lambda& lambda) {
