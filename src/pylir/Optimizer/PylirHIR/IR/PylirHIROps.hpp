@@ -18,6 +18,7 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
 
+#include "PylirHIRAttributes.hpp"
 #include "PylirHIRDialect.hpp"
 
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.h.inc"
