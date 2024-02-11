@@ -13,12 +13,14 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 
+#include "PylirHIRAttributes.hpp"
 #include "PylirHIROps.hpp"
 
 #define GET_TYPEDEF_CLASSES
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRAttributes.cpp.inc"
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.cpp.inc"
+#include "pylir/Optimizer/PylirHIR/IR/PylirHIREnums.cpp.inc"
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRTypes.cpp.inc"
 
 void pylir::HIR::PylirHIRDialect::initialize() {
