@@ -38,6 +38,23 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
+// Basic Operations Conversion Patterns
+//===----------------------------------------------------------------------===//
+
+struct BinOpConversionPattern : OpRewritePattern<BinOp> {
+  using OpRewritePattern<BinOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BinOp op,
+                                PatternRewriter& rewriter) const override {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(),
+        ("pylir" + stringifyEnum(op.getBinaryOperation())).str(),
+        ValueRange{op.getLhs(), op.getRhs()});
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
 
@@ -414,9 +431,134 @@ Value buildSpecialMethodCall(PyBuilder& builder, TypeSlots method, Value args,
   return result;
 }
 
+Value binOp(PyBuilder& builder, TypeSlots method, TypeSlots revMethod,
+            Value lhs, Value rhs) {
+  auto trueC = builder.create<arith::ConstantIntOp>(true, 1);
+  auto falseC = builder.create<arith::ConstantIntOp>(false, 1);
+  auto* endBlock = new Block;
+  endBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+  if (method == TypeSlots::Eq || method == TypeSlots::Ne) {
+    auto isSame = builder.createIs(lhs, rhs);
+    auto* continueNormal = new Block;
+    builder.create<cf::CondBranchOp>(
+        isSame, endBlock,
+        ValueRange{builder.createConstant(method == TypeSlots::Eq)},
+        continueNormal, ValueRange{});
+    implementBlock(builder, continueNormal);
+  }
+
+  auto lhsType = builder.createTypeOf(lhs);
+  auto rhsType = builder.createTypeOf(rhs);
+  auto sameType = builder.createIs(lhsType, rhsType);
+  auto* normalMethodBlock = new Block;
+  normalMethodBlock->addArgument(builder.getI1Type(), builder.getCurrentLoc());
+  auto* differentTypeBlock = new Block;
+  builder.create<cf::CondBranchOp>(sameType, normalMethodBlock,
+                                   ValueRange{trueC}, differentTypeBlock,
+                                   ValueRange{});
+
+  implementBlock(builder, differentTypeBlock);
+  auto mro = builder.createTypeMRO(rhsType);
+  auto subclass = builder.createTupleContains(mro, lhsType);
+  auto* isSubclassBlock = new Block;
+  builder.create<cf::CondBranchOp>(subclass, isSubclassBlock, normalMethodBlock,
+                                   ValueRange{falseC});
+
+  implementBlock(builder, isSubclassBlock);
+  auto rhsMroTuple = builder.createTypeMRO(rhsType);
+  auto lookup = builder.createMROLookup(rhsMroTuple, revMethod);
+  auto failure = builder.createIsUnboundValue(lookup);
+  auto* hasReversedBlock = new Block;
+  builder.create<cf::CondBranchOp>(failure, normalMethodBlock,
+                                   ValueRange{falseC}, hasReversedBlock,
+                                   ValueRange{});
+
+  implementBlock(builder, hasReversedBlock);
+  auto lhsMroTuple = builder.createTypeMRO(lhsType);
+  auto lhsLookup = builder.createMROLookup(lhsMroTuple, revMethod);
+  failure = builder.createIsUnboundValue(lhsLookup);
+  auto* callReversedBlock = new Block;
+  auto* lhsHasReversedBlock = new Block;
+  builder.create<cf::CondBranchOp>(failure, callReversedBlock,
+                                   lhsHasReversedBlock);
+
+  implementBlock(builder, lhsHasReversedBlock);
+  auto sameImplementation =
+      builder.createIs(lookup.getResult(), lhsLookup.getResult());
+  builder.create<cf::CondBranchOp>(sameImplementation, normalMethodBlock,
+                                   ValueRange{falseC}, callReversedBlock,
+                                   ValueRange{});
+
+  implementBlock(builder, callReversedBlock);
+  auto tuple = builder.createMakeTuple({rhs, lhs}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto reverseResult = buildSpecialMethodCall(builder, revMethod, tuple, dict);
+  auto isNotImplemented =
+      builder.createIs(reverseResult, builder.createNotImplementedRef());
+  builder.create<cf::CondBranchOp>(isNotImplemented, normalMethodBlock,
+                                   ValueRange{trueC}, endBlock,
+                                   ValueRange{reverseResult});
+
+  implementBlock(builder, normalMethodBlock);
+  auto* typeErrorBlock = new Block;
+  tuple = builder.createMakeTuple({lhs, rhs}, nullptr);
+  dict = builder.createMakeDict();
+  auto result =
+      buildTrySpecialMethodCall(builder, method, tuple, dict, typeErrorBlock);
+  isNotImplemented =
+      builder.createIs(result, builder.createNotImplementedRef());
+  auto* maybeTryReverse = new Block;
+  builder.create<cf::CondBranchOp>(isNotImplemented, maybeTryReverse, endBlock,
+                                   ValueRange{result});
+
+  implementBlock(builder, maybeTryReverse);
+  auto* actuallyTryReverse = new Block;
+  builder.create<cf::CondBranchOp>(normalMethodBlock->getArgument(0),
+                                   typeErrorBlock, actuallyTryReverse);
+
+  implementBlock(builder, actuallyTryReverse);
+  tuple = builder.createMakeTuple({rhs, lhs}, nullptr);
+  reverseResult = buildTrySpecialMethodCall(builder, revMethod, tuple, dict,
+                                            typeErrorBlock);
+  isNotImplemented =
+      builder.createIs(reverseResult, builder.createNotImplementedRef());
+  builder.create<cf::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock,
+                                   ValueRange{reverseResult});
+
+  implementBlock(builder, typeErrorBlock);
+  if (method != TypeSlots::Eq && method != TypeSlots::Ne) {
+    auto typeError = buildException(builder, TypeError.name, {}, nullptr);
+    builder.createRaise(typeError);
+  } else {
+    Value isEqual = builder.createIs(lhs, rhs);
+    if (method == TypeSlots::Ne) {
+      isEqual = builder.create<arith::XOrIOp>(isEqual, trueC);
+    }
+    Value boolean = builder.createBoolFromI1(isEqual);
+    builder.create<cf::BranchOp>(endBlock, boolean);
+  }
+
+  implementBlock(builder, endBlock);
+  return endBlock->getArgument(0);
+}
+
+void buildRevBinOpCompilerBuiltin(PyBuilder& builder,
+                                  llvm::StringRef functionName,
+                                  TypeSlots method, TypeSlots revMethod) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType(
+                        {builder.getDynamicType(), builder.getDynamicType()},
+                        builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  auto result = binOp(builder, method, revMethod, func.getArgument(0),
+                      func.getArgument(1));
+  builder.create<Py::ReturnOp>(result);
+}
+
 void buildCallOpCompilerBuiltin(PyBuilder& builder,
                                 llvm::StringRef functionName) {
-  auto func = builder.create<pylir::Py::FuncOp>(
+  auto func = builder.create<Py::FuncOp>(
       functionName, builder.getFunctionType({builder.getDynamicType(),
                                              builder.getDynamicType(),
                                              builder.getDynamicType()},
@@ -454,6 +596,12 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   builder.setInsertionPointToEnd(getOperation().getBody());
   buildCallOpCompilerBuiltin(builder, "pylir__call__");
 
+#define COMPILER_BUILTIN_REV_BIN_OP(name, slotName, revSlotName)            \
+  buildRevBinOpCompilerBuiltin(builder,                                     \
+                               COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                               TypeSlots::name, TypeSlots::revSlotName);
+#include <pylir/Interfaces/CompilerBuiltins.def>
+
   ConversionTarget target(getContext());
   target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
@@ -462,7 +610,7 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
                ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
-               CallOpConversionPattern>(&getContext());
+               CallOpConversionPattern, BinOpConversionPattern>(&getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
