@@ -1,0 +1,71 @@
+name: LLVM Trunk Test
+
+on:
+  # TODO: Remove before merge
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  llvm-trunk-test:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout Pylir
+        uses: actions/checkout@v4
+        with:
+          path: Pylir
+
+      - name: Install Dependencies
+        id: dep-install
+        uses: ./Pylir/.github/actions/dependencies
+        with:
+          c-compiler: clang
+          cpp-compiler: clang++
+
+      - id: lastcommit
+        name: Get LLVM main commit hash
+        uses: nmbgeek/github-action-get-latest-commit@v0.1.0
+        with:
+          owner: llvm-project
+          repo: llvm
+          branch: main
+
+      - name: Update .pinned-llvm-revision
+        run: |
+          echo "${{steps.lastcommit.outputs.hash}}" `
+          | Out-File -FilePath "${{github.workspace}}/Pylir/.pinned-llvm-revision" -Encoding utf8
+
+      - name: Configure Pylir
+        run: |
+          cmake -GNinja -Bpylir-build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_C_COMPILER=clang `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DPYLIR_ENABLE_ASSERTIONS=ON `
+            -DPYLIR_INCLUDE_LLVM_BUILD=ON `
+            -S ${{github.workspace}}/Pylir
+
+      - name: Build Pylir
+        run: |
+          cmake --build pylir-build
+
+      - name: Test
+        working-directory: ${{github.workspace}}/pylir-build
+        run: ctest --extra-verbose
+
+      - name: Cleanup disk space
+        if: always()
+        run: |
+          Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
