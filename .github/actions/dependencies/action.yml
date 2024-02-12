@@ -27,6 +27,14 @@ inputs:
     description: 'CMake version to install'
     required: false
     default: '3.20.6'
+  ccache-size:
+    description: 'custom ccache size or calculate if empty'
+    required: false
+    default: ''
+  ccache-key-append:
+    description: 'text to append to the ccache key'
+    required: false
+    default: ''
 
 outputs:
   key:
@@ -96,6 +104,7 @@ runs:
         if ('${{inputs.shared_libs}}' -eq 'ON') {
           $key += '-shared'
         }
+        $key += '${{inputs.ccache-key-append}}'
 
         "key=$key" >> $Env:GITHUB_OUTPUT
 
@@ -114,7 +123,9 @@ runs:
       shell: pwsh
       id: calculate-cache-size
       run: |
-        if ('${{inputs.sanitizers}}') {
+        if ('${{inputs.cccache-size}}') {
+          "size=${{inputs.cccache-size}}" >> $Env:GITHUB_OUTPUT
+        } elseif ('${{inputs.sanitizers}}') {
           if ($IsWindows) {
             "size=120M" >> $Env:GITHUB_OUTPUT
           } else {

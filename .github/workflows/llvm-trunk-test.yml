@@ -31,6 +31,8 @@ jobs:
           c-compiler: clang
           cpp-compiler: clang++
           cmake-version: 3.21.7
+          ccache-key-append: trunk
+          ccache-size: 100M
 
       - name: Install Python depends
         run: |
