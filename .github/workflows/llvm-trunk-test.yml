@@ -1,8 +1,6 @@
 name: LLVM Trunk Test
 
 on:
-  # TODO: Remove before merge.
-  pull_request:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * 0'
@@ -43,12 +41,6 @@ jobs:
           echo "main" `
           | Out-File -FilePath "${{github.workspace}}/Pylir/.pinned-llvm-revision" -Encoding utf8
 
-      - name: Restore CPM-Cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/cpm-cache
-          key: ${{ runner.os }}-cpm
-
       - name: Configure Pylir
         run: |
           cmake -GNinja -Bpylir-build `
@@ -63,12 +55,6 @@ jobs:
             -DPYLIR_INCLUDE_LLVM_BUILD=ON `
             -DCPM_SOURCE_CACHE=~/cpm-cache `
             -S ${{github.workspace}}/Pylir
-
-      - name: Save CPM-Cache
-        uses: actions/cache/save@v4
-        with:
-          path: ~/cpm-cache
-          key: ${{ runner.os }}-cpm
 
       - name: Build Pylir
         run: |
