@@ -30,7 +30,7 @@ jobs:
         with:
           c-compiler: clang
           cpp-compiler: clang++
-          cmake-version: 3.25.3
+          cmake-version: 3.23.5
 
       - name: Set .pinned-llvm-revision to main
         run: |
