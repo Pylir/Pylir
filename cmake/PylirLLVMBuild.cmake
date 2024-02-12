@@ -6,6 +6,10 @@
 function(add_required_llvm_build llvm_revision)
   include(CPM)
 
+  if (CMAKE_VERSION VERSION_LESS "3.21")
+    message(FATAL_ERROR "Building LLVM as part of Pylir requires at least version 3.21")
+  endif ()
+
   # Set the default value of the MSVC runtime library to the same as CMake
   # as is documented here: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
   # This is required to make the LLVM build use the same runtime library
