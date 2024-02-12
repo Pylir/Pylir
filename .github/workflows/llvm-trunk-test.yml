@@ -32,7 +32,7 @@ jobs:
           cpp-compiler: clang++
           cmake-version: 3.21.7
           ccache-key-append: trunk
-          ccache-size: 150M
+          ccache-size: 200M
 
       - name: Install Python depends
         run: |
@@ -42,6 +42,12 @@ jobs:
         run: |
           echo "main" `
           | Out-File -FilePath "${{github.workspace}}/Pylir/.pinned-llvm-revision" -Encoding utf8
+
+      - name: Restore CPM-Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/cpm-cache
+          key: ${{ runner.os }}-cpm
 
       - name: Configure Pylir
         run: |
@@ -55,7 +61,14 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DPYLIR_INCLUDE_LLVM_BUILD=ON `
+            -DCPM_SOURCE_CACHE=~/cpm-cache `
             -S ${{github.workspace}}/Pylir
+
+      - name: Save CPM-Cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/cpm-cache
+          key: ${{ runner.os }}-cpm
 
       - name: Build Pylir
         run: |
