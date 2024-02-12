@@ -104,7 +104,9 @@ runs:
         if ('${{inputs.shared_libs}}' -eq 'ON') {
           $key += '-shared'
         }
-        $key += '${{inputs.ccache-key-append}}'
+        if ('${{inputs.ccache-key-append}}') {
+          $key += '-${{inputs.ccache-key-append}}'
+        }
 
         "key=$key" >> $Env:GITHUB_OUTPUT
 
@@ -123,8 +125,8 @@ runs:
       shell: pwsh
       id: calculate-cache-size
       run: |
-        if ('${{inputs.cccache-size}}') {
-          "size=${{inputs.cccache-size}}" >> $Env:GITHUB_OUTPUT
+        if ('${{inputs.ccache-size}}') {
+          "size=${{inputs.ccache-size}}" >> $Env:GITHUB_OUTPUT
         } elseif ('${{inputs.sanitizers}}') {
           if ($IsWindows) {
             "size=120M" >> $Env:GITHUB_OUTPUT
