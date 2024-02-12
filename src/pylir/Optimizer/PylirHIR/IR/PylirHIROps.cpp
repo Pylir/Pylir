@@ -106,8 +106,21 @@ void pylir::HIR::CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
         });
   }
 
-  build(odsBuilder, odsState, callable, argOperands,
-        odsBuilder.getArrayAttr(keywords), kindInternal);
+  odsState.addTypes(odsBuilder.getType<Py::DynamicType>());
+  odsState.addOperands(callable);
+  odsState.addOperands(argOperands);
+  odsState.getOrAddProperties<Properties>().keywords =
+      odsBuilder.getArrayAttr(keywords);
+  odsState.getOrAddProperties<Properties>().kind_internal =
+      odsBuilder.getDenseI32ArrayAttr(kindInternal);
+}
+
+void pylir::HIR::CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
+                               Value callable, ValueRange posArguments) {
+  return build(odsBuilder, odsState, callable,
+               llvm::map_to_vector(posArguments, [](Value value) {
+                 return CallArgument{value, CallArgument::PositionalTag{}};
+               }));
 }
 
 LogicalResult pylir::HIR::CallOp::verify() {

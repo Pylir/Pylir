@@ -6,6 +6,7 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/ImplicitLocOpBuilder.h>
 
@@ -151,6 +152,22 @@ class CodeGenNew {
   /// exception.
   bool isUnreachable() const {
     return !m_builder.getInsertionBlock();
+  }
+
+  /// Creates a new basic block with 'argTypes' as block arguments.
+  /// The returned block is only created and inserted at the end of the region
+  /// that the builder is currently inserting into. The builders insertion point
+  /// remains unchanged.
+  Block* addBlock(TypeRange argTypes = std::nullopt) {
+    if (isUnreachable())
+      return nullptr;
+
+    SmallVector<Location> locs(argTypes.size(), m_builder.getLoc());
+    Region* region = m_builder.getInsertionBlock()->getParent();
+    auto* block = new Block();
+    block->addArguments(argTypes, locs);
+    region->push_back(block);
+    return block;
   }
 
 public:
@@ -465,6 +482,17 @@ private:
   // Expressions
   //===--------------------------------------------------------------------===//
 
+  /// Casts a python value to 'i1'.
+  Value toI1(Value value) {
+    if (!value)
+      return nullptr;
+
+    Value boolRef = m_builder.create<Py::ConstantOp>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Bool.name));
+    Value toPyBool = m_builder.create<HIR::CallOp>(boolRef, value);
+    return m_builder.create<Py::BoolToI1Op>(toPyBool);
+  }
+
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Yield& yield) {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -542,10 +570,32 @@ private:
     };
 
     switch (binOp.operation.getTokenType()) {
-    case TokenType::OrKeyword:
     case TokenType::AndKeyword:
-      // TODO:
-      PYLIR_UNREACHABLE;
+    case TokenType::OrKeyword: {
+      Value lhsTrue = toI1(visit(binOp.lhs));
+      if (!lhsTrue)
+        return nullptr;
+
+      Block* otherBlock = addBlock();
+      Block* continueBlock = addBlock(m_builder.getI1Type());
+      // Short circuiting behavior depends on whether the value is true or false
+      // in combination with it being an 'and' or 'or' operation.
+      if (binOp.operation.getTokenType() == TokenType::AndKeyword)
+        m_builder.create<cf::CondBranchOp>(lhsTrue, otherBlock, continueBlock,
+                                           lhsTrue);
+      else
+        m_builder.create<cf::CondBranchOp>(lhsTrue, continueBlock, lhsTrue,
+                                           otherBlock, ValueRange());
+
+      m_builder.setInsertionPointToStart(otherBlock);
+      Value rhsTrue = toI1(visit(binOp.rhs));
+      if (!rhsTrue)
+        return nullptr;
+      m_builder.create<cf::BranchOp>(continueBlock, rhsTrue);
+
+      m_builder.setInsertionPointToStart(continueBlock);
+      return m_builder.create<Py::BoolFromI1Op>(continueBlock->getArgument(0));
+    }
     case TokenType::Plus: return implementUsualBinOp(HIR::BinaryOperation::Add);
     case TokenType::Minus:
       return implementUsualBinOp(HIR::BinaryOperation::Sub);
@@ -571,9 +621,21 @@ private:
     }
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::UnaryOp& unaryOp) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::UnaryOp& unaryOp) {
+    switch (unaryOp.operation.getTokenType()) {
+    case TokenType::NotKeyword: {
+      Value value = toI1(visit(unaryOp.expression));
+      if (!value)
+        return nullptr;
+
+      return m_builder.create<Py::BoolFromI1Op>(m_builder.create<arith::XOrIOp>(
+          value,
+          m_builder.create<arith::ConstantOp>(m_builder.getBoolAttr(true))));
+    }
+    default:
+      // TODO:
+      PYLIR_UNREACHABLE;
+    }
   }
 
   mlir::Value
