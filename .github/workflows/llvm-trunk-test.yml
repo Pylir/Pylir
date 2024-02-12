@@ -1,7 +1,7 @@
 name: LLVM Trunk Test
 
 on:
-  # TODO: Remove before merge
+  # TODO: Remove before merge.
   pull_request:
   workflow_dispatch:
   schedule:
