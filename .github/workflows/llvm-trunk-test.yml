@@ -35,8 +35,8 @@ jobs:
         name: Get LLVM main commit hash
         uses: nmbgeek/github-action-get-latest-commit@v0.1.0
         with:
-          owner: llvm-project
-          repo: llvm
+          owner: llvm
+          repo: llvm-project
           branch: main
 
       - name: Update .pinned-llvm-revision
