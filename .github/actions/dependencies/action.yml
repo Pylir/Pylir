@@ -23,6 +23,18 @@ inputs:
     description: 'Whether only dependencies for build LLVM must be installed'
     required: false
     default: 'OFF'
+  cmake-version:
+    description: 'CMake version to install'
+    required: false
+    default: '3.20.6'
+  ccache-size:
+    description: 'custom ccache size or calculate if empty'
+    required: false
+    default: ''
+  ccache-key-append:
+    description: 'text to append to the ccache key'
+    required: false
+    default: ''
 
 outputs:
   key:
@@ -40,7 +52,7 @@ runs:
     - name: Install minimum required cmake and ninja
       uses: lukka/get-cmake@latest
       with:
-        cmakeVersion: 3.20.6
+        cmakeVersion: ${{inputs.cmake-version}}
 
     - name: Install Ubuntu dependencies
       if: ${{ runner.os == 'Linux' }}
@@ -92,6 +104,9 @@ runs:
         if ('${{inputs.shared_libs}}' -eq 'ON') {
           $key += '-shared'
         }
+        if ('${{inputs.ccache-key-append}}') {
+          $key += '-${{inputs.ccache-key-append}}'
+        }
 
         "key=$key" >> $Env:GITHUB_OUTPUT
 
@@ -110,7 +125,9 @@ runs:
       shell: pwsh
       id: calculate-cache-size
       run: |
-        if ('${{inputs.sanitizers}}') {
+        if ('${{inputs.ccache-size}}') {
+          "size=${{inputs.ccache-size}}" >> $Env:GITHUB_OUTPUT
+        } elseif ('${{inputs.sanitizers}}') {
           if ($IsWindows) {
             "size=120M" >> $Env:GITHUB_OUTPUT
           } else {
