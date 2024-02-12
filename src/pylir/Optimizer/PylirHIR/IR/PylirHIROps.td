@@ -63,6 +63,7 @@ def PylirHIR_BinOp : PylirHIR_Op<"binOp", []> {
     $lhs $binaryOperation $rhs attr-dict
   }];
 }
+
 def PylirHIR_CallOp : PylirHIR_Op<"call"> {
   let arguments = (ins DynamicType:$callable,
     Variadic<DynamicType>:$arguments,
@@ -93,8 +94,12 @@ def PylirHIR_CallOp : PylirHIR_Op<"call"> {
 
   let builders = [
     OpBuilder<(ins "mlir::Value":$callable,
-                   "llvm::ArrayRef<CallArgument>":$arguments)>
+                   "llvm::ArrayRef<CallArgument>":$arguments)>,
+    OpBuilder<(ins "mlir::Value":$callable,
+                   "mlir::ValueRange":$posArguments)>
   ];
+
+  let skipDefaultBuilders = 1;
 
   let hasVerifier = 1;
 
