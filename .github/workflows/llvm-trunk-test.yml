@@ -32,6 +32,10 @@ jobs:
           cpp-compiler: clang++
           cmake-version: 3.21.7
 
+      - name: Install Python depends
+        run: |
+          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
+
       - name: Set .pinned-llvm-revision to main
         run: |
           echo "main" `
