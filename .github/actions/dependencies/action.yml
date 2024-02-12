@@ -23,6 +23,10 @@ inputs:
     description: 'Whether only dependencies for build LLVM must be installed'
     required: false
     default: 'OFF'
+  cmake-version:
+    description: 'CMake version to install'
+    required: false
+    default: '3.20.6'
 
 outputs:
   key:
@@ -40,7 +44,7 @@ runs:
     - name: Install minimum required cmake and ninja
       uses: lukka/get-cmake@latest
       with:
-        cmakeVersion: 3.20.6
+        cmakeVersion: ${{inputs.cmake-version}}
 
     - name: Install Ubuntu dependencies
       if: ${{ runner.os == 'Linux' }}
