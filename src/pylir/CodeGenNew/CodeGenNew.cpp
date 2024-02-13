@@ -185,14 +185,6 @@ class CodeGenNew {
   /// This function should be used instead of manually setting the insertion to
   /// ensure that blocks are inserted in the correct regions.
   void implementBlock(Block* block) {
-    if (Block* insertionBlock = m_builder.getInsertionBlock())
-      if (!insertionBlock->mightHaveTerminator()) {
-        if (insertionBlock->empty() && insertionBlock->hasNoPredecessors())
-          block->erase();
-        else
-          m_builder.create<Py::UnreachableOp>();
-      }
-
     assert(block->getParent() == nullptr &&
            "block must not have been implemented previously");
     m_builder.getInsertionBlock()->getParent()->push_back(block);
@@ -295,6 +287,8 @@ public:
       if (m_builder.getInsertionBlock())
         return;
 
+      // If the insertion point was cleared, enforce the post-condition of
+      // always having an insertion point by adding an unreachable block.
       m_builder.setInsertionPointToStart(&currentRegion->emplaceBlock());
     });
     if constexpr (Diag::hasLocationProvider_v<T>)
