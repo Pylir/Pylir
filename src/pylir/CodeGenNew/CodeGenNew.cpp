@@ -74,6 +74,32 @@ class CodeGenNew {
         });
   }
 
+  friend class MarkOpenBlock;
+
+  /// RAII class that marks a block as open on initialization and seals it on
+  /// destruction.
+  class MarkOpenBlock {
+    CodeGenNew& m_codeGen;
+    Block* m_block;
+
+  public:
+    MarkOpenBlock(CodeGenNew& codeGen, Block* block)
+        : m_codeGen(codeGen), m_block(block) {
+      if (m_codeGen.m_functionScope)
+        m_codeGen.m_functionScope->ssaBuilder.markOpenBlock(m_block);
+    }
+
+    ~MarkOpenBlock() {
+      if (m_codeGen.m_functionScope)
+        m_codeGen.m_functionScope->ssaBuilder.sealBlock(m_block);
+    }
+
+    MarkOpenBlock(const MarkOpenBlock&) = delete;
+    MarkOpenBlock& operator=(const MarkOpenBlock&) = delete;
+    MarkOpenBlock(MarkOpenBlock&&) = delete;
+    MarkOpenBlock& operator=(MarkOpenBlock&&) = delete;
+  };
+
   /// Qualifies 'name' by prepending the currently active qualifier to it.
   std::string qualify(llvm::StringRef name) const {
     return m_qualifiers + "." + name.str();
@@ -376,7 +402,7 @@ private:
           break;
         case Syntax::Scope::Cell:
         case Syntax::Scope::NonLocal: llvm_unreachable("not-yet-implemented");
-        default: llvm_unreachable("not possible");
+        default: break;
         }
       }
 
@@ -408,9 +434,34 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::WhileStmt& whileStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::WhileStmt& whileStmt) {
+    Block* conditionBlock = addBlock();
+    m_builder.create<cf::BranchOp>(conditionBlock);
+
+    implementBlock(conditionBlock);
+
+    {
+      MarkOpenBlock markOpenBlock(*this, conditionBlock);
+
+      Block* body = addBlock();
+      Block* elseBlock = addBlock();
+      m_builder.create<cf::CondBranchOp>(toI1(visit(whileStmt.condition)), body,
+                                         elseBlock);
+
+      implementBlock(body);
+      visit(whileStmt.suite);
+      m_builder.create<cf::BranchOp>(conditionBlock);
+
+      implementBlock(elseBlock);
+    }
+
+    if (whileStmt.elseSection)
+      visit(whileStmt.elseSection->suite);
+
+    Block* thenBlock = addBlock();
+    m_builder.create<cf::BranchOp>(thenBlock);
+
+    implementBlock(thenBlock);
   }
 
   void visitImpl([[maybe_unused]] const Syntax::ForStmt& forStmt) {
