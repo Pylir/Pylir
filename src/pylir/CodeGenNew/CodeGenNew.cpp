@@ -168,13 +168,6 @@ class CodeGenNew {
     return readValue;
   }
 
-  /// Returns true if the construct being generated is statically unreachable.
-  /// This is most commonly the case if previously generated code throws an
-  /// exception.
-  bool isUnreachable() const {
-    return !m_builder.getInsertionBlock();
-  }
-
   /// Creates a new basic block with 'argTypes' as block arguments.
   /// The returned block is only created and not inserted. The builders
   /// insertion point remains unchanged.
@@ -272,29 +265,36 @@ public:
   }
 
   /// Top-level 'visit' method that should be called by users to visit an AST
-  /// construct. This implements logic common to all visit implementations such
-  /// as changing the location of the builder or skipping the visit call if
-  /// unreachable.
-  /// Calls 'visitImpl' with 'object' and 'args...' forwarded as is.
+  /// construct.
+  /// Calling 'visit' is only legal if the builder has an insertion point.
+  /// Additionally, once 'visit' returns, the builder is guaranteed to have an
+  /// insertion point. The insertion point may potentially be in a block with no
+  /// predecessors.
+  ///
+  /// The implementation calls 'visitImpl' with 'object' and 'args...' forwarded
+  /// as is. Any implementation of 'visitImpl' is required to clear the
+  /// insertion point on exit if it terminated the last block it inserted into.
   template <class T, class... Args,
             std::enable_if_t<!IsAbstractVariantConcrete<T>{}>* = nullptr>
   decltype(auto) visit(const T& object, Args&&... args) {
-    auto lambda = [&] {
-      return visitImpl(object, std::forward<Args>(args)...);
-    };
-    using Ret = decltype(lambda());
-    if (isUnreachable()) {
-      if constexpr (std::is_void_v<Ret>)
-        return;
-      else
-        return Ret{};
-    }
+    assert(m_builder.getInsertionBlock() &&
+           "builder must have insertion block");
+
+    Region* currentRegion = m_builder.getInsertionBlock()->getParent();
     Location currLoc = m_builder.getLoc();
-    auto exit = llvm::make_scope_exit([=] { m_builder.setLoc(currLoc); });
+    auto exit = llvm::make_scope_exit([=] {
+      m_builder.setLoc(currLoc);
+      if (m_builder.getInsertionBlock())
+        return;
+
+      // If the insertion point was cleared, enforce the post-condition of
+      // always having an insertion point by adding an unreachable block.
+      m_builder.setInsertionPointToStart(&currentRegion->emplaceBlock());
+    });
     if constexpr (Diag::hasLocationProvider_v<T>)
       m_builder.setLoc(getLoc(object));
 
-    return lambda();
+    return visitImpl(object, std::forward<Args>(args)...);
   }
 
   mlir::ModuleOp visit(const Syntax::FileInput& fileInput) {
@@ -435,9 +435,6 @@ private:
 
   void visitImpl(const Syntax::AssignmentStmt& assignmentStmt) {
     Value rhs = visit(assignmentStmt.maybeExpression);
-    if (!rhs)
-      return;
-
     for (const auto& [target, token] : assignmentStmt.targets) {
       switch (token.getTokenType()) {
       case TokenType::Assignment: visit(target, rhs); continue;
@@ -455,10 +452,6 @@ private:
 
   void visitImpl(const Syntax::ReturnStmt& returnStmt) {
     Value value = visit(returnStmt.maybeExpression);
-    // TODO: Execute all finally blocks.
-    if (isUnreachable())
-      return;
-
     if (!value)
       value = m_builder.create<Py::ConstantOp>(
           m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name));
@@ -508,13 +501,11 @@ private:
 
   //===--------------------------------------------------------------------===//
   // Expressions
+  // Any 'visitImpl' must return a non-null value.
   //===--------------------------------------------------------------------===//
 
   /// Casts a python value to 'i1'.
   Value toI1(Value value) {
-    if (!value)
-      return nullptr;
-
     Value boolRef = m_builder.create<Py::ConstantOp>(
         m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Bool.name));
     Value toPyBool = m_builder.create<HIR::CallOp>(boolRef, value);
@@ -587,13 +578,7 @@ private:
     auto implementUsualBinOp =
         [&](HIR::BinaryOperation binaryOperation) -> Value {
       Value lhs = visit(binOp.lhs);
-      if (!lhs)
-        return nullptr;
-
       Value rhs = visit(binOp.rhs);
-      if (!rhs)
-        return nullptr;
-
       return m_builder.create<HIR::BinOp>(binaryOperation, lhs, rhs);
     };
 
@@ -601,9 +586,6 @@ private:
     case TokenType::AndKeyword:
     case TokenType::OrKeyword: {
       Value lhsTrue = toI1(visit(binOp.lhs));
-      if (!lhsTrue)
-        return nullptr;
-
       Block* otherBlock = addBlock();
       Block* continueBlock = addBlock(m_builder.getI1Type());
       // Short circuiting behavior depends on whether the value is true or false
@@ -617,8 +599,6 @@ private:
 
       implementBlock(otherBlock);
       Value rhsTrue = toI1(visit(binOp.rhs));
-      if (!rhsTrue)
-        return nullptr;
       m_builder.create<cf::BranchOp>(continueBlock, rhsTrue);
 
       implementBlock(continueBlock);
@@ -653,9 +633,6 @@ private:
     switch (unaryOp.operation.getTokenType()) {
     case TokenType::NotKeyword: {
       Value value = toI1(visit(unaryOp.expression));
-      if (!value)
-        return nullptr;
-
       return m_builder.create<Py::BoolFromI1Op>(m_builder.create<arith::XOrIOp>(
           value,
           m_builder.create<arith::ConstantOp>(m_builder.getBoolAttr(true))));
@@ -728,16 +705,14 @@ private:
                     Diag::INTRINSICS_DO_NOT_SUPPORT_COMPREHENSION_ARGUMENTS)
             .addHighlight(call.variant)
             .addHighlight(intr->identifiers, Diag::flags::secondaryColour);
-        return nullptr;
+        return m_builder.create<Py::ConstantOp>(
+            m_builder.getAttr<Py::UnboundAttr>());
       }
 
       return callIntrinsic(std::move(*intr), *args, call);
     }
 
     Value callable = visit(call.expression);
-    if (!callable)
-      return nullptr;
-
     return match(
         call.variant,
         [&]([[maybe_unused]] const Syntax::Comprehension& comprehension)
@@ -749,9 +724,6 @@ private:
           SmallVector<HIR::CallArgument> callArguments;
           for (const Syntax::Argument& arg : arguments) {
             Value value = visit(arg.expression);
-            if (!value)
-              return nullptr;
-
             if (arg.maybeName)
               callArguments.push_back(
                   {value, m_builder.getStringAttr(arg.maybeName->getValue())});
@@ -820,13 +792,15 @@ private:
       args.push_back(arg);
     }
     if (errorsOccurred)
-      return {};
+      return m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::UnboundAttr>());
 
 #include <pylir/CodeGen/CodeGenIntr.cpp.inc>
 
     createError(intrinsic.identifiers, Diag::UNKNOWN_INTRINSIC_N, intrName)
         .addHighlight(intrinsic.identifiers);
-    return {};
+    return m_builder.create<Py::ConstantOp>(
+        m_builder.getAttr<Py::UnboundAttr>());
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Lambda& lambda) {
