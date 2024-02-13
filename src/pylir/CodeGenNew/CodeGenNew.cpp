@@ -403,9 +403,34 @@ private:
     writeToIdentifier(function, funcDef.funcName.getValue());
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::IfStmt& ifStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::IfStmt& ifStmt) {
+    Block* thenBlock = addBlock();
+
+    // Create code that evaluates 'trueBody' if 'expression' is true before
+    // continuing to 'thenBlock'. Otherwise, jumps to an else block which will
+    // be set as insertion point prior to exiting.
+    auto codeGenIfTrue = [&](const auto& expression, const auto& trueBody) {
+      Value condition = toI1(visit(expression));
+      Block* trueBlock = addBlock();
+      Block* elseBlock = addBlock();
+      m_builder.create<cf::CondBranchOp>(condition, trueBlock, elseBlock);
+
+      implementBlock(trueBlock);
+      visit(trueBody);
+      m_builder.create<cf::BranchOp>(thenBlock);
+
+      implementBlock(elseBlock);
+    };
+
+    codeGenIfTrue(ifStmt.condition, ifStmt.suite);
+    for (const Syntax::IfStmt::Elif& elif : ifStmt.elifs)
+      codeGenIfTrue(elif.condition, elif.suite);
+
+    if (ifStmt.elseSection)
+      visit(ifStmt.elseSection->suite);
+
+    m_builder.create<cf::BranchOp>(thenBlock);
+    implementBlock(thenBlock);
   }
 
   void visitImpl([[maybe_unused]] const Syntax::WhileStmt& whileStmt) {
