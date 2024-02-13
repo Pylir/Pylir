@@ -60,6 +60,57 @@ class CodeGenNew {
   /// Currently active function scope or an empty optional if at module scope.
   std::optional<Scope> m_functionScope;
 
+  /// Structure containing the currently active loop's break and continue
+  /// blocks.
+  struct Loop {
+    Block* breakBlock;
+    Block* continueBlock;
+
+    bool operator==(const Loop& rhs) const {
+      return std::tie(breakBlock, continueBlock) ==
+             std::tie(rhs.breakBlock, rhs.continueBlock);
+    }
+
+    bool operator!=(const Loop& rhs) const {
+      return !(rhs == *this);
+    }
+  } m_currentLoop{nullptr, nullptr};
+
+  /// Base class for any RAII class operating on the outer class.
+  /// Subclasses must only call the constructor and implement 'void release()'.
+  template <class Self>
+  class RAIIBaseClass {
+  protected:
+    CodeGenNew& m_codeGen;
+
+    explicit RAIIBaseClass(CodeGenNew& codeGen) : m_codeGen(codeGen) {}
+
+  public:
+    ~RAIIBaseClass() {
+      static_cast<Self&>(*this).release();
+    }
+
+    RAIIBaseClass(const RAIIBaseClass&) = delete;
+    RAIIBaseClass& operator=(const RAIIBaseClass&) = delete;
+    RAIIBaseClass(RAIIBaseClass&&) = delete;
+    RAIIBaseClass& operator=(RAIIBaseClass&&) = delete;
+  };
+
+  /// RAII class setting and resetting the currently active loop information.
+  class EnterLoop : public RAIIBaseClass<EnterLoop> {
+    Loop m_previousLoop;
+
+  public:
+    EnterLoop(CodeGenNew& codeGen, Block* breakBlock, Block* continueBlock)
+        : RAIIBaseClass(codeGen), m_previousLoop(m_codeGen.m_currentLoop) {
+      m_codeGen.m_currentLoop = {breakBlock, continueBlock};
+    }
+
+    void release() {
+      m_codeGen.m_currentLoop = m_previousLoop;
+    }
+  };
+
   /// Adds 'args' as currently active qualifiers. The final qualifier consists
   /// of each component separated by dots.
   /// Returns an RAII object resetting the qualifier to its previous value on
@@ -74,30 +125,22 @@ class CodeGenNew {
         });
   }
 
-  friend class MarkOpenBlock;
-
   /// RAII class that marks a block as open on initialization and seals it on
   /// destruction.
-  class MarkOpenBlock {
-    CodeGenNew& m_codeGen;
+  class MarkOpenBlock : public RAIIBaseClass<MarkOpenBlock> {
     Block* m_block;
 
   public:
     MarkOpenBlock(CodeGenNew& codeGen, Block* block)
-        : m_codeGen(codeGen), m_block(block) {
+        : RAIIBaseClass(codeGen), m_block(block) {
       if (m_codeGen.m_functionScope)
         m_codeGen.m_functionScope->ssaBuilder.markOpenBlock(m_block);
     }
 
-    ~MarkOpenBlock() {
+    void release() {
       if (m_codeGen.m_functionScope)
         m_codeGen.m_functionScope->ssaBuilder.sealBlock(m_block);
     }
-
-    MarkOpenBlock(const MarkOpenBlock&) = delete;
-    MarkOpenBlock& operator=(const MarkOpenBlock&) = delete;
-    MarkOpenBlock(MarkOpenBlock&&) = delete;
-    MarkOpenBlock& operator=(MarkOpenBlock&&) = delete;
   };
 
   /// Qualifies 'name' by prepending the currently active qualifier to it.
@@ -436,6 +479,7 @@ private:
 
   void visitImpl(const Syntax::WhileStmt& whileStmt) {
     Block* conditionBlock = addBlock();
+    Block* thenBlock = addBlock();
     m_builder.create<cf::BranchOp>(conditionBlock);
 
     implementBlock(conditionBlock);
@@ -448,9 +492,14 @@ private:
       m_builder.create<cf::CondBranchOp>(toI1(visit(whileStmt.condition)), body,
                                          elseBlock);
 
-      implementBlock(body);
-      visit(whileStmt.suite);
-      m_builder.create<cf::BranchOp>(conditionBlock);
+      {
+        EnterLoop enterLoop(*this, /*breakBlock=*/thenBlock,
+                            /*continueBlock=*/conditionBlock);
+
+        implementBlock(body);
+        visit(whileStmt.suite);
+        m_builder.create<cf::BranchOp>(conditionBlock);
+      }
 
       implementBlock(elseBlock);
     }
@@ -458,7 +507,6 @@ private:
     if (whileStmt.elseSection)
       visit(whileStmt.elseSection->suite);
 
-    Block* thenBlock = addBlock();
     m_builder.create<cf::BranchOp>(thenBlock);
 
     implementBlock(thenBlock);
@@ -512,12 +560,18 @@ private:
   }
 
   void visitImpl(const Syntax::SingleTokenStmt& singleTokenStmt) {
-    if (singleTokenStmt.token.getTokenType() == pylir::TokenType::PassKeyword) {
+    switch (singleTokenStmt.token.getTokenType()) {
+    case TokenType::PassKeyword: return;
+    case TokenType::BreakKeyword:
+      m_builder.create<cf::BranchOp>(m_currentLoop.breakBlock);
+      m_builder.clearInsertionPoint();
       return;
+    case TokenType::ContinueKeyword:
+      m_builder.create<cf::BranchOp>(m_currentLoop.continueBlock);
+      m_builder.clearInsertionPoint();
+      return;
+    default: PYLIR_UNREACHABLE;
     }
-
-    // TODO:
-    PYLIR_UNREACHABLE;
   }
 
   void visitImpl([[maybe_unused]] const Syntax::GlobalOrNonLocalStmt&
