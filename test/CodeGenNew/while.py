@@ -44,3 +44,31 @@ def foo(a):
     # CHECK: ^[[ELSE]]:
     # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
     # CHECK: ^[[THEN]]:
+
+
+# CHECK: cf.br ^[[COND:[[:alnum:]]+]]
+
+# CHECK: ^[[COND]]:
+# CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+# CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: cf.cond_br %[[I1]], ^[[BODY:.*]], ^[[ELSE:[[:alnum:]]+]]
+while True:
+    # CHECK: ^[[BODY]]:
+    # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
+    break
+# CHECK: ^[[ELSE]]:
+# CHECK: cf.br ^[[THEN]]
+
+# CHECK: ^[[THEN]]:
+# CHECK: cf.br ^[[COND:[[:alnum:]]+]]
+
+# CHECK: ^[[COND]]:
+# CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+# CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: cf.cond_br %[[I1]], ^[[BODY:.*]], ^[[ELSE:[[:alnum:]]+]]
+while True:
+    # CHECK: ^[[BODY]]:
+    # CHECK: cf.br ^[[COND]]
+    continue
