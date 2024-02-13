@@ -96,7 +96,7 @@ def PylirHIR_CallOp : PylirHIR_Op<"call"> {
     OpBuilder<(ins "mlir::Value":$callable,
                    "llvm::ArrayRef<CallArgument>":$arguments)>,
     OpBuilder<(ins "mlir::Value":$callable,
-                   "mlir::ValueRange":$posArguments)>
+                   CArg<"mlir::ValueRange", "std::nullopt">:$posArguments)>
   ];
 
   let skipDefaultBuilders = 1;
