@@ -114,13 +114,30 @@ class CodeGenNew {
                                         value);
   }
 
-  /// Reads the identifier given by 'name'. Currently returns a '#py.unbound' if
-  /// the identifier is unbound, but is subject to change.
+  /// Reads the identifier given by 'name' and returns its value. Generates code
+  /// to throw an appropriate exception if the identifier is unknown.
+  /// '#py.unbound' is returned in this case.
   Value readFromIdentifier(llvm::StringRef name) {
+    auto throwExceptionIfUnbound = [&](Value value,
+                                       const Builtins::Builtin& exceptionType) {
+      Value isUnbound = m_builder.create<Py::IsUnboundValueOp>(value);
+      Block* raiseBlock = addBlock();
+      Block* continueBlock = addBlock();
+      m_builder.create<cf::CondBranchOp>(isUnbound, raiseBlock, continueBlock);
+
+      implementBlock(raiseBlock);
+      Value typeObject = m_builder.create<Py::ConstantOp>(
+          m_builder.getAttr<Py::GlobalValueAttr>(exceptionType.name));
+      Value object = m_builder.create<HIR::CallOp>(typeObject);
+      m_builder.create<Py::RaiseOp>(object);
+
+      implementBlock(continueBlock);
+    };
+
     if (m_functionScope) {
       auto iter = m_functionScope->identifiers.find(name);
       if (iter != m_functionScope->identifiers.end()) {
-        return match(
+        Value result = match(
             iter->second,
             [&](SSABuilder::DefinitionsMap& map) -> Value {
               return m_functionScope->ssaBuilder.readVariable(
@@ -128,6 +145,8 @@ class CodeGenNew {
                   m_builder.getInsertionBlock());
             },
             [](auto) -> Value { llvm_unreachable("not yet implemented"); });
+        throwExceptionIfUnbound(result, Builtins::UnboundLocalError);
+        return result;
       }
     }
 
@@ -143,6 +162,8 @@ class CodeGenNew {
       Value isUnbound = m_builder.create<Py::IsUnboundValueOp>(readValue);
       readValue =
           m_builder.create<arith::SelectOp>(isUnbound, alternative, readValue);
+    } else {
+      throwExceptionIfUnbound(readValue, Builtins::NameError);
     }
     return readValue;
   }
@@ -155,19 +176,26 @@ class CodeGenNew {
   }
 
   /// Creates a new basic block with 'argTypes' as block arguments.
-  /// The returned block is only created and inserted at the end of the region
-  /// that the builder is currently inserting into. The builders insertion point
-  /// remains unchanged.
+  /// The returned block is only created and not inserted. The builders
+  /// insertion point remains unchanged.
   Block* addBlock(TypeRange argTypes = std::nullopt) {
-    if (isUnreachable())
-      return nullptr;
-
     SmallVector<Location> locs(argTypes.size(), m_builder.getLoc());
-    Region* region = m_builder.getInsertionBlock()->getParent();
     auto* block = new Block();
     block->addArguments(argTypes, locs);
-    region->push_back(block);
     return block;
+  }
+
+  /// Insert the given block into the current region and set the builders
+  /// insertion point to the start of the block. The block mustn't have been
+  /// implemented previously.
+  ///
+  /// This function should be used instead of manually setting the insertion to
+  /// ensure that blocks are inserted in the correct regions.
+  void implementBlock(Block* block) {
+    assert(block->getParent() == nullptr &&
+           "block must not have been implemented previously");
+    m_builder.getInsertionBlock()->getParent()->push_back(block);
+    m_builder.setInsertionPointToStart(block);
   }
 
 public:
@@ -587,13 +615,13 @@ private:
         m_builder.create<cf::CondBranchOp>(lhsTrue, continueBlock, lhsTrue,
                                            otherBlock, ValueRange());
 
-      m_builder.setInsertionPointToStart(otherBlock);
+      implementBlock(otherBlock);
       Value rhsTrue = toI1(visit(binOp.rhs));
       if (!rhsTrue)
         return nullptr;
       m_builder.create<cf::BranchOp>(continueBlock, rhsTrue);
 
-      m_builder.setInsertionPointToStart(continueBlock);
+      implementBlock(continueBlock);
       return m_builder.create<Py::BoolFromI1Op>(continueBlock->getArgument(0));
     }
     case TokenType::Plus: return implementUsualBinOp(HIR::BinaryOperation::Add);
