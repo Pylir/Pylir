@@ -17,6 +17,7 @@ add_dependencies(PylirHIRDialect
 target_link_libraries(PylirHIRDialect
   PUBLIC
   PylirPyDialect
+  PylirPyExceptionHandlingInterface
   
   MLIRControlFlowInterfaces
   MLIRIR

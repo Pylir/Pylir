@@ -16,7 +16,9 @@
 
 #include <llvm/ADT/iterator.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyTraits.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.hpp>
 
 #include "PylirHIRAttributes.hpp"
 #include "PylirHIRDialect.hpp"
@@ -190,20 +192,32 @@ struct CallArgument {
 namespace pylir::HIR {
 
 /// Range adaptor allowing easy iteration over the arguments of a call op.
+template <class OpT>
 class CallArgumentRange
-    : public llvm::indexed_accessor_range<
-          CallArgumentRange, CallOp, CallArgument, CallArgument, CallArgument> {
+    : public llvm::indexed_accessor_range<CallArgumentRange<OpT>, OpT,
+                                          CallArgument, CallArgument,
+                                          CallArgument> {
   using Base =
-      llvm::indexed_accessor_range<CallArgumentRange, CallOp, CallArgument,
+      llvm::indexed_accessor_range<CallArgumentRange, OpT, CallArgument,
                                    CallArgument, CallArgument>;
 
   friend Base;
 
   // dereference function required by indexed_accessor_range.
-  static CallArgument dereference(CallOp call, std::ptrdiff_t index);
+  static CallArgument dereference(OpT call, std::ptrdiff_t index) {
+    mlir::Value value = call.getArguments()[index];
+    if (call.isPosExpansion(index))
+      return CallArgument{value, CallArgument::PosExpansionTag{}};
+    if (call.isMapExpansion(index))
+      return CallArgument{value, CallArgument::MapExpansionTag{}};
+    if (mlir::StringAttr keyword = call.getKeyword(index))
+      return CallArgument{value, keyword};
+
+    return CallArgument{value, CallArgument::PositionalTag{}};
+  }
 
 public:
-  explicit CallArgumentRange(CallOp call)
+  explicit CallArgumentRange(OpT call)
       : Base(call, 0, call.getArguments().size()) {}
 };
 

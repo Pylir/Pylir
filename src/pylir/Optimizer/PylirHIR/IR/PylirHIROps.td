@@ -18,6 +18,7 @@ include "pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.td"
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
+include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 
 class PylirHIR_Op<string mneomic, list<Trait> traits = []>
   : Op<PylirHIR_Dialect, mneomic, traits>;
@@ -50,7 +51,8 @@ def PylirHIR_BinaryOperationAttr : I32EnumAttr<"BinaryOperation",
   let cppNamespace = "pylir::HIR";
 }
 
-def PylirHIR_BinOp : PylirHIR_Op<"binOp", []> {
+def PylirHIR_BinOp : PylirHIR_Op<"binOp",
+  [AddableExceptionHandling<"BinExOp">]> {
   let arguments = (ins PylirHIR_BinaryOperationAttr:$binaryOperation,
                        DynamicType:$lhs, DynamicType:$rhs);
   let results = (outs DynamicType:$result);
@@ -64,7 +66,10 @@ def PylirHIR_BinOp : PylirHIR_Op<"binOp", []> {
   }];
 }
 
-def PylirHIR_CallOp : PylirHIR_Op<"call"> {
+def PylirHIR_BinExOp : CreateExceptionHandlingVariant<PylirHIR_BinOp>;
+
+def PylirHIR_CallOp : PylirHIR_Op<"call",
+  [AddableExceptionHandling<"CallExOp", ["Single", "Variadic"]>]> {
   let arguments = (ins DynamicType:$callable,
     Variadic<DynamicType>:$arguments,
     DefaultValuedAttr<StrArrayAttr, "{}">:$keywords,
@@ -139,6 +144,8 @@ def PylirHIR_CallOp : PylirHIR_Op<"call"> {
     }
   }];
 }
+
+def PylirHIR_CallExOp : CreateExceptionHandlingVariant<PylirHIR_CallOp>;
 
 //===----------------------------------------------------------------------===//
 // Functions
