@@ -111,6 +111,50 @@ class CodeGenNew {
     }
   };
 
+  /// Currently active exception handler.
+  Block* m_exceptionHandler = nullptr;
+
+  struct FinallyCode {
+    const Syntax::TryStmt::Finally* finally;
+    /// Loop containing the 'finally'.
+    Loop containedLoop;
+    /// Namespace containing the 'finally'.
+    std::string containedNamespace;
+  };
+  /// Stack of currently active finally sections with the most recent at the
+  /// back.
+  std::vector<FinallyCode> m_finallyStack;
+
+  /// RAII class setting and resetting the currently active exception handler.
+  class EnterTry : public RAIIBaseClass<EnterTry> {
+    Block* m_previousHandler;
+
+  public:
+    EnterTry(CodeGenNew& codeGen, Block* newExceptionHandler)
+        : RAIIBaseClass(codeGen),
+          m_previousHandler(codeGen.m_exceptionHandler) {
+      codeGen.m_exceptionHandler = newExceptionHandler;
+    }
+
+    void release() {
+      m_codeGen.m_exceptionHandler = m_previousHandler;
+    }
+  };
+
+  /// RAII class pushing and popping a finally section on the finally stack.
+  class AddFinally : public RAIIBaseClass<AddFinally> {
+  public:
+    AddFinally(CodeGenNew& codeGen, const Syntax::TryStmt::Finally* finally)
+        : RAIIBaseClass(codeGen) {
+      codeGen.m_finallyStack.push_back(
+          {finally, codeGen.m_currentLoop, codeGen.m_qualifiers});
+    }
+
+    void release() {
+      m_codeGen.m_finallyStack.pop_back();
+    }
+  };
+
   /// Adds 'args' as currently active qualifiers. The final qualifier consists
   /// of each component separated by dots.
   /// Returns an RAII object resetting the qualifier to its previous value on
@@ -159,6 +203,42 @@ class CodeGenNew {
             line, col));
   }
 
+  /// Create the operation 'T' using 'args'. This should be preferred over using
+  /// the builder directly to create exception handling versions of operations
+  /// if an exception handler is active.
+  template <class T, class... Args>
+  auto create(Args&&... args) {
+    T op = m_builder.create<T>(std::forward<Args>(args)...);
+    if constexpr (!std::is_base_of_v<
+                      Py::AddableExceptionHandlingInterface::Trait<T>, T>) {
+      return op;
+    } else {
+      // Return the single result or the operation depending on whether the op
+      // has a statically known single result.
+      auto doReturn = [](Operation* op) {
+        if constexpr (T::template hasTrait<OpTrait::OneResult>())
+          return op->getResult(0);
+        else
+          return op;
+      };
+
+      if (!m_exceptionHandler)
+        return doReturn(op);
+
+      // Immediately replace the just created op with its exception handling
+      // variant.
+      Block* happyPath = addBlock();
+      Operation* newOp = op.cloneWithExceptionHandling(
+          m_builder, happyPath, m_exceptionHandler,
+          /*unwind_operands=*/ValueRange());
+      op.erase();
+
+      // Continue on the happy path.
+      implementBlock(happyPath);
+      return doReturn(newOp);
+    }
+  }
+
   /// Writes 'value' to the identifier given by 'name'. This abstracts the
   /// different procedures required to write to local, nonlocal and global
   /// variables.
@@ -176,11 +256,9 @@ class CodeGenNew {
       }
     }
 
-    Value string =
-        m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
-    Value hash = m_builder.create<Py::StrHashOp>(string);
-    m_builder.create<Py::DictSetItemOp>(m_globalDictionary, string, hash,
-                                        value);
+    Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+    Value hash = create<Py::StrHashOp>(string);
+    create<Py::DictSetItemOp>(m_globalDictionary, string, hash, value);
   }
 
   /// Reads the identifier given by 'name' and returns its value. Generates code
@@ -189,16 +267,16 @@ class CodeGenNew {
   Value readFromIdentifier(llvm::StringRef name) {
     auto throwExceptionIfUnbound = [&](Value value,
                                        const Builtins::Builtin& exceptionType) {
-      Value isUnbound = m_builder.create<Py::IsUnboundValueOp>(value);
+      Value isUnbound = create<Py::IsUnboundValueOp>(value);
       Block* raiseBlock = addBlock();
       Block* continueBlock = addBlock();
-      m_builder.create<cf::CondBranchOp>(isUnbound, raiseBlock, continueBlock);
+      create<cf::CondBranchOp>(isUnbound, raiseBlock, continueBlock);
 
       implementBlock(raiseBlock);
-      Value typeObject = m_builder.create<Py::ConstantOp>(
+      Value typeObject = create<Py::ConstantOp>(
           m_builder.getAttr<Py::GlobalValueAttr>(exceptionType.name));
-      Value object = m_builder.create<HIR::CallOp>(typeObject);
-      m_builder.create<Py::RaiseOp>(object);
+      Value object = create<HIR::CallOp>(typeObject);
+      create<Py::RaiseOp>(object);
 
       implementBlock(continueBlock);
     };
@@ -219,18 +297,16 @@ class CodeGenNew {
       }
     }
 
-    Value string =
-        m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
-    Value hash = m_builder.create<Py::StrHashOp>(string);
-    Value readValue = m_builder.create<Py::DictTryGetItemOp>(m_globalDictionary,
-                                                             string, hash);
+    Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+    Value hash = create<Py::StrHashOp>(string);
+    Value readValue =
+        create<Py::DictTryGetItemOp>(m_globalDictionary, string, hash);
 
     auto iter = m_builtinNamespace.find(name);
     if (iter != m_builtinNamespace.end()) {
-      Value alternative = m_builder.create<Py::ConstantOp>(iter->second);
-      Value isUnbound = m_builder.create<Py::IsUnboundValueOp>(readValue);
-      readValue =
-          m_builder.create<arith::SelectOp>(isUnbound, alternative, readValue);
+      Value alternative = create<Py::ConstantOp>(iter->second);
+      Value isUnbound = create<Py::IsUnboundValueOp>(readValue);
+      readValue = create<arith::SelectOp>(isUnbound, alternative, readValue);
     } else {
       throwExceptionIfUnbound(readValue, Builtins::NameError);
     }
@@ -260,12 +336,49 @@ class CodeGenNew {
     m_builder.setInsertionPointToStart(block);
   }
 
+  /// Alternative of reasons as to why 'finally' sections should be executed.
+  /// Depending on the reason, more or less 'finally' sections on the stack are
+  /// executed.
+  struct FinallyExitReason {
+    /// A 'break' or 'continue' statement within the current loop is being
+    /// executed.
+    struct BreakOrContinueStatement {};
+
+    /// A 'return' from the current function is executed.
+    struct ReturnStatement {};
+
+    /// The top-most 'finally' is being exited normally (end of 'try' and/or
+    /// 'else' section).
+    struct LeavingTry {
+      const Syntax::TryStmt::Finally* finally = nullptr;
+
+      /// Creates a reason optionally leaving 'finally' if a value is present.
+      /// Calling 'executeFinallys' with 'LeavingTry' constructed with an empty
+      /// optional is a noop.
+      explicit LeavingTry(
+          const std::optional<Syntax::TryStmt::Finally>& finally) {
+        if (finally)
+          this->finally = &*finally;
+      }
+    };
+
+    std::variant<BreakOrContinueStatement, ReturnStatement, LeavingTry> value;
+
+    template <class T,
+              std::enable_if_t<std::is_constructible_v<decltype(value), T&&>>* =
+                  nullptr>
+    FinallyExitReason(T&& t) : value(std::forward<T>(t)) {}
+  };
+
+  /// Execute all 'finally' sections required for the given 'exitReason'.
+  void executeFinallys(FinallyExitReason exitReason);
+
 public:
   CodeGenNew(MLIRContext* context, Diag::DiagnosticsDocManager& manager,
              CodeGenOptions&& options)
       : m_options(std::move(options)),
         m_builder(mlir::UnknownLoc::get(context), context),
-        m_module(m_builder.create<mlir::ModuleOp>()), m_docManager(&manager) {
+        m_module(create<mlir::ModuleOp>()), m_docManager(&manager) {
     context->loadDialect<Py::PylirPyDialect, HIR::PylirHIRDialect,
                          cf::ControlFlowDialect, arith::ArithDialect>();
 
@@ -371,7 +484,7 @@ public:
     m_builder.setInsertionPointToEnd(m_module.getBody());
 
     // TODO: Set qualifier to '__main__' in top level CodeGenOptions instead.
-    auto init = m_builder.create<HIR::InitOp>(
+    auto init = create<HIR::InitOp>(
         m_options.qualifier.empty() ? "__main__" : m_options.qualifier);
     m_qualifiers = init.getName();
 
@@ -379,12 +492,12 @@ public:
     init.getBody().push_back(entryBlock);
     m_builder.setInsertionPointToEnd(entryBlock);
 
-    m_globalDictionary = m_builder.create<Py::MakeDictOp>();
+    m_globalDictionary = create<Py::MakeDictOp>();
 
     visit(fileInput.input);
 
     if (m_builder.getInsertionBlock())
-      m_builder.create<HIR::InitReturnOp>(m_globalDictionary);
+      create<HIR::InitReturnOp>(m_globalDictionary);
 
     return m_module;
   }
@@ -424,7 +537,7 @@ private:
       }
     }
 
-    auto function = m_builder.create<HIR::FuncOp>(qualify(funcName), specs);
+    auto function = create<HIR::FuncOp>(qualify(funcName), specs);
     {
       auto resetQualifier = addQualifiers(funcName, "<locals>");
 
@@ -457,9 +570,9 @@ private:
       emitFunctionBody();
 
       if (m_builder.getInsertionBlock()) {
-        auto ref = m_builder.create<Py::ConstantOp>(Py::GlobalValueAttr::get(
+        auto ref = create<Py::ConstantOp>(Py::GlobalValueAttr::get(
             m_builder.getContext(), Builtins::None.name));
-        m_builder.create<HIR::ReturnOp>(ref);
+        create<HIR::ReturnOp>(ref);
       }
     }
     return function;
@@ -482,11 +595,11 @@ private:
       Value condition = toI1(visit(expression));
       Block* trueBlock = addBlock();
       Block* elseBlock = addBlock();
-      m_builder.create<cf::CondBranchOp>(condition, trueBlock, elseBlock);
+      create<cf::CondBranchOp>(condition, trueBlock, elseBlock);
 
       implementBlock(trueBlock);
       visit(trueBody);
-      m_builder.create<cf::BranchOp>(thenBlock);
+      create<cf::BranchOp>(thenBlock);
 
       implementBlock(elseBlock);
     };
@@ -498,14 +611,14 @@ private:
     if (ifStmt.elseSection)
       visit(ifStmt.elseSection->suite);
 
-    m_builder.create<cf::BranchOp>(thenBlock);
+    create<cf::BranchOp>(thenBlock);
     implementBlock(thenBlock);
   }
 
   void visitImpl(const Syntax::WhileStmt& whileStmt) {
     Block* conditionBlock = addBlock();
     Block* thenBlock = addBlock();
-    m_builder.create<cf::BranchOp>(conditionBlock);
+    create<cf::BranchOp>(conditionBlock);
 
     implementBlock(conditionBlock);
 
@@ -514,8 +627,8 @@ private:
 
       Block* body = addBlock();
       Block* elseBlock = addBlock();
-      m_builder.create<cf::CondBranchOp>(toI1(visit(whileStmt.condition)), body,
-                                         elseBlock);
+      create<cf::CondBranchOp>(toI1(visit(whileStmt.condition)), body,
+                               elseBlock);
 
       {
         EnterLoop enterLoop(*this, /*breakBlock=*/thenBlock,
@@ -523,7 +636,7 @@ private:
 
         implementBlock(body);
         visit(whileStmt.suite);
-        m_builder.create<cf::BranchOp>(conditionBlock);
+        create<cf::BranchOp>(conditionBlock);
       }
 
       implementBlock(elseBlock);
@@ -532,7 +645,7 @@ private:
     if (whileStmt.elseSection)
       visit(whileStmt.elseSection->suite);
 
-    m_builder.create<cf::BranchOp>(thenBlock);
+    create<cf::BranchOp>(thenBlock);
 
     implementBlock(thenBlock);
   }
@@ -542,9 +655,62 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::TryStmt& tryStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::TryStmt& tryStmt) {
+    std::optional<AddFinally> addFinally;
+    if (tryStmt.finally)
+      addFinally.emplace(*this, &*tryStmt.finally);
+
+    Block* elseBlock = addBlock();
+    Block* thenBlock = addBlock();
+    Block* exceptionHandler = addBlock(m_builder.getType<Py::DynamicType>());
+    {
+      EnterTry enterTry(*this, exceptionHandler);
+      visit(tryStmt.suite);
+
+      create<cf::BranchOp>(elseBlock);
+    }
+
+    implementBlock(exceptionHandler);
+    Value exception = exceptionHandler->getArgument(0);
+    for (const Syntax::TryStmt::ExceptArgs& exceptArgs : tryStmt.excepts) {
+      Value type = visit(exceptArgs.filter);
+      Value instanceOf = create<Py::ConstantOp>(
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::IsInstance.name));
+      Value call = create<HIR::CallOp>(instanceOf, ValueRange{exception, type});
+      Value i1 = create<Py::BoolToI1Op>(call);
+      Block* matched = addBlock();
+      Block* continueSearch = addBlock();
+      create<cf::CondBranchOp>(i1, matched, continueSearch);
+
+      implementBlock(matched);
+      // TODO: Call 'del' name as if within a finally surrounding the suite.
+      if (exceptArgs.maybeName)
+        writeToIdentifier(exception, exceptArgs.maybeName->getValue());
+      visit(exceptArgs.suite);
+
+      executeFinallys(FinallyExitReason::LeavingTry{tryStmt.finally});
+      create<cf::BranchOp>(thenBlock);
+      implementBlock(continueSearch);
+    }
+
+    if (tryStmt.maybeExceptAll) {
+      visit(tryStmt.maybeExceptAll->suite);
+      executeFinallys(FinallyExitReason::LeavingTry{tryStmt.finally});
+      create<cf::BranchOp>(thenBlock);
+    } else {
+      // Execute the current finally and reraise the exception if no 'except'
+      // handles it.
+      executeFinallys(FinallyExitReason::LeavingTry{tryStmt.finally});
+      create<Py::RaiseOp>(exception);
+    }
+
+    implementBlock(elseBlock);
+    if (tryStmt.elseSection)
+      visit(tryStmt.elseSection->suite);
+    executeFinallys(FinallyExitReason::LeavingTry{tryStmt.finally});
+    create<cf::BranchOp>(thenBlock);
+
+    implementBlock(thenBlock);
   }
 
   void visitImpl([[maybe_unused]] const Syntax::WithStmt& withStmt) {
@@ -577,10 +743,11 @@ private:
   void visitImpl(const Syntax::ReturnStmt& returnStmt) {
     Value value = visit(returnStmt.maybeExpression);
     if (!value)
-      value = m_builder.create<Py::ConstantOp>(
+      value = create<Py::ConstantOp>(
           m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name));
 
-    m_builder.create<HIR::ReturnOp>(value);
+    executeFinallys(FinallyExitReason::ReturnStatement{});
+    create<HIR::ReturnOp>(value);
     m_builder.clearInsertionPoint();
   }
 
@@ -588,22 +755,20 @@ private:
     switch (singleTokenStmt.token.getTokenType()) {
     case TokenType::PassKeyword: return;
     case TokenType::BreakKeyword:
-      m_builder.create<cf::BranchOp>(m_currentLoop.breakBlock);
+      executeFinallys(FinallyExitReason::BreakOrContinueStatement{});
+      create<cf::BranchOp>(m_currentLoop.breakBlock);
       m_builder.clearInsertionPoint();
       return;
     case TokenType::ContinueKeyword:
-      m_builder.create<cf::BranchOp>(m_currentLoop.continueBlock);
+      executeFinallys(FinallyExitReason::BreakOrContinueStatement{});
+      create<cf::BranchOp>(m_currentLoop.continueBlock);
       m_builder.clearInsertionPoint();
       return;
     default: PYLIR_UNREACHABLE;
     }
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::GlobalOrNonLocalStmt&
-                     globalOrNonLocalStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
-  }
+  void visitImpl(const Syntax::GlobalOrNonLocalStmt&) {}
 
   void visitImpl(const Syntax::ExpressionStmt& expressionStmt) {
     visit(expressionStmt.expression);
@@ -636,10 +801,10 @@ private:
 
   /// Casts a python value to 'i1'.
   Value toI1(Value value) {
-    Value boolRef = m_builder.create<Py::ConstantOp>(
+    Value boolRef = create<Py::ConstantOp>(
         m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Bool.name));
-    Value toPyBool = m_builder.create<HIR::CallOp>(boolRef, value);
-    return m_builder.create<Py::BoolToI1Op>(toPyBool);
+    Value toPyBool = create<HIR::CallOp>(boolRef, value);
+    return create<Py::BoolToI1Op>(toPyBool);
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Yield& yield) {
@@ -661,22 +826,20 @@ private:
   Value visitImpl(const Syntax::Atom& atom) {
     switch (atom.token.getTokenType()) {
     case TokenType::IntegerLiteral:
-      return m_builder.create<Py::ConstantOp>(
+      return create<Py::ConstantOp>(
           m_builder.getAttr<Py::IntAttr>(get<BigInt>(atom.token.getValue())));
     case TokenType::FloatingPointLiteral:
-      return m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::FloatAttr>(
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::FloatAttr>(
           llvm::APFloat(get<double>(atom.token.getValue()))));
     case TokenType::StringLiteral:
-      return m_builder.create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(
           get<std::string>(atom.token.getValue())));
     case TokenType::TrueKeyword:
-      return m_builder.create<Py::ConstantOp>(
-          m_builder.getAttr<Py::BoolAttr>(true));
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::BoolAttr>(true));
     case TokenType::FalseKeyword:
-      return m_builder.create<Py::ConstantOp>(
-          m_builder.getAttr<Py::BoolAttr>(false));
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::BoolAttr>(false));
     case TokenType::NoneKeyword:
-      return m_builder.create<Py::ConstantOp>(
+      return create<Py::ConstantOp>(
           m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name));
     case TokenType::ByteLiteral:
     case TokenType::ComplexLiteral:
@@ -709,7 +872,7 @@ private:
         [&](HIR::BinaryOperation binaryOperation) -> Value {
       Value lhs = visit(binOp.lhs);
       Value rhs = visit(binOp.rhs);
-      return m_builder.create<HIR::BinOp>(binaryOperation, lhs, rhs);
+      return create<HIR::BinOp>(binaryOperation, lhs, rhs);
     };
 
     switch (binOp.operation.getTokenType()) {
@@ -721,18 +884,17 @@ private:
       // Short circuiting behavior depends on whether the value is true or false
       // in combination with it being an 'and' or 'or' operation.
       if (binOp.operation.getTokenType() == TokenType::AndKeyword)
-        m_builder.create<cf::CondBranchOp>(lhsTrue, otherBlock, continueBlock,
-                                           lhsTrue);
+        create<cf::CondBranchOp>(lhsTrue, otherBlock, continueBlock, lhsTrue);
       else
-        m_builder.create<cf::CondBranchOp>(lhsTrue, continueBlock, lhsTrue,
-                                           otherBlock, ValueRange());
+        create<cf::CondBranchOp>(lhsTrue, continueBlock, lhsTrue, otherBlock,
+                                 ValueRange());
 
       implementBlock(otherBlock);
       Value rhsTrue = toI1(visit(binOp.rhs));
-      m_builder.create<cf::BranchOp>(continueBlock, rhsTrue);
+      create<cf::BranchOp>(continueBlock, rhsTrue);
 
       implementBlock(continueBlock);
-      return m_builder.create<Py::BoolFromI1Op>(continueBlock->getArgument(0));
+      return create<Py::BoolFromI1Op>(continueBlock->getArgument(0));
     }
     case TokenType::Plus: return implementUsualBinOp(HIR::BinaryOperation::Add);
     case TokenType::Minus:
@@ -763,9 +925,8 @@ private:
     switch (unaryOp.operation.getTokenType()) {
     case TokenType::NotKeyword: {
       Value value = toI1(visit(unaryOp.expression));
-      return m_builder.create<Py::BoolFromI1Op>(m_builder.create<arith::XOrIOp>(
-          value,
-          m_builder.create<arith::ConstantOp>(m_builder.getBoolAttr(true))));
+      return create<Py::BoolFromI1Op>(create<arith::XOrIOp>(
+          value, create<arith::ConstantOp>(m_builder.getBoolAttr(true))));
     }
     default:
       // TODO:
@@ -835,8 +996,7 @@ private:
                     Diag::INTRINSICS_DO_NOT_SUPPORT_COMPREHENSION_ARGUMENTS)
             .addHighlight(call.variant)
             .addHighlight(intr->identifiers, Diag::flags::secondaryColour);
-        return m_builder.create<Py::ConstantOp>(
-            m_builder.getAttr<Py::UnboundAttr>());
+        return create<Py::ConstantOp>(m_builder.getAttr<Py::UnboundAttr>());
       }
 
       return callIntrinsic(std::move(*intr), *args, call);
@@ -868,7 +1028,7 @@ private:
               callArguments.push_back(
                   {value, HIR::CallArgument::MapExpansionTag{}});
           }
-          return m_builder.create<HIR::CallOp>(callable, callArguments);
+          return create<HIR::CallOp>(callable, callArguments);
         });
   }
 
@@ -922,15 +1082,13 @@ private:
       args.push_back(arg);
     }
     if (errorsOccurred)
-      return m_builder.create<Py::ConstantOp>(
-          m_builder.getAttr<Py::UnboundAttr>());
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::UnboundAttr>());
 
 #include <pylir/CodeGen/CodeGenIntr.cpp.inc>
 
     createError(intrinsic.identifiers, Diag::UNKNOWN_INTRINSIC_N, intrName)
         .addHighlight(intrinsic.identifiers);
-    return m_builder.create<Py::ConstantOp>(
-        m_builder.getAttr<Py::UnboundAttr>());
+    return create<Py::ConstantOp>(m_builder.getAttr<Py::UnboundAttr>());
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Lambda& lambda) {
@@ -1013,6 +1171,63 @@ private:
     PYLIR_UNREACHABLE;
   }
 };
+
+void CodeGenNew::executeFinallys(CodeGenNew::FinallyExitReason exitReason) {
+  if (m_finallyStack.empty())
+    return;
+
+  std::size_t numToExecute = 0;
+  match(
+      exitReason.value,
+      [&](FinallyExitReason::LeavingTry leavingTry) {
+        if (!leavingTry.finally)
+          return;
+
+        assert(leavingTry.finally == m_finallyStack.back().finally &&
+               "can only leave top-most finally");
+        numToExecute++;
+      },
+      [&](FinallyExitReason::BreakOrContinueStatement) {
+        // Execute all finallys in the current loop.
+        for (const FinallyCode& code : llvm::reverse(m_finallyStack)) {
+          if (code.containedLoop == m_currentLoop)
+            numToExecute++;
+          else
+            break;
+        }
+      },
+      [&](FinallyExitReason::ReturnStatement) {
+        // Execute all finallys in the current function.
+        // The current function is identifier by the current qualifier.
+        for (const FinallyCode& code : llvm::reverse(m_finallyStack)) {
+          if (code.containedNamespace == m_qualifiers)
+            numToExecute++;
+          else
+            break;
+        }
+      });
+
+  // Every 'finally' suite has to be generated without it on the stack. This is
+  // due to the code in the 'finally' also being able to call this function
+  // (by e.g. executing a 'break', 'continue' or 'return' statement). Not doing
+  // so would cause an endless recursion.
+  // Save all finallys that are going to be popped and restore them at the end
+  // of the function by reinserting them.
+  SmallVector<FinallyCode> savePopped(
+      m_finallyStack.rbegin(),
+      std::next(m_finallyStack.rbegin(), numToExecute));
+  auto restoredPopped = llvm::make_scope_exit([&] {
+    m_finallyStack.insert(m_finallyStack.end(),
+                          std::move_iterator(savePopped.rbegin()),
+                          std::move_iterator(savePopped.rend()));
+  });
+
+  for ([[maybe_unused]] int i : llvm::seq(numToExecute)) {
+    const Syntax::TryStmt::Finally* finally = m_finallyStack.back().finally;
+    m_finallyStack.pop_back();
+    visit(finally->suite);
+  }
+}
 
 } // namespace
 
