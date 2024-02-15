@@ -20,47 +20,6 @@
 #include "PylirPyAttributes.hpp"
 #include "Value.hpp"
 
-namespace {
-
-//===----------------------------------------------------------------------===//
-// ExceptionHandlingInterface implementation
-//===----------------------------------------------------------------------===//
-
-template <class T>
-mlir::Operation*
-cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T exceptionOp,
-                                  llvm::StringRef normalOpName) {
-  auto operationName = mlir::OperationName(normalOpName, builder.getContext());
-  mlir::OperationState state(exceptionOp->getLoc(), operationName);
-  state.addTypes(exceptionOp->getResultTypes());
-  state.addOperands(exceptionOp->getOperands().drop_back(
-      exceptionOp.getNormalDestOperandsMutable().size() +
-      exceptionOp.getUnwindDestOperandsMutable().size()));
-  llvm::SmallVector<mlir::NamedAttribute> attributes;
-  for (auto& iter : exceptionOp->getAttrs()) {
-    attributes.push_back(iter);
-    if (iter.getName() == mlir::OpTrait::AttrSizedOperandSegments<
-                              T>::getOperandSegmentSizeAttr()) {
-      if (!operationName.hasTrait<mlir::OpTrait::AttrSizedOperandSegments>()) {
-        attributes.pop_back();
-        continue;
-      }
-      llvm::SmallVector<std::int32_t> sizes;
-      for (auto integer : iter.getValue()
-                              .template cast<mlir::DenseI32ArrayAttr>()
-                              .asArrayRef())
-        sizes.push_back(integer);
-
-      sizes.resize(sizes.size() - 2);
-      attributes.back().setValue(builder.getDenseI32ArrayAttr(sizes));
-    }
-  }
-  state.addAttributes(attributes);
-  return builder.create(state);
-}
-
-} // namespace
-
 //===----------------------------------------------------------------------===//
 // DictArgsIterator implementation
 //===----------------------------------------------------------------------===//

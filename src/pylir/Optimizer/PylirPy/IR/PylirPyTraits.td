@@ -52,8 +52,8 @@ class KnownType<string type>
 /// for every ith operand of the op.
 class AddableExceptionHandling<string clazz, list<string> shape = []>
   : ParamNativeOpTrait<"AddableExceptionHandling",
-	"::pylir::Py::" # clazz # !foldl("", shape, acc, var,
-	    !strconcat(acc, ", ::pylir::Py::OperandShape::" # var))> {
+	    clazz # !foldl("", shape, acc, var,
+	      !strconcat(acc, ", ::pylir::Py::OperandShape::" # var))> {
   let cppNamespace = "pylir::Py";
 }
 

@@ -33,61 +33,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 class PylirPy_Op<string mneomic, list<Trait> traits = []>
   : Op<PylirPy_Dialect, mneomic, traits>;
 
-/// Creates a new Op as a variant of the existing Op 'op', adding the required
-/// arguments, successors, traits, interface implementations and syntax
-/// automatically.
-/// If 'opName' is empty, its mnemonic is the mnemonic of 'op' with 'Ex' as
-/// suffix.
-class CreateExceptionHandlingVariant<Op op, string opName = "">
-  : PylirPy_Op<!if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
-    !listconcat(!filter(x, op.traits, !not(!isa<AddableExceptionHandling>(x))),
-      [Terminator, AttrSizedOperandSegments,
-        DeclareOpInterfaceMethods<BranchOpInterface>,
-        DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
-
-  assert !eq(!size(op.successors), 0), "Op mustn't already have successors";
-
-  let results = op.results;
-  let regions = op.regions;
-  let arguments = !con(op.arguments,
-            (ins Variadic<AnyType>:$normal_dest_operands,
-                 Variadic<AnyType>:$unwind_dest_operands));
-  let successors = (successor AnySuccessor:$happy_path,
-                              AnySuccessor:$exception_path);
-
-  let assemblyFormat = !strconcat(op.assemblyFormat, [{
-    `\n` ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `:` type($normal_dest_operands) `)`)?
-           `unwind` $exception_path ( `(` $unwind_dest_operands^ `:` type($unwind_dest_operands) `)`)?
-  }]);
-
-  let extraClassDeclaration = op.extraClassDeclaration;
-
-  let extraClassDefinition = [{
-
-    //===------------------------------------------------------------------===//
-    // BranchOpInterface implementation
-    //===------------------------------------------------------------------===//
-
-    mlir::SuccessorOperands
-    $cppClass::getSuccessorOperands(unsigned int index) {
-      if (index == 0)
-        return mlir::SuccessorOperands(getNormalDestOperandsMutable());
-      return mlir::SuccessorOperands(1, getUnwindDestOperandsMutable());
-    }
-
-    //===------------------------------------------------------------------===//
-    // ExceptionHandlingInterface implementation
-    //===------------------------------------------------------------------===//
-
-    mlir::Operation*
-    $cppClass::cloneWithoutExceptionHandling(::mlir::OpBuilder& builder)
-    {
-      return ::cloneWithoutExceptionHandlingImpl(builder, *this, "}]
-        # op.opDialect.name # "." # op.opName #[{");
-    }
-  }];
-}
-
 /// Resource declarations in ODS. See PylirPyOps.hpp for definition.
 def GlobalResource : Resource<"::pylir::Py::GlobalResource">;
 def ObjectResource : Resource<"::pylir::Py::ObjectResource">;

@@ -64,8 +64,8 @@ ParseResult pylir::HIR::parseCallArguments(
 }
 
 namespace {
-
-void printCallArguments(OpAsmPrinter& printer, CallOp callOp, ArrayAttr,
+template <class OpT>
+void printCallArguments(OpAsmPrinter& printer, OpT callOp, ArrayAttr,
                         ValueRange, DenseI32ArrayAttr) {
   llvm::interleaveComma(
       CallArgumentRange(callOp), printer.getStream(),
@@ -146,18 +146,6 @@ LogicalResult pylir::HIR::CallOp::verify() {
   }
 
   return success();
-}
-
-CallArgument CallArgumentRange::dereference(CallOp call, std::ptrdiff_t index) {
-  Value value = call.getArguments()[index];
-  if (call.isPosExpansion(index))
-    return CallArgument{value, CallArgument::PosExpansionTag{}};
-  if (call.isMapExpansion(index))
-    return CallArgument{value, CallArgument::MapExpansionTag{}};
-  if (StringAttr keyword = call.getKeyword(index))
-    return CallArgument{value, keyword};
-
-  return CallArgument{value, CallArgument::PositionalTag{}};
 }
 
 //===----------------------------------------------------------------------===//
