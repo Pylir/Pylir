@@ -230,7 +230,7 @@ class CodeGenNew {
       Block* happyPath = addBlock();
       Operation* newOp = op.cloneWithExceptionHandling(
           m_builder, happyPath, m_exceptionHandler,
-          /*unwind_operands=*/ValueRange());
+          /*unwindOperands=*/ValueRange());
       op.erase();
 
       // Continue on the happy path.
