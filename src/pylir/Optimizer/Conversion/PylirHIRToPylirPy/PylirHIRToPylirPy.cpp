@@ -37,15 +37,212 @@ public:
   using Base::Base;
 };
 
+/// Custom 'PatternRewriter' performing on-the-fly transformation of rewriters
+/// to handle exceptions. This is done by m_wrapping and forwarding the actual
+/// 'PatternRewriter' but overriding its 'create' calls to create exception
+/// handling versions of ops if the exception handling version of the operation
+/// is being processed.
+class ExceptionRewriter final : public PatternRewriter {
+  Block* m_exceptionHandler = nullptr;
+  SmallVector<Value> m_exceptionOperands;
+  PatternRewriter& m_wrapping;
+
+public:
+  ExceptionRewriter(PatternRewriter& wrapper, Block* exceptionHandler,
+                    ValueRange exceptionOperands)
+      : PatternRewriter(static_cast<OpBuilder&>(wrapper)),
+        m_exceptionHandler(exceptionHandler),
+        m_exceptionOperands(exceptionOperands), m_wrapping(wrapper) {
+    setListener(nullptr);
+  }
+
+  /// Redefinition to use the 'create' of 'ExceptionRewriter' rather than
+  /// 'PatternRewriter's.
+  template <typename OpTy, typename... Args>
+  auto replaceOpWithNewOp(Operation* op, Args&&... args) {
+    auto newOp = create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
+    replaceOp(op, newOp);
+    return newOp;
+  }
+
+  /// Creates 'OpTy' with 'args' or its exception handling version if processing
+  /// an exception handling operation.
+  template <typename OpTy, typename... Args>
+  auto create(Location loc, Args&&... args) {
+    m_wrapping.setInsertionPoint(getInsertionBlock(), getInsertionPoint());
+    if constexpr (std::is_base_of_v<
+                      Py::AddableExceptionHandlingInterface::Trait<OpTy>,
+                      OpTy>) {
+      auto doReturn = [](Operation* op) {
+        if constexpr (OpTy::template hasTrait<OpTrait::OneResult>())
+          return op->getResult(0);
+        else
+          return op;
+      };
+
+      // Nothing to do if there is no exception handler.
+      if (!m_exceptionHandler)
+        return doReturn(
+            m_wrapping.create<OpTy>(loc, std::forward<Args>(args)...));
+
+      // Create the op but do so with this create rather than 'm_wrapping's to
+      // avoid the conversion infrastructure of being notified of the transient
+      // operation.
+      auto op = PatternRewriter::create<OpTy>(loc, std::forward<Args>(args)...);
+      // Split the block *after* the operation to make 'op' the terminator.
+      Block* happyPath =
+          splitBlock(op->getBlock(), Block::iterator(op->getNextNode()));
+      // After the split the insertion point has moved to the beginning of
+      // 'happyPath'. Move it to after the 'op'.
+      m_wrapping.setInsertionPointAfter(op);
+      // Create the exception handling version from 'op'. This is done with
+      // 'm_wrapping' to notify the conversion infrastructure.
+      Operation* newOp = op.cloneWithExceptionHandling(
+          m_wrapping, happyPath, m_exceptionHandler, m_exceptionOperands);
+      op->erase();
+
+      // Continue in the just created 'happyPath'.
+      setInsertionPointToStart(happyPath);
+      return doReturn(newOp);
+    } else {
+      return m_wrapping.create<OpTy>(loc, std::forward<Args>(args)...);
+    }
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Forwarding implementations.
+  //===--------------------------------------------------------------------===//
+
+  bool canRecoverFromRewriteFailure() const override {
+    return m_wrapping.canRecoverFromRewriteFailure();
+  }
+
+  void inlineRegionBefore(Region& region, Region& parent,
+                          Region::iterator before) override {
+    m_wrapping.inlineRegionBefore(region, parent, before);
+  }
+
+  void cloneRegionBefore(Region& region, Region& parent,
+                         Region::iterator before, IRMapping& mapping) override {
+    m_wrapping.cloneRegionBefore(region, parent, before, mapping);
+  }
+
+  void replaceOpWithIf(
+      Operation* op, ValueRange newValues, bool* allUsesReplaced,
+      llvm::unique_function<bool(OpOperand&) const> functor) override {
+    m_wrapping.replaceOpWithIf(op, newValues, allUsesReplaced,
+                               std::move(functor));
+  }
+
+  void replaceOp(Operation* op, ValueRange newValues) override {
+    m_wrapping.replaceOp(op, newValues);
+  }
+
+  void replaceOp(Operation* op, Operation* newOp) override {
+    m_wrapping.replaceOp(op, newOp);
+  }
+
+  void eraseOp(Operation* op) override {
+    m_wrapping.eraseOp(op);
+  }
+
+  void eraseBlock(Block* block) override {
+    m_wrapping.eraseBlock(block);
+  }
+
+  void inlineBlockBefore(Block* source, Block* dest, Block::iterator before,
+                         ValueRange argValues) override {
+    m_wrapping.inlineBlockBefore(source, dest, before, argValues);
+  }
+
+  Block* splitBlock(Block* block, Block::iterator before) override {
+    return m_wrapping.splitBlock(block, before);
+  }
+
+  void startOpModification(Operation* op) override {
+    m_wrapping.startOpModification(op);
+  }
+
+  void finalizeOpModification(Operation* op) override {
+    m_wrapping.finalizeOpModification(op);
+  }
+
+  void cancelOpModification(Operation* op) override {
+    m_wrapping.cancelOpModification(op);
+  }
+};
+
+/// 'RewritePattern' that allows reusing the same 'matchAndRewrite'
+/// implementation for both the normal and exception-handling variant of an
+/// operation.
+/// Derived-classes should implement:
+///
+/// template<class OpT>
+/// LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+///   ...
+/// }
+///
+/// Where 'OpT' may then be either 'NormalOp' or its exception handling version.
+/// 'ExceptionRewriter' is always used even for 'NormalOp' for consistency.
+///
+/// The only constraint given is that the rewriter must be written in a way that
+/// 'op' can be replaced with a branch to the normal destination if handling the
+/// exception handling version. The default insertion point is before the
+/// operation which satisfies this behaviour. Do not place operations after
+/// 'op'!
+template <class Self, class NormalOp>
+struct OpExRewritePattern : public RewritePattern {
+  using Base = OpExRewritePattern<Self, NormalOp>;
+  using InvokeOp = typename NormalOp::InvokeOpT;
+
+  OpExRewritePattern(MLIRContext* context, PatternBenefit benefit = 1,
+                     ArrayRef<StringRef> generatedNames = {})
+      : RewritePattern(MatchAnyOpTypeTag{}, benefit, context, generatedNames) {}
+
+  LogicalResult matchAndRewrite(Operation* op,
+                                PatternRewriter& rewriter) const final {
+    // There is no support for 'RewritePattern's that explicitly match two ops
+    // so 'MatchAnyOpTypeTag' is used and failure returned here if the op is
+    // neither 'NormalOp' or 'InvokeOp'.
+    if (auto normal = dyn_cast<NormalOp>(op)) {
+      ExceptionRewriter exceptionRewriter{rewriter, nullptr, {}};
+      return static_cast<const Self&>(*this).matchAndRewrite(normal,
+                                                             exceptionRewriter);
+    }
+
+    if (auto invokeOp = dyn_cast<InvokeOp>(op)) {
+      ExceptionRewriter exceptionRewriter{rewriter, invokeOp.getExceptionPath(),
+                                          invokeOp.getUnwindDestOperands()};
+      Location loc = op->getLoc();
+      Block* happyPath = invokeOp.getHappyPath();
+      SmallVector<Value> happyOperands(invokeOp.getNormalDestOperands());
+
+      LogicalResult result = static_cast<const Self&>(*this).matchAndRewrite(
+          invokeOp, exceptionRewriter);
+      if (failed(result))
+        return result;
+
+      // WARNING: Using this insertion point is only safe because the conversion
+      // infrastructure doesn't erase operations until the end.
+      rewriter.setInsertionPointAfter(op);
+      rewriter.create<cf::BranchOp>(loc, happyPath, happyOperands);
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Basic Operations Conversion Patterns
 //===----------------------------------------------------------------------===//
 
-struct BinOpConversionPattern : OpRewritePattern<BinOp> {
-  using OpRewritePattern<BinOp>::OpRewritePattern;
+struct BinOpConversionPattern
+    : OpExRewritePattern<BinOpConversionPattern, BinOp> {
+  using Base::Base;
 
-  LogicalResult matchAndRewrite(BinOp op,
-                                PatternRewriter& rewriter) const override {
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
     rewriter.replaceOpWithNewOp<Py::CallOp>(
         op, op.getType(),
         ("pylir" + stringifyEnum(op.getBinaryOperation())).str(),
@@ -58,11 +255,12 @@ struct BinOpConversionPattern : OpRewritePattern<BinOp> {
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
 
-struct CallOpConversionPattern : OpRewritePattern<HIR::CallOp> {
-  using OpRewritePattern<HIR::CallOp>::OpRewritePattern;
+struct CallOpConversionPattern
+    : OpExRewritePattern<CallOpConversionPattern, HIR::CallOp> {
+  using Base::Base;
 
-  LogicalResult matchAndRewrite(HIR::CallOp op,
-                                PatternRewriter& rewriter) const override {
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
     SmallVector<Py::IterArg> iterArgs;
     SmallVector<Py::DictArg> dictArgs;
     for (const CallArgument& argument : CallArgumentRange(op)) {

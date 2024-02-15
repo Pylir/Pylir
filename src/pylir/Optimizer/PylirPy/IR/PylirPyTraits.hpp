@@ -120,6 +120,9 @@ struct AddableExceptionHandling {
               InvokeVersion>::getOperandSegmentSizeAttr(),
           result);
     }
+
+    /// Invoke version of this operation.
+    using InvokeOpT = InvokeVersion;
   };
 };
 

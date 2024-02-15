@@ -42,3 +42,25 @@ pyHIR.globalFunc @binOp(%0, %1) {
   %19 = binOp %0 __matmul__ %1
   return %2
 }
+
+// CHECK-LABEL: func @binOpEx$impl
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+pyHIR.globalFunc @binOpEx(%0, %1) {
+  // CHECK: invoke @pylir__eq__(%[[ARG0]], %[[ARG1]])
+  // CHECK-NEXT: label ^[[BB1:.*]] unwind ^[[BB2:.*]](%[[ARG1]] : !py.dynamic)
+  %2 = binOpEx %0 __eq__ %1
+    label ^bb1(%0 : !py.dynamic) unwind ^bb2(%1 : !py.dynamic)
+
+// CHECK: ^[[BB1]]:
+// CHECK: cf.br ^{{.*}}(%[[ARG0]] : !py.dynamic)
+^bb1(%arg0 : !py.dynamic):
+  return %0
+
+// CHECK: ^[[BB2]]({{.*}}):
+// CHECK: call @pylir__eq__
+// CHECK: return
+^bb2(%e : !py.dynamic, %arg1 : !py.dynamic):
+  %3 = binOp %e __eq__ %arg1
+  return %3
+}
