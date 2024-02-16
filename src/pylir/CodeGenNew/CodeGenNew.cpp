@@ -650,9 +650,67 @@ private:
     implementBlock(thenBlock);
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::ForStmt& forStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::ForStmt& forStmt) {
+    Value iter = create<Py::ConstantOp>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Iter.name));
+    Value iterator = create<HIR::CallOp>(iter, visit(forStmt.expression));
+
+    Block* condition = addBlock();
+    create<cf::BranchOp>(condition);
+
+    Block* stopIterationHandler =
+        addBlock(m_builder.getType<Py::DynamicType>());
+    implementBlock(condition);
+
+    // Condition does not yet have all its predecessors known.
+    std::optional<MarkOpenBlock> openBlock(std::in_place, *this, condition);
+    Value nextValue;
+    {
+      EnterTry catchException(*this, stopIterationHandler);
+      Value next = create<Py::ConstantOp>(
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Next.name));
+      nextValue = create<HIR::CallOp>(next, iterator);
+    }
+    // Assign next value to the targets.
+    visit(forStmt.targetList, nextValue);
+
+    Block* body = addBlock();
+    create<cf::BranchOp>(body);
+
+    implementBlock(body);
+    Block* thenBlock = addBlock();
+    {
+      EnterLoop loop(*this, /*breakBlock=*/thenBlock,
+                     /*continueBlock=*/condition);
+      visit(forStmt.suite);
+      create<cf::BranchOp>(condition);
+    }
+    // With the body generated all predecessors of the condition block are known
+    // and it can be sealed.
+    openBlock.reset();
+
+    implementBlock(stopIterationHandler);
+    Value exception = stopIterationHandler->getArgument(0);
+    Value instanceOf = create<Py::ConstantOp>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::IsInstance.name));
+    Value stopIteration = create<Py::ConstantOp>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::StopIteration.name));
+    Value isInstance =
+        create<HIR::CallOp>(instanceOf, ValueRange{exception, stopIteration});
+    Block* reraise = addBlock();
+    Block* elseBlock = addBlock();
+    create<cf::CondBranchOp>(create<Py::BoolToI1Op>(isInstance), elseBlock,
+                             reraise);
+
+    implementBlock(reraise);
+    create<Py::RaiseOp>(exception);
+
+    implementBlock(elseBlock);
+    if (forStmt.elseSection)
+      visit(forStmt.elseSection->suite);
+    create<cf::BranchOp>(thenBlock);
+
+    implementBlock(thenBlock);
   }
 
   void visitImpl(const Syntax::TryStmt& tryStmt) {
