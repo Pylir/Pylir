@@ -108,7 +108,7 @@ jobs:
           $san_flag = ''
           if ('${{inputs.sanitizers}}') {
             if ($IsWindows) {
-              $san_flag = "-DCMAKE_CXX_FLAGS=""-fsanitize=${{inputs.sanitizers}} -g0 -fno-omit-frame-pointer"""
+              $san_flag = "-DCMAKE_CXX_FLAGS=-fsanitize=${{inputs.sanitizers}} -g0 -fno-omit-frame-pointer"
             } else {
               $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
               $san_flag = "-DLLVM_USE_SANITIZER=$sanitizer"
