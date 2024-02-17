@@ -870,10 +870,21 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value
-  visitImpl([[maybe_unused]] const Syntax::Conditional& conditional) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Conditional& conditional) {
+    Value condition = toI1(visit(conditional.condition));
+    Block* trueBlock = addBlock();
+    Block* elseBlock = addBlock();
+    Block* thenBlock = addBlock(m_builder.getAttr<Py::DynamicType>());
+    create<cf::CondBranchOp>(condition, trueBlock, elseBlock);
+
+    implementBlock(trueBlock);
+    create<cf::BranchOp>(thenBlock, visit(conditional.trueValue));
+
+    implementBlock(elseBlock);
+    create<cf::BranchOp>(thenBlock, visit(conditional.elseValue));
+
+    implementBlock(thenBlock);
+    return thenBlock->getArgument(0);
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Comparison& comparison) {
