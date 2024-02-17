@@ -998,9 +998,10 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::Assignment& assignment) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Assignment& assignment) {
+    Value value = visit(assignment.expression);
+    writeToIdentifier(value, assignment.variable.getValue());
+    return value;
   }
 
   /// Evaluates all starred items and returns them as iter arguments.
