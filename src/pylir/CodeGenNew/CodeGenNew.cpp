@@ -878,7 +878,7 @@ private:
 
   Value visitImpl(const Syntax::Comparison& comparison) {
     Value result;
-    PYLIR_ASSERT(comparison.rest.size() >= 1 &&
+    PYLIR_ASSERT(!comparison.rest.empty() &&
                  "comparison must have at least one operator");
 
     Value current = visit(comparison.first);
