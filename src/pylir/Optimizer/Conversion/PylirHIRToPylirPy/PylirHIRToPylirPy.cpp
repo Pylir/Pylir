@@ -117,16 +117,6 @@ public:
     return m_wrapping.canRecoverFromRewriteFailure();
   }
 
-  void inlineRegionBefore(Region& region, Region& parent,
-                          Region::iterator before) override {
-    m_wrapping.inlineRegionBefore(region, parent, before);
-  }
-
-  void cloneRegionBefore(Region& region, Region& parent,
-                         Region::iterator before, IRMapping& mapping) override {
-    m_wrapping.cloneRegionBefore(region, parent, before, mapping);
-  }
-
   void replaceOpWithIf(
       Operation* op, ValueRange newValues, bool* allUsesReplaced,
       llvm::unique_function<bool(OpOperand&) const> functor) override {
