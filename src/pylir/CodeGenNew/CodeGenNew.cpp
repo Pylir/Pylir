@@ -876,9 +876,82 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::Comparison& comparison) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Comparison& comparison) {
+    Value result;
+    PYLIR_ASSERT(comparison.rest.size() >= 1 &&
+                 "comparison must have at least one operator");
+
+    Value current = visit(comparison.first);
+    for (auto&& [op, rhs] : comparison.rest) {
+      Block* found = nullptr;
+      // More than one operators (a < b < c) are chained as if written as
+      // 'a < b and b < c', except that 'b' is only evaluated once.
+      // If not evaluating the first operator then 'result' is set and we need
+      // implement the 'and' logic here.
+      if (result) {
+        found = addBlock(m_builder.getType<Py::DynamicType>());
+        Block* tryRHS = addBlock();
+        create<cf::CondBranchOp>(toI1(result), tryRHS, found, result);
+
+        implementBlock(tryRHS);
+      }
+
+      struct IsTag {};
+      std::variant<HIR::BinaryOperation, IsTag> binaryOperation;
+      switch (op.firstToken.getTokenType()) {
+      case TokenType::LessThan:
+        binaryOperation = HIR::BinaryOperation::Lt;
+        break;
+      case TokenType::LessOrEqual:
+        binaryOperation = HIR::BinaryOperation::Le;
+        break;
+      case TokenType::GreaterThan:
+        binaryOperation = HIR::BinaryOperation::Gt;
+        break;
+      case TokenType::GreaterOrEqual:
+        binaryOperation = HIR::BinaryOperation::Ge;
+        break;
+      case TokenType::Equal: binaryOperation = HIR::BinaryOperation::Eq; break;
+      case TokenType::NotEqual:
+        binaryOperation = HIR::BinaryOperation::Ne;
+        break;
+      case TokenType::IsKeyword: binaryOperation = IsTag{}; break;
+      case TokenType::InKeyword:
+        // TODO:
+        PYLIR_UNREACHABLE;
+        break;
+      default: PYLIR_UNREACHABLE;
+      }
+
+      bool invert = op.secondToken.has_value();
+      Value other = visit(rhs);
+      Value boolean = match(
+          binaryOperation,
+          [&](HIR::BinaryOperation binaryOperation) -> Value {
+            return create<HIR::BinOp>(binaryOperation, current, other);
+          },
+          [&](IsTag) -> Value {
+            return create<Py::BoolFromI1Op>(create<Py::IsOp>(current, other));
+          });
+      if (invert) {
+        Value i1 = toI1(boolean);
+        Value one = create<arith::ConstantOp>(m_builder.getBoolAttr(true));
+        Value inverse = create<arith::XOrIOp>(i1, one);
+        boolean = create<Py::BoolFromI1Op>(inverse);
+      }
+      current = other;
+      // If this is the first operator, set the result to the comparison result.
+      if (!result) {
+        result = boolean;
+        continue;
+      }
+      // Otherwise, branch to the common result block.
+      create<cf::BranchOp>(found, boolean);
+
+      implementBlock(found);
+      result = found->getArgument(0);
+    }
+    return result;
   }
 
   Value visitImpl(const Syntax::Atom& atom) {
