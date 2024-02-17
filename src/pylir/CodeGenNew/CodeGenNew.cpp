@@ -930,10 +930,22 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value
-  visitImpl([[maybe_unused]] const Syntax::TupleConstruct& tupleConstruct) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  /// Evaluates all starred items and returns them as iter arguments.
+  SmallVector<Py::IterArg>
+  toIterArgs(ArrayRef<Syntax::StarredItem> starredItems) {
+    SmallVector<Py::IterArg> result;
+    for (const Syntax::StarredItem& item : starredItems) {
+      Value value = visit(item.expression);
+      if (item.maybeStar)
+        result.emplace_back(Py::IterExpansion{value});
+      else
+        result.emplace_back(value);
+    }
+    return result;
+  }
+
+  Value visitImpl(const Syntax::TupleConstruct& tupleConstruct) {
+    return create<Py::MakeTupleOp>(toIterArgs(tupleConstruct.items));
   }
 
   Value visitImpl(const Syntax::BinOp& binOp) {
@@ -1170,10 +1182,16 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value
-  visitImpl([[maybe_unused]] const Syntax::ListDisplay& listDisplay) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::ListDisplay& listDisplay) {
+    return match(
+        listDisplay.variant,
+        [&](ArrayRef<Syntax::StarredItem> items) -> Value {
+          return create<Py::MakeListOp>(toIterArgs(items));
+        },
+        [&](const Syntax::Comprehension&) -> Value {
+          // TODO:
+          PYLIR_UNREACHABLE;
+        });
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::SetDisplay& setDisplay) {
