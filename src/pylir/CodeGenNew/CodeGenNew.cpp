@@ -28,6 +28,7 @@ class CodeGenNew {
   CodeGenOptions m_options;
   ImplicitLocOpBuilder m_builder;
   ModuleOp m_module;
+  SymbolTable m_symbolTable;
   Diag::DiagnosticsDocManager* m_docManager;
   std::string m_qualifiers;
   Value m_globalDictionary;
@@ -77,7 +78,6 @@ class CodeGenNew {
   } m_currentLoop{nullptr, nullptr};
 
   /// Base class for any RAII class operating on the outer class.
-  /// Subclasses must only call the constructor and implement 'void release()'.
   template <class Self>
   class RAIIBaseClass {
   protected:
@@ -86,9 +86,7 @@ class CodeGenNew {
     explicit RAIIBaseClass(CodeGenNew& codeGen) : m_codeGen(codeGen) {}
 
   public:
-    ~RAIIBaseClass() {
-      static_cast<Self&>(*this).release();
-    }
+    ~RAIIBaseClass() = default;
 
     RAIIBaseClass(const RAIIBaseClass&) = delete;
     RAIIBaseClass& operator=(const RAIIBaseClass&) = delete;
@@ -106,7 +104,7 @@ class CodeGenNew {
       m_codeGen.m_currentLoop = {breakBlock, continueBlock};
     }
 
-    void release() {
+    ~EnterLoop() {
       m_codeGen.m_currentLoop = m_previousLoop;
     }
   };
@@ -136,7 +134,7 @@ class CodeGenNew {
       codeGen.m_exceptionHandler = newExceptionHandler;
     }
 
-    void release() {
+    ~EnterTry() {
       m_codeGen.m_exceptionHandler = m_previousHandler;
     }
   };
@@ -150,24 +148,29 @@ class CodeGenNew {
           {finally, codeGen.m_currentLoop, codeGen.m_qualifiers});
     }
 
-    void release() {
+    ~AddFinally() {
       m_codeGen.m_finallyStack.pop_back();
     }
   };
 
   /// Adds 'args' as currently active qualifiers. The final qualifier consists
   /// of each component separated by dots.
-  /// Returns an RAII object resetting the qualifier to its previous value on
-  /// destruction.
-  template <class... Args>
-  [[nodiscard]] auto addQualifiers(Args&&... args) {
-    std::string previous = m_qualifiers;
-    (m_qualifiers.append(".").append(std::forward<Args>(args)), ...);
-    return llvm::make_scope_exit(
-        [previous = std::move(previous), this]() mutable {
-          m_qualifiers = std::move(previous);
-        });
-  }
+  /// Resets the qualifier to its previous value on destruction.
+  class AddQualifiers : public RAIIBaseClass<AddQualifiers> {
+    std::string m_previous;
+
+  public:
+    template <class... Args>
+    AddQualifiers(CodeGenNew& codeGen, Args&&... args)
+        : RAIIBaseClass(codeGen), m_previous(codeGen.m_qualifiers) {
+      (m_codeGen.m_qualifiers.append(".").append(std::forward<Args>(args)),
+       ...);
+    }
+
+    ~AddQualifiers() {
+      m_codeGen.m_qualifiers = std::move(m_previous);
+    }
+  };
 
   /// RAII class that marks a block as open on initialization and seals it on
   /// destruction.
@@ -181,7 +184,7 @@ class CodeGenNew {
         m_codeGen.m_functionScope->ssaBuilder.markOpenBlock(m_block);
     }
 
-    void release() {
+    ~MarkOpenBlock() {
       if (m_codeGen.m_functionScope)
         m_codeGen.m_functionScope->ssaBuilder.sealBlock(m_block);
     }
@@ -378,7 +381,8 @@ public:
              CodeGenOptions&& options)
       : m_options(std::move(options)),
         m_builder(mlir::UnknownLoc::get(context), context),
-        m_module(create<mlir::ModuleOp>()), m_docManager(&manager) {
+        m_module(create<mlir::ModuleOp>()), m_symbolTable(m_module),
+        m_docManager(&manager) {
     context->loadDialect<Py::PylirPyDialect, HIR::PylirHIRDialect,
                          cf::ControlFlowDialect, arith::ArithDialect>();
 
@@ -512,10 +516,10 @@ private:
       visit(iter);
   }
 
-  Value visitFunction(llvm::ArrayRef<Syntax::Decorator>,
-                      llvm::ArrayRef<Syntax::Parameter> parameterList,
-                      llvm::StringRef funcName, const Syntax::Scope& scope,
-                      llvm::function_ref<void()> emitFunctionBody) {
+  /// Converts the parameter list to a function parameter spec suitable for
+  /// constructing a 'pyHIR.func' or 'pyHIR.globalFunc'.
+  SmallVector<HIR::FunctionParameterSpec>
+  parameterListToSpecs(ArrayRef<Syntax::Parameter> parameterList) {
     llvm::SmallVector<HIR::FunctionParameterSpec> specs;
     for (const Syntax::Parameter& iter : parameterList) {
       switch (iter.kind) {
@@ -536,52 +540,128 @@ private:
         break;
       }
     }
+    return specs;
+  }
 
-    auto function = create<HIR::FuncOp>(qualify(funcName), specs);
-    {
-      auto resetQualifier = addQualifiers(funcName, "<locals>");
+  /// Performs the generation of a function body. 'funcName' should be the
+  /// (unqualified) name of the function. 'emitFunctionBody' is called after
+  /// a new function scope has been created, new qualifiers added and all
+  /// parameters have been initialized in the scope to trigger codegen of the
+  /// function body into 'region'.
+  void emitFunctionBody(StringRef funcName,
+                        ArrayRef<Syntax::Parameter> parameterList,
+                        const Syntax::Scope& scope,
+                        function_ref<void()> emitFunctionBody, Region& region) {
+    AddQualifiers resetQualifier(*this, funcName, "<locals>");
 
-      ValueReset functionScopeReset(std::move(m_functionScope));
-      m_functionScope.emplace(m_builder);
+    ValueReset functionScopeReset(std::move(m_functionScope));
+    m_functionScope.emplace(m_builder);
 
-      mlir::OpBuilder::InsertionGuard guard{m_builder};
-      m_builder.setInsertionPointToEnd(&function.getBody().front());
+    mlir::OpBuilder::InsertionGuard guard{m_builder};
+    m_builder.setInsertionPointToEnd(&region.front());
 
-      // First, initialize all locals and non-locals in the function scope.
-      // This makes it known to all subsequent reads and writes that the
-      // identifier is a local rather than a global.
-      for (auto&& [identifier, kind] : scope.identifiers) {
-        switch (kind) {
-        case Syntax::Scope::Local:
-          m_functionScope->identifiers[identifier.getValue()] =
-              SSABuilder::DefinitionsMap{};
-          break;
-        case Syntax::Scope::Cell:
-        case Syntax::Scope::NonLocal: llvm_unreachable("not-yet-implemented");
-        default: break;
-        }
-      }
-
-      // Initialize the parameters by initializing them with the arguments.
-      for (auto&& [param, arg] :
-           llvm::zip(parameterList, function.getBody().getArguments()))
-        writeToIdentifier(arg, param.name.getValue());
-
-      emitFunctionBody();
-
-      if (m_builder.getInsertionBlock()) {
-        auto ref = create<Py::ConstantOp>(Py::GlobalValueAttr::get(
-            m_builder.getContext(), Builtins::None.name));
-        create<HIR::ReturnOp>(ref);
+    // First, initialize all locals and non-locals in the function scope.
+    // This makes it known to all subsequent reads and writes that the
+    // identifier is a local rather than a global.
+    for (auto&& [identifier, kind] : scope.identifiers) {
+      switch (kind) {
+      case Syntax::Scope::Local:
+        m_functionScope->identifiers[identifier.getValue()] =
+            SSABuilder::DefinitionsMap{};
+        break;
+      case Syntax::Scope::Cell:
+      case Syntax::Scope::NonLocal: llvm_unreachable("not-yet-implemented");
+      default: break;
       }
     }
+
+    // Initialize the parameters by initializing them with the arguments.
+    for (auto&& [param, arg] : llvm::zip(parameterList, region.getArguments()))
+      writeToIdentifier(arg, param.name.getValue());
+
+    emitFunctionBody();
+
+    if (m_builder.getInsertionBlock()) {
+      auto ref = create<Py::ConstantOp>(Py::GlobalValueAttr::get(
+          m_builder.getContext(), Builtins::None.name));
+      create<HIR::ReturnOp>(ref);
+    }
+  }
+
+  Value visitFunction(ArrayRef<Syntax::Decorator>,
+                      ArrayRef<Syntax::Parameter> parameterList,
+                      StringRef funcName, const Syntax::Scope& scope,
+                      function_ref<void()> emitFunctionBody) {
+    SmallVector<HIR::FunctionParameterSpec> specs =
+        parameterListToSpecs(parameterList);
+
+    auto function = create<HIR::FuncOp>(qualify(funcName), specs);
+    this->emitFunctionBody(funcName, parameterList, scope, emitFunctionBody,
+                           function.getBody());
     return function;
   }
 
   void visitImpl(const Syntax::FuncDef& funcDef) {
-    Value function = visitFunction(funcDef.decorators, funcDef.parameterList,
-                                   funcDef.funcName.getValue(), funcDef.scope,
-                                   [&] { visit(funcDef.suite); });
+    Value function;
+    if (!funcDef.isConst) {
+      function = visitFunction(funcDef.decorators, funcDef.parameterList,
+                               funcDef.funcName.getValue(), funcDef.scope,
+                               [&] { visit(funcDef.suite); });
+    } else {
+      SmallVector<HIR::FunctionParameterSpec> spec =
+          parameterListToSpecs(funcDef.parameterList);
+
+      Py::GlobalValueAttr attr;
+      {
+        OpBuilder::InsertionGuard guard{m_builder};
+        m_builder.setInsertionPointToEnd(m_module.getBody());
+
+        auto globalFunc = create<HIR::GlobalFuncOp>(
+            qualify(funcDef.funcName.getValue()), spec);
+        emitFunctionBody(
+            funcDef.funcName.getValue(), funcDef.parameterList, funcDef.scope,
+            [&] { visit(funcDef.suite); }, globalFunc.getBody());
+
+        SmallVector<Attribute> defaultPosParams;
+        SmallVector<Py::DictAttr::Entry> keywordDefaultParams;
+        for (const Syntax::Parameter& parameter : funcDef.parameterList) {
+          if (!parameter.maybeDefault)
+            continue;
+
+          Attribute value =
+              visit(parameter.maybeDefault, ConstantExpressionTag{});
+          if (parameter.kind == Syntax::Parameter::KeywordOnly) {
+            keywordDefaultParams.emplace_back(
+                m_builder.getAttr<Py::StrAttr>(parameter.name.getValue()),
+                value);
+          } else {
+            defaultPosParams.push_back(value);
+          }
+        }
+
+        attr = m_builder.getAttr<Py::GlobalValueAttr>(
+            qualify(funcDef.funcName.getValue()));
+        attr.setConstant(true);
+        // Insertion of the external has to be done before the 'globalFunc' to
+        // cause the latter to be renamed, rather than the former.
+        if (funcDef.isExported)
+          m_symbolTable.insert(create<Py::ExternalOp>(
+              qualify(funcDef.funcName.getValue()), attr));
+
+        // With the 'globalFunc' the 'FlatSymbolRefAttr' can now be constructed
+        // from the op as its name has been updated.
+        m_symbolTable.insert(globalFunc);
+        attr.setInitializer(m_builder.getAttr<Py::FunctionAttr>(
+            FlatSymbolRefAttr::get(globalFunc),
+            m_builder.getAttr<Py::StrAttr>(
+                qualify(funcDef.funcName.getValue())),
+            m_builder.getAttr<Py::TupleAttr>(defaultPosParams),
+            m_builder.getAttr<Py::DictAttr>(keywordDefaultParams),
+            /*dict=*/nullptr));
+      }
+      function = create<Py::ConstantOp>(attr);
+    }
+
     writeToIdentifier(function, funcDef.funcName.getValue());
   }
 
@@ -1289,6 +1369,54 @@ private:
                                       !Syntax::validTargetType<T>()>* = nullptr>
   void visitImpl(const T&, Value) {
     PYLIR_UNREACHABLE;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Constant expression overloads
+  // These overloads may assume that the 'SemanticAnalysis' already verified
+  // that the structure consists of only constant expressions. They mustn't emit
+  // any diagnostic and always return a valid attribute.
+  //===--------------------------------------------------------------------===//
+
+  struct ConstantExpressionTag {};
+
+  template <class T>
+  Attribute visitImpl(const T&, ConstantExpressionTag) {
+    PYLIR_UNREACHABLE;
+  }
+
+  Attribute visitImpl(const Syntax::Atom& atom, ConstantExpressionTag) {
+    switch (atom.token.getTokenType()) {
+    case TokenType::IntegerLiteral:
+      return m_builder.getAttr<Py::IntAttr>(get<BigInt>(atom.token.getValue()));
+    case TokenType::FloatingPointLiteral:
+      return m_builder.getAttr<Py::FloatAttr>(
+          llvm::APFloat(get<double>(atom.token.getValue())));
+    case TokenType::StringLiteral:
+      return m_builder.getAttr<Py::StrAttr>(
+          get<std::string>(atom.token.getValue()));
+    case TokenType::TrueKeyword: return m_builder.getAttr<Py::BoolAttr>(true);
+    case TokenType::FalseKeyword: return m_builder.getAttr<Py::BoolAttr>(false);
+    case TokenType::NoneKeyword:
+      return m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name);
+    case TokenType::ByteLiteral:
+    case TokenType::ComplexLiteral:
+      // TODO:
+      PYLIR_UNREACHABLE;
+    case TokenType::Identifier:
+      return m_builtinNamespace.at(
+          pylir::get<std::string>(atom.token.getValue()));
+    default: PYLIR_UNREACHABLE;
+    }
+  }
+
+  Attribute visitImpl(const Syntax::TupleConstruct& tupleConstruct,
+                      ConstantExpressionTag) {
+    SmallVector<Attribute> elements;
+    for (const Syntax::StarredItem& item : tupleConstruct.items) {
+      elements.push_back(visit(item.expression, ConstantExpressionTag{}));
+    }
+    return m_builder.getAttr<Py::TupleAttr>(elements);
   }
 };
 
