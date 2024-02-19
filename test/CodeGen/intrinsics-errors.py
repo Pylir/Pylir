@@ -26,25 +26,3 @@ pylir.intr.int.cmp(args, d, args)
 # expected-error@below {{invalid enum value 'lol' for enum 'IntCmpKind' argument}}
 pylir.intr.int.cmp('lol', d, args)
 # expected-note@above {{valid values are: eq, ne, lt, le, gt, ge}}
-
-
-def foo():
-    @pylir.intr.const_export
-    # expected-error@below {{'pylir.intr.const_export' object must be defined in global scope}}
-    class Bar:
-        pass
-
-
-@pylir.intr.const_export
-# expected-error@below {{Decorators on a 'const_export' object are not supported}}
-@foo
-class Bar:
-    pass
-
-
-@pylir.intr.const_export
-class Bar:
-    # expected-error@below {{Decorators on a 'const_export' object are not supported}}
-    @foo
-    def bar(self):
-        pass

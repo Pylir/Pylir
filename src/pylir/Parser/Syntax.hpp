@@ -423,6 +423,8 @@ struct FuncDef : CompoundStmt::Base<FuncDef> {
   std::unique_ptr<Suite> suite;
 
   Scope scope;
+  bool isConst = false;
+  bool isExported = false;
 };
 
 struct ClassDef : CompoundStmt::Base<ClassDef> {
@@ -439,6 +441,8 @@ struct ClassDef : CompoundStmt::Base<ClassDef> {
   std::unique_ptr<Suite> suite;
 
   Scope scope;
+  bool isConst = false;
+  bool isExported = false;
 };
 
 struct Suite {
@@ -450,6 +454,22 @@ struct FileInput {
   Suite input;
   IdentifierSet globals;
 };
+
+struct Intrinsic {
+  /// Name of the intrinsic. These are all identifier joined with dots.
+  /// Includes the 'pylir.intr' prefix.
+  std::string name;
+  /// All identifier tokens making up the name. Main use-case is for the
+  /// purpose of the location in the source code.
+  llvm::SmallVector<IdentifierToken> identifiers;
+};
+
+/// Checks whether 'expression' is a reference to an intrinsic. An intrinsic
+/// consists of a series of attribute references resulting in the syntax:
+/// "pylir" `.` "intr" { `.` identifier }.
+/// Returns an empty optional if the expression is not an intrinsic reference.
+std::optional<Intrinsic>
+checkForIntrinsic(const Syntax::Expression& expression);
 
 } // namespace pylir::Syntax
 
@@ -779,6 +799,14 @@ template <>
 struct LocationProvider<Syntax::Comprehension> {
   static std::pair<std::size_t, std::size_t>
   getRange(const Syntax::Comprehension& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Intrinsic> {
+  static std::pair<std::size_t, std::size_t>
+  getRange(const Syntax::Intrinsic& value) noexcept {
+    return rangeLoc(value.identifiers);
+  }
 };
 
 } // namespace pylir::Diag

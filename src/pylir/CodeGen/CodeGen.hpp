@@ -192,19 +192,11 @@ class CodeGen {
 
   std::vector<ModuleImport> importModules(llvm::ArrayRef<ModuleSpec> specs);
 
-  struct Intrinsic {
-    std::string name;
-    std::vector<IdentifierToken> identifiers;
-  };
-
-  std::optional<Intrinsic>
-  checkForIntrinsic(const Syntax::Expression& expression);
-
-  mlir::Value callIntrinsic(Intrinsic&& intrinsic,
+  mlir::Value callIntrinsic(Syntax::Intrinsic&& intrinsic,
                             llvm::ArrayRef<Syntax::Argument> arguments,
                             const Syntax::Call& call);
 
-  mlir::Value intrinsicConstant(Intrinsic&& intrinsic);
+  mlir::Value intrinsicConstant(Syntax::Intrinsic&& intrinsic);
 
   std::optional<bool>
   checkDecoratorIntrinsics(llvm::ArrayRef<Syntax::Decorator> decorators,
@@ -313,7 +305,7 @@ class CodeGen {
                             llvm::StringRef funcName,
                             const Syntax::Scope& scope,
                             llvm::function_ref<void()> emitFunctionBody,
-                            const BaseToken& location);
+                            bool isConst, bool isExported);
 
   template <class T,
             std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>

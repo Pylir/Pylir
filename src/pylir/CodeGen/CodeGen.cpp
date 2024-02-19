@@ -1470,13 +1470,7 @@ mlir::Value pylir::CodeGen::visitFunction(
     llvm::ArrayRef<Syntax::Decorator> decorators,
     llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
     const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody,
-    const BaseToken& location) {
-  auto constExport =
-      checkDecoratorIntrinsics(decorators, m_constantClass, location);
-  if (!constExport) {
-    return {};
-  }
-
+    bool isConst, bool isExported) {
   std::vector<Py::IterArg> defaultParameters;
   std::vector<Py::DictArg> keywordOnlyDefaultParameters;
   std::vector<const IdentifierToken*> functionParametersTokens;
@@ -1595,7 +1589,7 @@ mlir::Value pylir::CodeGen::visitFunction(
                            functionParameters);
   }
 
-  if (*constExport || m_constantClass) {
+  if (isConst) {
     std::vector<mlir::Attribute> defaultPosParams;
     for (auto& iter : defaultParameters) {
       if (std::holds_alternative<Py::IterExpansion>(iter)) {
@@ -1640,7 +1634,7 @@ mlir::Value pylir::CodeGen::visitFunction(
               m_builder.getStrAttr(qualifiedName),
               m_builder.getTupleAttr(defaultPosParams),
               m_builder.getDictAttr(keywordDefaultParams)),
-          *constExport);
+          isExported);
     }
     return m_builder.createConstant(valueOp);
   }
@@ -1707,7 +1701,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef) {
   auto locExit = changeLoc(funcDef);
   auto function = visitFunction(
       funcDef.decorators, funcDef.parameterList, funcDef.funcName.getValue(),
-      funcDef.scope, [&] { visit(*funcDef.suite); }, funcDef.funcName);
+      funcDef.scope, [&] { visit(*funcDef.suite); }, funcDef.isConst,
+      funcDef.isExported);
   if (!function) {
     return;
   }
@@ -2248,7 +2243,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda) {
         auto value = visit(*lambda.expression);
         m_builder.create<Py::ReturnOp>(value);
       },
-      lambda.lambdaKeyword);
+      /*isConst==*/false, /*isExported=*/false);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef) {
@@ -2469,33 +2464,8 @@ pylir::CodeGen::ModuleSpec::ModuleSpec(
   }
 }
 
-std::optional<pylir::CodeGen::Intrinsic>
-pylir::CodeGen::checkForIntrinsic(const Syntax::Expression& expression) {
-  std::vector<IdentifierToken> identifiers;
-  const Syntax::Expression* current = &expression;
-  while (const auto* ref = current->dyn_cast<Syntax::AttributeRef>()) {
-    identifiers.push_back(ref->identifier);
-    current = ref->object.get();
-  }
-  const auto* atom = current->dyn_cast<Syntax::Atom>();
-  if (!atom || atom->token.getTokenType() != TokenType::Identifier)
-    return std::nullopt;
-  identifiers.emplace_back(atom->token);
-  std::reverse(identifiers.begin(), identifiers.end());
-  if (identifiers.size() < 2 || identifiers[0].getValue() != "pylir" ||
-      identifiers[1].getValue() != "intr")
-    return std::nullopt;
-
-  auto name = llvm::join(llvm::map_range(identifiers,
-                                         [](const IdentifierToken& token) {
-                                           return token.getValue();
-                                         }),
-                         ".");
-  return Intrinsic{std::move(name), std::move(identifiers)};
-}
-
 mlir::Value
-pylir::CodeGen::callIntrinsic(Intrinsic&& intrinsic,
+pylir::CodeGen::callIntrinsic(Syntax::Intrinsic&& intrinsic,
                               llvm::ArrayRef<Syntax::Argument> arguments,
                               const Syntax::Call& call) {
   std::string_view intrName = intrinsic.name;
@@ -2553,8 +2523,7 @@ pylir::CodeGen::callIntrinsic(Intrinsic&& intrinsic,
   return {};
 }
 
-mlir::Value
-pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrinsic) {
+mlir::Value pylir::CodeGen::intrinsicConstant(Syntax::Intrinsic&& intrinsic) {
   std::string_view intrName = intrinsic.name;
   if (intrName == "pylir.intr.type.__slots__") {
     llvm::SmallVector<mlir::Attribute> attrs;

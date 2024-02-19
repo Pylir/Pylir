@@ -7,7 +7,10 @@
 #include <llvm/ADT/ScopeExit.h>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
+#include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Support/ValueReset.hpp>
+
+using namespace pylir;
 
 void pylir::SemanticAnalysis::visit(Syntax::Yield& yield) {
   if (!m_inFunc)
@@ -421,13 +424,65 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner) {
           [&](auto* ptr) { visitor.visit(*ptr); });
 }
 
+namespace {
+
+/// Checks whether 'decorators' contains '@pylir.intr.const_export'. Returns
+/// the instance of 'Syntax::Intrinsic' if contained.
+std::optional<Syntax::Intrinsic>
+hasConstDecorator(llvm::ArrayRef<Syntax::Decorator> decorators) {
+  for (const Syntax::Decorator& decorator : decorators) {
+    std::optional<Syntax::Intrinsic> intrinsic =
+        Syntax::checkForIntrinsic(*decorator.expression);
+    if (intrinsic && intrinsic->name == "pylir.intr.const_export")
+      return intrinsic;
+  }
+  return std::nullopt;
+}
+} // namespace
+
+void pylir::SemanticAnalysis::verifyCommonConstDecorator(
+    llvm::ArrayRef<Syntax::Decorator> decorators, BaseToken nameLocation,
+    bool& isExported, bool& isConst) {
+  std::optional<Syntax::Intrinsic> isConstExport =
+      hasConstDecorator(decorators);
+  if (isConstExport) {
+    isExported = true;
+    if (m_currentScopeOwner) {
+      createError(nameLocation,
+                  Diag::CONST_EXPORT_OBJECT_MUST_BE_DEFINED_IN_GLOBAL_SCOPE)
+          .addHighlight(nameLocation)
+          .addHighlight(*isConstExport, Diag::flags::secondaryColour);
+    }
+  }
+
+  isConst = isConstExport || m_inConstClass;
+  if (!isConst)
+    return;
+
+  for (const Syntax::Decorator& decorator : decorators) {
+    if (Syntax::checkForIntrinsic(*decorator.expression))
+      continue;
+
+    createError(decorator,
+                Diag::DECORATORS_ON_A_CONST_EXPORT_OBJECT_ARE_NOT_SUPPORTED)
+        .addHighlight(decorator)
+        .addHighlight(nameLocation, Diag::flags::secondaryColour);
+  }
+}
+
 void pylir::SemanticAnalysis::visit(Syntax::FuncDef& funcDef) {
+  verifyCommonConstDecorator(funcDef.decorators, funcDef.funcName,
+                             funcDef.isExported, funcDef.isConst);
+
   for (auto& iter : funcDef.decorators)
     visit(iter);
 
   addToNamespace(funcDef.funcName);
-  for (auto& iter : funcDef.parameterList)
+  for (auto& iter : funcDef.parameterList) {
     visit(iter);
+    if (iter.maybeDefault && funcDef.isConst)
+      verifyIsConstant(*iter.maybeDefault);
+  }
 
   if (funcDef.maybeSuffix)
     visit(*funcDef.maybeSuffix);
@@ -461,13 +516,34 @@ void pylir::SemanticAnalysis::visit(Syntax::FuncDef& funcDef) {
 }
 
 void pylir::SemanticAnalysis::visit(Syntax::ClassDef& classDef) {
+  verifyCommonConstDecorator(classDef.decorators, classDef.className,
+                             classDef.isExported, classDef.isConst);
+
+  std::optional<ValueReset<bool>> constClassReset;
+  if (classDef.isConst) {
+    constClassReset.emplace(m_inConstClass);
+    m_inConstClass = true;
+  }
+
   for (auto& iter : classDef.decorators)
     visit(iter);
 
   addToNamespace(classDef.className);
   if (classDef.inheritance)
-    for (auto& iter : classDef.inheritance->argumentList)
+    for (auto& iter : classDef.inheritance->argumentList) {
       visit(iter);
+      if (classDef.isConst) {
+        if (iter.maybeExpansionsOrEqual) {
+          createError(
+              iter,
+              Diag::
+                  ONLY_POSITIONAL_ARGUMENTS_ALLOWED_IN_CONST_EXPORT_CLASS_INHERITANCE_LIST)
+              .addHighlight(iter)
+              .addHighlight(classDef.className, Diag::flags::secondaryColour);
+        }
+        verifyIsConstant(*iter.expression);
+      }
+    }
 
   {
     ValueReset inLoopReset(m_inLoop);
@@ -480,4 +556,79 @@ void pylir::SemanticAnalysis::visit(Syntax::ClassDef& classDef) {
   }
   if (!m_currentScopeOwner)
     finishNamespace(&classDef);
+}
+
+namespace {
+
+/// Visitor assuming a constant expression until proven otherwise.
+class IsConstantExpressionVisitor
+    : public Syntax::Visitor<IsConstantExpressionVisitor> {
+  bool m_isConstant = true;
+
+public:
+  using Visitor::Visitor;
+
+  template <class T>
+  void visit(T&) {
+    m_isConstant = false;
+  }
+
+  /// Top-level 'visit' function returning true if 'expression' is a constant
+  /// expression.
+  [[nodiscard]] bool visit(Syntax::Expression& expression) {
+    Visitor::visit(expression);
+    return m_isConstant;
+  }
+
+  void visit(Syntax::TupleConstruct& tupleConstruct) {
+    if (llvm::any_of(tupleConstruct.items,
+                     [](const Syntax::StarredItem& starredItem) {
+                       return starredItem.maybeStar.has_value();
+                     })) {
+      // Iterable-expansions are non-constant.
+      m_isConstant = false;
+      return;
+    }
+    // Tuple is constant if all elements are.
+    Visitor::visit(tupleConstruct);
+  }
+
+  void visit(Syntax::Atom& atom) {
+    // Atoms are all constants except identifiers. We bend the rules of the
+    // language here by saying "all references that area possibly to builtins
+    // are builtins and constant, otherwise it's not a constant expression".
+    switch (atom.token.getTokenType()) {
+    case TokenType::IntegerLiteral:
+    case TokenType::FloatingPointLiteral:
+    case TokenType::StringLiteral:
+    case TokenType::TrueKeyword:
+    case TokenType::FalseKeyword:
+    case TokenType::NoneKeyword:
+    case TokenType::ByteLiteral:
+    case TokenType::ComplexLiteral: return;
+    case TokenType::Identifier:
+
+      // Name must match a public builtin in the 'builtins' module with the
+      // spelling being equal to the 'builtins.' prefix removed.
+      if (llvm::none_of(Builtins::allBuiltins, [&](Builtins::Builtin builtin) {
+            return builtin.isPublic && builtin.name.starts_with("builtins.") &&
+                   builtin.name.drop_front(
+                       std::string_view("builtins.").size()) ==
+                       pylir::get<std::string>(atom.token.getValue());
+          }))
+        m_isConstant = false;
+      return;
+    default: PYLIR_UNREACHABLE;
+    }
+  }
+};
+} // namespace
+
+void pylir::SemanticAnalysis::verifyIsConstant(Syntax::Expression& expression) {
+  IsConstantExpressionVisitor visitor;
+  if (visitor.visit(expression))
+    return;
+
+  createError(expression, Diag::EXPECTED_CONSTANT_EXPRESSION)
+      .addHighlight(expression);
 }

@@ -223,4 +223,12 @@ constexpr auto CONST_EXPORT_OBJECT_MUST_BE_DEFINED_IN_GLOBAL_SCOPE = FMT_STRING(
 constexpr auto DECORATORS_ON_A_CONST_EXPORT_OBJECT_ARE_NOT_SUPPORTED =
     FMT_STRING("Decorators on a 'const_export' object are not supported");
 
+constexpr auto EXPECTED_CONSTANT_EXPRESSION =
+    FMT_STRING("expected constant expression");
+
+constexpr auto
+    ONLY_POSITIONAL_ARGUMENTS_ALLOWED_IN_CONST_EXPORT_CLASS_INHERITANCE_LIST =
+        FMT_STRING("only positional arguments allowed in 'const_export' class "
+                   "inheritance list");
+
 } // namespace pylir::Diag
