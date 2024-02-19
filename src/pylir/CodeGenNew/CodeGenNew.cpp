@@ -1100,50 +1100,9 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  struct Intrinsic {
-    /// Name of the intrinsic. These are all identifier joined with dots.
-    /// Includes the 'pylir.intr' prefix.
-    std::string name;
-    /// All identifier tokens making up the name. Main use-case is for the
-    /// purpose of the location in the source code.
-    SmallVector<IdentifierToken> identifiers;
-  };
-
-  /// Checks whether 'expression' is a reference to an intrinsic. An intrinsic
-  /// consists of a series of attribute references resulting in the syntax:
-  /// "pylir" `.` "intr" { `.` identifier }.
-  /// Returns an empty optional if the expression is not an intrinsic reference.
-  std::optional<Intrinsic>
-  checkForIntrinsic(const Syntax::Expression& expression) {
-    // Collect all the chained attribute references and their identifiers up
-    // until the atom.
-    SmallVector<IdentifierToken> identifiers;
-    const Syntax::Expression* current = &expression;
-    while (const auto* ref = current->dyn_cast<Syntax::AttributeRef>()) {
-      identifiers.push_back(ref->identifier);
-      current = ref->object.get();
-    }
-
-    // If its not an atom or not an identifier its not an intrinsic.
-    const auto* atom = current->dyn_cast<Syntax::Atom>();
-    if (!atom || atom->token.getTokenType() != TokenType::Identifier)
-      return std::nullopt;
-
-    identifiers.emplace_back(atom->token);
-    std::reverse(identifiers.begin(), identifiers.end());
-    // Intrinsics always start with 'pylir' and 'intr'.
-    if (identifiers.size() < 2 || identifiers[0].getValue() != "pylir" ||
-        identifiers[1].getValue() != "intr")
-      return std::nullopt;
-
-    std::string name = llvm::join(
-        llvm::map_range(identifiers, std::mem_fn(&IdentifierToken::getValue)),
-        ".");
-    return Intrinsic{std::move(name), std::move(identifiers)};
-  }
-
   Value visitImpl(const Syntax::Call& call) {
-    if (std::optional<Intrinsic> intr = checkForIntrinsic(*call.expression)) {
+    if (std::optional<Syntax::Intrinsic> intr =
+            checkForIntrinsic(*call.expression)) {
       const auto* args =
           std::get_if<std::vector<Syntax::Argument>>(&call.variant);
       if (!args) {
@@ -1189,7 +1148,7 @@ private:
 
   /// Performs the associated action for calling 'intrinsic' using 'arguments'.
   /// Returns a null value if an error occurred.
-  Value callIntrinsic(Intrinsic&& intrinsic,
+  Value callIntrinsic(Syntax::Intrinsic&& intrinsic,
                       ArrayRef<Syntax::Argument> arguments,
                       const Syntax::Call& call) {
     std::string_view intrName = intrinsic.name;

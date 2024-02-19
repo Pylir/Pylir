@@ -22,6 +22,7 @@ class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis> {
   ScopeOwner m_currentScopeOwner;
   bool m_inFunc = false;
   bool m_inLoop = false;
+  bool m_inConstClass = false;
 
   [[nodiscard]] Syntax::Scope* getCurrentScope() const {
     if (!m_currentScopeOwner)
@@ -42,6 +43,18 @@ class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis> {
   void addToNamespace(pylir::Syntax::Target& target);
 
   void finishNamespace(ScopeOwner owner);
+
+  /// Checks whether 'decorators' contains intrinsics such as 'const_export'
+  /// and verifies extra constraints given by these intrinsics. 'nameLocation'
+  /// is used for any diagnostic and 'isExported' and 'isConst' are set
+  /// accordingly.
+  void verifyCommonConstDecorator(llvm::ArrayRef<Syntax::Decorator> decorators,
+                                  BaseToken nameLocation, bool& isExported,
+                                  bool& isConst);
+
+  /// Checks whether 'expression' is a constant expression, issuing a diagnostic
+  /// if not.
+  void verifyIsConstant(Syntax::Expression& expression);
 
 public:
   explicit SemanticAnalysis(Diag::DiagnosticsDocManager& manager)
