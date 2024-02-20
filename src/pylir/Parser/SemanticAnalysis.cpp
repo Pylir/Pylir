@@ -523,6 +523,52 @@ void pylir::SemanticAnalysis::visit(Syntax::ClassDef& classDef) {
   if (classDef.isConst) {
     constClassReset.emplace(m_inConstClass);
     m_inConstClass = true;
+
+    // Verify that the body of the class is valid. Currently only assignments of
+    // the form "id = constant-expr", function definitions, and "pass" are
+    // valid.
+    for (const Syntax::Suite::Variant& variant : classDef.suite->statements) {
+      bool valid = match(
+          variant,
+          [&](const IntrVarPtr<Syntax::SimpleStmt>& simpleStatement) {
+            return llvm::TypeSwitch<Syntax::SimpleStmt&, bool>(*simpleStatement)
+                .Case([&](const Syntax::AssignmentStmt* assignmentStmt)
+                          -> bool {
+                  if (assignmentStmt->targets.size() != 1)
+                    return false;
+
+                  if (assignmentStmt->targets.front().second.getTokenType() !=
+                      TokenType::Assignment)
+                    return false;
+
+                  if (assignmentStmt->maybeExpression)
+                    verifyIsConstant(*assignmentStmt->maybeExpression);
+                  return llvm::isa<Syntax::Atom>(
+                      *assignmentStmt->targets.front().first);
+                })
+                .Case([&](const Syntax::SingleTokenStmt* singleTokenStmt)
+                          -> bool {
+                  return singleTokenStmt->token.getTokenType() ==
+                         TokenType::PassKeyword;
+                })
+                .Default(false);
+          },
+          [&](const IntrVarPtr<Syntax::CompoundStmt>& compoundStatement) {
+            return llvm::isa<Syntax::FuncDef>(*compoundStatement);
+          });
+      if (valid)
+        continue;
+
+      std::pair<std::size_t, std::size_t> loc =
+          match(variant,
+                [](const auto& pointer) { return Diag::rangeLoc(*pointer); });
+      createError(
+          loc,
+          Diag::
+              ONLY_SINGLE_ASSIGNMENTS_AND_FUNCTION_DEFINITIONS_ALLOWED_IN_CONST_EXPORT_CLASS)
+          .addHighlight(loc)
+          .addHighlight(classDef.className, Diag::flags::secondaryColour);
+    }
   }
 
   for (auto& iter : classDef.decorators)
@@ -580,17 +626,24 @@ public:
     return m_isConstant;
   }
 
-  void visit(Syntax::TupleConstruct& tupleConstruct) {
-    if (llvm::any_of(tupleConstruct.items,
-                     [](const Syntax::StarredItem& starredItem) {
-                       return starredItem.maybeStar.has_value();
-                     })) {
-      // Iterable-expansions are non-constant.
-      m_isConstant = false;
+  void visit(Syntax::StarredItem& starredItem) {
+    if (!starredItem.maybeStar) {
+      (void)visit(*starredItem.expression);
       return;
     }
+    m_isConstant = false;
+  }
+
+  void visit(Syntax::TupleConstruct& tupleConstruct) {
     // Tuple is constant if all elements are.
     Visitor::visit(tupleConstruct);
+  }
+
+  void visit(Syntax::AttributeRef& attributeRef) {
+    // Be very permissive with intrinsics for now.
+    if (Syntax::checkForIntrinsic(attributeRef))
+      return;
+    m_isConstant = false;
   }
 
   void visit(Syntax::Atom& atom) {

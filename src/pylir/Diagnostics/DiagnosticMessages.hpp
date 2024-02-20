@@ -231,4 +231,9 @@ constexpr auto
         FMT_STRING("only positional arguments allowed in 'const_export' class "
                    "inheritance list");
 
+constexpr auto
+    ONLY_SINGLE_ASSIGNMENTS_AND_FUNCTION_DEFINITIONS_ALLOWED_IN_CONST_EXPORT_CLASS =
+        FMT_STRING("only single assignments and function definitions allowed "
+                   "in 'const_export' class");
+
 } // namespace pylir::Diag

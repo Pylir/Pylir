@@ -446,8 +446,9 @@ struct ClassDef : CompoundStmt::Base<ClassDef> {
 };
 
 struct Suite {
-  std::vector<std::variant<IntrVarPtr<SimpleStmt>, IntrVarPtr<CompoundStmt>>>
-      statements;
+  using Variant =
+      std::variant<IntrVarPtr<SimpleStmt>, IntrVarPtr<CompoundStmt>>;
+  std::vector<Variant> statements;
 };
 
 struct FileInput {
