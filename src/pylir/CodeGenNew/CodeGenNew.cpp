@@ -601,68 +601,72 @@ private:
     return function;
   }
 
-  void visitImpl(const Syntax::FuncDef& funcDef) {
-    Value function;
-    if (!funcDef.isConst) {
-      function = visitFunction(funcDef.decorators, funcDef.parameterList,
-                               funcDef.funcName.getValue(), funcDef.scope,
-                               [&] { visit(funcDef.suite); });
-    } else {
-      SmallVector<HIR::FunctionParameterSpec> spec =
-          parameterListToSpecs(funcDef.parameterList);
+  /// Generates code for a function definition. Returns the value of the
+  /// 'pyHIR.func' in general and the 'py.globalValue' implementing the function
+  /// if it is constant.
+  OpFoldResult visitFuncDef(const Syntax::FuncDef& funcDef) {
+    if (!funcDef.isConst)
+      return visitFunction(funcDef.decorators, funcDef.parameterList,
+                           funcDef.funcName.getValue(), funcDef.scope,
+                           [&] { visit(funcDef.suite); });
 
-      Py::GlobalValueAttr attr;
-      {
-        OpBuilder::InsertionGuard guard{m_builder};
-        m_builder.setInsertionPointToEnd(m_module.getBody());
+    SmallVector<HIR::FunctionParameterSpec> spec =
+        parameterListToSpecs(funcDef.parameterList);
 
-        auto globalFunc = create<HIR::GlobalFuncOp>(
-            qualify(funcDef.funcName.getValue()), spec);
-        emitFunctionBody(
-            funcDef.funcName.getValue(), funcDef.parameterList, funcDef.scope,
-            [&] { visit(funcDef.suite); }, globalFunc.getBody());
+    Py::GlobalValueAttr attr;
 
-        SmallVector<Attribute> defaultPosParams;
-        SmallVector<Py::DictAttr::Entry> keywordDefaultParams;
-        for (const Syntax::Parameter& parameter : funcDef.parameterList) {
-          if (!parameter.maybeDefault)
-            continue;
+    OpBuilder::InsertionGuard guard{m_builder};
+    m_builder.setInsertionPointToEnd(m_module.getBody());
 
-          Attribute value =
-              visit(parameter.maybeDefault, ConstantExpressionTag{});
-          if (parameter.kind == Syntax::Parameter::KeywordOnly) {
-            keywordDefaultParams.emplace_back(
-                m_builder.getAttr<Py::StrAttr>(parameter.name.getValue()),
-                value);
-          } else {
-            defaultPosParams.push_back(value);
-          }
-        }
+    auto globalFunc =
+        create<HIR::GlobalFuncOp>(qualify(funcDef.funcName.getValue()), spec);
+    emitFunctionBody(
+        funcDef.funcName.getValue(), funcDef.parameterList, funcDef.scope,
+        [&] { visit(funcDef.suite); }, globalFunc.getBody());
 
-        attr = m_builder.getAttr<Py::GlobalValueAttr>(
-            qualify(funcDef.funcName.getValue()));
-        attr.setConstant(true);
-        // Insertion of the external has to be done before the 'globalFunc' to
-        // cause the latter to be renamed, rather than the former.
-        if (funcDef.isExported)
-          m_symbolTable.insert(create<Py::ExternalOp>(
-              qualify(funcDef.funcName.getValue()), attr));
+    SmallVector<Attribute> defaultPosParams;
+    SmallVector<Py::DictAttr::Entry> keywordDefaultParams;
+    for (const Syntax::Parameter& parameter : funcDef.parameterList) {
+      if (!parameter.maybeDefault)
+        continue;
 
-        // With the 'globalFunc' the 'FlatSymbolRefAttr' can now be constructed
-        // from the op as its name has been updated.
-        m_symbolTable.insert(globalFunc);
-        attr.setInitializer(m_builder.getAttr<Py::FunctionAttr>(
-            FlatSymbolRefAttr::get(globalFunc),
-            m_builder.getAttr<Py::StrAttr>(
-                qualify(funcDef.funcName.getValue())),
-            m_builder.getAttr<Py::TupleAttr>(defaultPosParams),
-            m_builder.getAttr<Py::DictAttr>(keywordDefaultParams),
-            /*dict=*/nullptr));
+      Attribute value = visit(parameter.maybeDefault, ConstantExpressionTag{});
+      if (parameter.kind == Syntax::Parameter::KeywordOnly) {
+        keywordDefaultParams.emplace_back(
+            m_builder.getAttr<Py::StrAttr>(parameter.name.getValue()), value);
+      } else {
+        defaultPosParams.push_back(value);
       }
-      function = create<Py::ConstantOp>(attr);
     }
 
-    writeToIdentifier(function, funcDef.funcName.getValue());
+    attr = m_builder.getAttr<Py::GlobalValueAttr>(
+        qualify(funcDef.funcName.getValue()));
+    attr.setConstant(true);
+    // Insertion of the external has to be done before the 'globalFunc' to
+    // cause the latter to be renamed, rather than the former.
+    if (funcDef.isExported)
+      m_symbolTable.insert(
+          create<Py::ExternalOp>(qualify(funcDef.funcName.getValue()), attr));
+
+    // With the 'globalFunc' the 'FlatSymbolRefAttr' can now be constructed
+    // from the op as its name has been updated.
+    m_symbolTable.insert(globalFunc);
+    attr.setInitializer(m_builder.getAttr<Py::FunctionAttr>(
+        FlatSymbolRefAttr::get(globalFunc),
+        m_builder.getAttr<Py::StrAttr>(qualify(funcDef.funcName.getValue())),
+        m_builder.getAttr<Py::TupleAttr>(defaultPosParams),
+        m_builder.getAttr<Py::DictAttr>(keywordDefaultParams),
+        /*dict=*/nullptr));
+
+    return attr;
+  }
+
+  void visitImpl(const Syntax::FuncDef& funcDef) {
+    OpFoldResult result = visitFuncDef(funcDef);
+    if (auto attr = dyn_cast<Attribute>(result))
+      result = create<Py::ConstantOp>(attr).getResult();
+
+    writeToIdentifier(cast<Value>(result), funcDef.funcName.getValue());
   }
 
   void visitImpl(const Syntax::IfStmt& ifStmt) {
@@ -857,8 +861,93 @@ private:
   }
 
   void visitImpl([[maybe_unused]] const Syntax::ClassDef& classDef) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+    if (!classDef.isConst) {
+      // TODO:
+      PYLIR_UNREACHABLE;
+    }
+
+    std::string qualifiedName = qualify(classDef.className.getValue());
+    AddQualifiers addQualifiers(*this, classDef.className.getValue());
+
+    SmallVector<Attribute> bases;
+    bases.push_back(m_builder.getAttr<Py::GlobalValueAttr>(qualifiedName));
+    if (classDef.inheritance)
+      for (const Syntax::Argument& argument :
+           classDef.inheritance->argumentList)
+        bases.push_back(visit(argument.expression, ConstantExpressionTag{}));
+
+    // TODO: bases should be sorted according to MRO algorithm.
+
+    // Instance slots are the slots that instances of this class have.
+    SetVector<Attribute> instanceSlots;
+    for (Attribute base : bases)
+      if (auto interface = dyn_cast<Py::TypeAttrInterface>(base)) {
+        instanceSlots.insert(interface.getInstanceSlots());
+      }
+
+    // Slots are the slots of this class due to being an instance of type.
+    SmallVector<NamedAttribute> slots;
+    slots.emplace_back(
+        m_builder.getStringAttr("__name__"),
+        m_builder.getAttr<Py::StrAttr>(classDef.className.getValue()));
+    for (const Syntax::Suite::Variant& variant : classDef.suite->statements) {
+      std::optional<std::pair<StringAttr, Attribute>> result = match(
+          variant,
+          [&](const IntrVarPtr<Syntax::SimpleStmt>& simpleStatement)
+              -> std::optional<std::pair<StringAttr, Attribute>> {
+            if (isa<Syntax::SingleTokenStmt>(*simpleStatement))
+              return std::nullopt;
+
+            auto& assignment = cast<Syntax::AssignmentStmt>(*simpleStatement);
+            if (!assignment.maybeExpression)
+              return std::nullopt;
+
+            return std::pair(
+                m_builder.getStringAttr(pylir::get<std::string>(
+                    cast<Syntax::Atom>(*assignment.targets.front().first)
+                        .token.getValue())),
+                visit(assignment.maybeExpression, ConstantExpressionTag{}));
+          },
+          [&](const IntrVarPtr<Syntax::CompoundStmt>& compoundStatement)
+              -> std::optional<std::pair<StringAttr, Attribute>> {
+            auto& funcDef = cast<Syntax::FuncDef>(*compoundStatement);
+            return std::pair(
+                m_builder.getStringAttr(funcDef.funcName.getValue()),
+                cast<Attribute>(visitFuncDef(funcDef)));
+          });
+      if (!result)
+        continue;
+
+      auto [name, value] = *result;
+      // __slots__ maps to the instance slots of this class and '#py.type'.
+      if (name != "__slots__") {
+        slots.emplace_back(name, value);
+        continue;
+      }
+
+      if (isa<Py::StrAttr>(value)) {
+        instanceSlots.insert(value);
+        continue;
+      }
+
+      auto tupleAttr = cast<Py::TupleAttrInterface>(value);
+      instanceSlots.insert(tupleAttr.begin(), tupleAttr.end());
+    }
+
+    auto attr = m_builder.getAttr<Py::GlobalValueAttr>(qualifiedName);
+    attr.setConstant(true);
+    attr.setInitializer(m_builder.getAttr<Py::TypeAttr>(
+        m_builder.getAttr<Py::TupleAttr>(bases),
+        m_builder.getAttr<Py::TupleAttr>(instanceSlots.getArrayRef()),
+        m_builder.getAttr<DictionaryAttr>(slots)));
+    if (classDef.isExported) {
+      OpBuilder::InsertionGuard guard{m_builder};
+      m_builder.setInsertionPointToEnd(m_module.getBody());
+      m_symbolTable.insert(create<Py::ExternalOp>(qualifiedName, attr));
+    }
+
+    writeToIdentifier(m_builder.create<Py::ConstantOp>(attr),
+                      classDef.className.getValue());
   }
 
   void visitImpl(const Syntax::AssignmentStmt& assignmentStmt) {
