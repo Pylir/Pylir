@@ -2,7 +2,7 @@
 
 # CHECK: #[[$BASE_EXCEPTION:.*]] = #py.globalValue<builtins.BaseException{{(,|>)}}
 
-# CHECK: %[[GLOBALS:.*]] = py.makeDict
+# CHECK: %[[GLOBALS:.*]] = py.constant(#__main__$dict)
 
 # CHECK: %[[STR:.*]] = py.constant(#py.str<"BaseException">)
 # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]

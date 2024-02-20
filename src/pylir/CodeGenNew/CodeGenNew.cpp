@@ -496,7 +496,11 @@ public:
     init.getBody().push_back(entryBlock);
     m_builder.setInsertionPointToEnd(entryBlock);
 
-    m_globalDictionary = create<Py::MakeDictOp>();
+    auto dictionary =
+        m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers + "$dict");
+    dictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
+
+    m_globalDictionary = create<Py::ConstantOp>(dictionary);
 
     visit(fileInput.input);
 
