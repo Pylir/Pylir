@@ -1,7 +1,7 @@
 # RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
 
 # CHECK-LABEL: init "__main__"
-# CHECK: %[[GLOBALS:.*]] = py.makeDict
+# CHECK: %[[GLOBALS:.*]] = py.constant(#__main__$dict)
 # CHECK: %[[TEST1:.*]] = func "__main__.test1"
 def test1():
     # CHECK: %[[NESTED:.*]] = func "__main__.test1.<locals>.nested"

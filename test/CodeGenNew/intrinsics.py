@@ -1,7 +1,7 @@
 # RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
 
 # CHECK-LABEL: init "__main__"
-# CHECK: %[[DICT:.*]] = py.makeDict ()
+# CHECK: %[[DICT:.*]] = py.constant(#__main__$dict)
 
 def foo():
     pass

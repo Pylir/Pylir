@@ -4,7 +4,7 @@
 # CHECK-DAG: #[[$UNBOUND_LOCAL_ERROR:.*]] = #py.globalValue<builtins.UnboundLocalError{{>|,}}
 
 # CHECK-LABEL: init "__main__"
-# CHECK: %[[$GLOBALS:.*]] = py.makeDict ()
+# CHECK: %[[$GLOBALS:.*]] = py.constant(#__main__$dict)
 
 # CHECK-LABEL: func "__main__.foo"
 # CHECK-SAME: %[[A:[[:alnum:]]+]]
