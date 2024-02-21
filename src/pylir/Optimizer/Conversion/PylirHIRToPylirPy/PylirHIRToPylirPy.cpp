@@ -241,6 +241,20 @@ struct BinOpConversionPattern
   }
 };
 
+struct BinAssignOpConversionPattern
+    : OpExRewritePattern<BinAssignOpConversionPattern, BinAssignOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(),
+        ("pylir" + stringifyEnum(op.getBinaryAssignment())).str(),
+        ValueRange{op.getLhs(), op.getRhs()});
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
@@ -777,6 +791,52 @@ void buildCallOpCompilerBuiltin(PyBuilder& builder,
   builder.create<Py::ReturnOp>(result);
 }
 
+void buildIOpCompilerBuiltins(PyBuilder& builder, llvm::StringRef functionName,
+                              TypeSlots method,
+                              BinaryOperation binaryOperation) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType(
+                        {builder.getDynamicType(), builder.getDynamicType()},
+                        builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  Value lhs = func.getArgument(0);
+  Value rhs = func.getArgument(1);
+
+  Value lhsType = builder.createTypeOf(lhs);
+  Value mro = builder.createTypeMRO(lhsType);
+  auto lookup = builder.createMROLookup(mro, method);
+  Value failure = builder.createIsUnboundValue(lookup);
+  auto* fallback = new Block;
+  auto* callIOp = new Block;
+  builder.create<cf::CondBranchOp>(failure, fallback, callIOp);
+
+  implementBlock(builder, callIOp);
+  Value res =
+      builder.create<HIR::CallOp>(lookup.getResult(), ValueRange{lhs, rhs});
+  auto isNotImplemented =
+      builder.createIs(res, builder.createNotImplementedRef());
+  auto* returnBlock = new Block;
+  returnBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+  builder.create<cf::CondBranchOp>(isNotImplemented, fallback, returnBlock,
+                                   res);
+
+  implementBlock(builder, fallback);
+  res = builder.create<HIR::BinOp>(binaryOperation, lhs, rhs);
+  isNotImplemented = builder.createIs(res, builder.createNotImplementedRef());
+  auto* throwBlock = new Block;
+  builder.create<cf::CondBranchOp>(isNotImplemented, throwBlock, returnBlock,
+                                   res);
+
+  implementBlock(builder, throwBlock);
+  auto typeError = buildException(builder, TypeError.name, {}, nullptr);
+  builder.createRaise(typeError);
+
+  implementBlock(builder, returnBlock);
+  builder.create<Py::ReturnOp>(builder.getCurrentLoc(),
+                               returnBlock->getArgument(0));
+}
+
 } // namespace
 
 void ConvertPylirHIRToPylirPy::runOnOperation() {
@@ -788,6 +848,11 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   buildRevBinOpCompilerBuiltin(builder,                                     \
                                COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
                                TypeSlots::name, TypeSlots::revSlotName);
+#define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                       \
+  buildIOpCompilerBuiltins(                                                  \
+      builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name, \
+      static_cast<HIR::BinaryOperation>(                                     \
+          *symbolizeBinaryAssignment(#slotName)));
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
   ConversionTarget target(getContext());
@@ -798,7 +863,8 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
                ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
-               CallOpConversionPattern, BinOpConversionPattern>(&getContext());
+               CallOpConversionPattern, BinOpConversionPattern,
+               BinAssignOpConversionPattern>(&getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
