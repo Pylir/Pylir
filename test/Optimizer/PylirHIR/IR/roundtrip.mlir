@@ -119,3 +119,34 @@ pyHIR.globalFunc @binExOp(%0, %1) {
 ^bb2(%e : !py.dynamic, %arg1 : !py.dynamic):
   return %arg1
 }
+
+// CHECK-LABEL: pyHIR.globalFunc @binAssignOp(
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+pyHIR.globalFunc @binAssignOp(%0, %1) {
+  // CHECK: binAssignOp %[[ARG0]] __iadd__ %[[ARG1]]
+  %8 = binAssignOp %0 __iadd__ %1
+  // CHECK: binAssignOp %[[ARG0]] __isub__ %[[ARG1]]
+  %9 = binAssignOp %0 __isub__ %1
+  // CHECK: binAssignOp %[[ARG0]] __ior__ %[[ARG1]]
+  %10 = binAssignOp %0 __ior__ %1
+  // CHECK: binAssignOp %[[ARG0]] __ixor__ %[[ARG1]]
+  %11 = binAssignOp %0 __ixor__ %1
+  // CHECK: binAssignOp %[[ARG0]] __iand__ %[[ARG1]]
+  %12 = binAssignOp %0 __iand__ %1
+  // CHECK: binAssignOp %[[ARG0]] __ilshift__ %[[ARG1]]
+  %13 = binAssignOp %0 __ilshift__ %1
+  // CHECK: binAssignOp %[[ARG0]] __irshift__ %[[ARG1]]
+  %14 = binAssignOp %0 __irshift__ %1
+  // CHECK: binAssignOp %[[ARG0]] __imul__ %[[ARG1]]
+  %15 = binAssignOp %0 __imul__ %1
+  // CHECK: binAssignOp %[[ARG0]] __idiv__ %[[ARG1]]
+  %16 = binAssignOp %0 __idiv__ %1
+  // CHECK: binAssignOp %[[ARG0]] __ifloordiv__ %[[ARG1]]
+  %17 = binAssignOp %0 __ifloordiv__ %1
+  // CHECK: binAssignOp %[[ARG0]] __imod__ %[[ARG1]]
+  %18 = binAssignOp %0 __imod__ %1
+  // CHECK: binAssignOp %[[ARG0]] __imatmul__ %[[ARG1]]
+  %19 = binAssignOp %0 __imatmul__ %1
+  return %19
+}
