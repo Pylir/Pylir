@@ -65,3 +65,6 @@ del [*a]
 # expected-error@below {{only one iterable unpacking possible in assignment}}
 *a, b, *c = 3
 # expected-note@above {{previous occurrence here}}
+
+# expected-error@below {{cannot assign to intrinsic}}
+pylir.intr.const_export = 3

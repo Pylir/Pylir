@@ -386,6 +386,12 @@ struct Visitor {
     visit(pylir::get<std::vector<Syntax::StarredItem>>(expression.variant));
   }
 
+  void visit(const Syntax::Intrinsic& intrinsic) {
+    parser.createError(intrinsic, Diag::CANNOT_ASSIGN_TO_N, "intrinsic")
+        .addHighlight(intrinsic)
+        .addHighlight(assignOp, Diag::flags::secondaryColour);
+  }
+
   void visit(const Syntax::Yield& expression) {
     parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
         .addHighlight(expression)

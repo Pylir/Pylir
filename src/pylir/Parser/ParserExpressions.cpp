@@ -5,10 +5,50 @@
 #include "Parser.hpp"
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/ADT/StringExtras.h>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/Variant.hpp>
+
+namespace {
+/// Checks whether 'expression' is a reference to an intrinsic. An intrinsic
+/// consists of a series of attribute references resulting in the syntax:
+/// "pylir" `.` "intr" { `.` identifier }.
+/// Returns an empty optional if the expression is not an intrinsic reference.
+std::optional<pylir::Syntax::Intrinsic>
+checkForIntrinsic(const pylir::Syntax::Expression& expression) {
+  using namespace pylir;
+  using namespace pylir::Syntax;
+
+  // Collect all the chained attribute references and their identifiers up until
+  // the atom.
+  llvm::SmallVector<IdentifierToken> identifiers;
+  const Expression* current = &expression;
+  while (const auto* ref = current->dyn_cast<AttributeRef>()) {
+    identifiers.push_back(ref->identifier);
+    current = ref->object.get();
+  }
+
+  // If its not an atom or not an identifier its not an intrinsic.
+  const auto* atom = current->dyn_cast<Atom>();
+  if (!atom || atom->token.getTokenType() != TokenType::Identifier)
+    return std::nullopt;
+
+  identifiers.emplace_back(atom->token);
+  std::reverse(identifiers.begin(), identifiers.end());
+  // Intrinsics always start with 'pylir' and 'intr'.
+  if (identifiers.size() < 2 || identifiers[0].getValue() != "pylir" ||
+      identifiers[1].getValue() != "intr")
+    return std::nullopt;
+
+  std::string name = llvm::join(
+      llvm::map_range(identifiers, std::mem_fn(&IdentifierToken::getValue)),
+      ".");
+  return Intrinsic{{}, std::move(name), std::move(identifiers)};
+}
+
+} // namespace
 
 std::optional<pylir::Syntax::Yield> pylir::Parser::parseYieldExpression() {
   auto yield = expect(TokenType::YieldKeyword);
@@ -542,6 +582,14 @@ pylir::Parser::parsePrimary() {
   if (m_current == m_lexer.end())
     return {std::move(current)};
 
+  // Checks whether 'current' refers to an intrinsic and transforms it to that
+  // node. Should be called after all attribute refs have been parsed.
+  auto performIntrinsicCheck = [&] {
+    if (std::optional<Syntax::Intrinsic> intrinsic =
+            checkForIntrinsic(*current))
+      current = std::make_unique<Syntax::Intrinsic>(std::move(*intrinsic));
+  };
+
   while (peekedIs({TokenType::Dot, TokenType::OpenParentheses,
                    TokenType::OpenSquareBracket})) {
     switch (m_current->getTokenType()) {
@@ -554,6 +602,8 @@ pylir::Parser::parsePrimary() {
       break;
     }
     case TokenType::OpenSquareBracket: {
+      performIntrinsicCheck();
+
       auto newCurrent = parseSlicingOrSubscription(std::move(current));
       if (!newCurrent)
         return std::nullopt;
@@ -561,6 +611,8 @@ pylir::Parser::parsePrimary() {
       break;
     }
     case TokenType::OpenParentheses: {
+      performIntrinsicCheck();
+
       auto call = parseCall(std::move(current));
       if (!call)
         return std::nullopt;
@@ -570,6 +622,9 @@ pylir::Parser::parsePrimary() {
     default: PYLIR_UNREACHABLE;
     }
   }
+
+  performIntrinsicCheck();
+
   return {std::move(current)};
 }
 
