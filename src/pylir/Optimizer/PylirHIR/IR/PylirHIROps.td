@@ -68,6 +68,47 @@ def PylirHIR_BinOp : PylirHIR_Op<"binOp",
 
 def PylirHIR_BinExOp : CreateExceptionHandlingVariant<PylirHIR_BinOp>;
 
+// Enums values kept in sync with 'PylirHIR_BinaryOperationAttr'.
+def PylirHIR_BinaryAssignmentAttr : I32EnumAttr<"BinaryAssignment",
+  "Binary assignment operations in python", [
+  I32EnumAttrCase<"Add", 6, "__iadd__">,
+  I32EnumAttrCase<"Sub", 7, "__isub__">,
+  I32EnumAttrCase<"Or", 8, "__ior__">,
+  I32EnumAttrCase<"Xor", 9, "__ixor__">,
+  I32EnumAttrCase<"And", 10, "__iand__">,
+  I32EnumAttrCase<"LShift", 11, "__ilshift__">,
+  I32EnumAttrCase<"RShift", 12, "__irshift__">,
+  I32EnumAttrCase<"Mul", 13, "__imul__">,
+  I32EnumAttrCase<"Div", 14, "__idiv__">,
+  I32EnumAttrCase<"FloorDiv", 15, "__ifloordiv__">,
+  I32EnumAttrCase<"Mod", 16, "__imod__">,
+  I32EnumAttrCase<"MatMul", 17, "__imatmul__">,
+]> {
+  let cppNamespace = "pylir::HIR";
+}
+
+def PylirHIR_BinAssignOp : PylirHIR_Op<"binAssignOp",
+  [AddableExceptionHandling<"BinAssignExOp">]> {
+  let arguments = (ins PylirHIR_BinaryAssignmentAttr:$binaryAssignment,
+                       DynamicType:$lhs, DynamicType:$rhs);
+  let results = (outs DynamicType:$result);
+
+  let description = [{
+    Operation representing compound assignment operators in python.
+  }];
+
+  let assemblyFormat = [{
+    $lhs $binaryAssignment $rhs attr-dict
+  }];
+}
+
+def PylirHIR_BinAssignExOp
+  : CreateExceptionHandlingVariant<PylirHIR_BinAssignOp>;
+
+//===----------------------------------------------------------------------===//
+// Call Operations
+//===----------------------------------------------------------------------===//
+
 def PylirHIR_CallOp : PylirHIR_Op<"call",
   [AddableExceptionHandling<"CallExOp", ["Single", "Variadic"]>]> {
   let arguments = (ins DynamicType:$callable,
