@@ -966,9 +966,33 @@ private:
     }
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::RaiseStmt& raiseStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::RaiseStmt& raiseStmt) {
+    if (!raiseStmt.maybeException) {
+      // TODO: Get current exception via sys.exc_info().
+      PYLIR_UNREACHABLE;
+    }
+
+    // TODO: Attach __cause__ and __context__.
+
+    Value exception = visit(raiseStmt.maybeException);
+    Value isInstance = create<Py::ConstantOp>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::IsInstance.name));
+    Value type = create<Py::ConstantOp>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Type.name));
+    Value isTypeObject =
+        create<HIR::CallOp>(isInstance, ValueRange{exception, type});
+    Block* isTypeBlock = addBlock();
+    Block* isInstanceBlock = addBlock(m_builder.getType<Py::DynamicType>());
+    create<cf::CondBranchOp>(create<Py::BoolToI1Op>(isTypeObject), isTypeBlock,
+                             isInstanceBlock, exception);
+
+    implementBlock(isTypeBlock);
+    exception = create<HIR::CallOp>(exception);
+    create<cf::BranchOp>(isInstanceBlock, exception);
+
+    implementBlock(isInstanceBlock);
+    create<Py::RaiseOp>(isInstanceBlock->getArgument(0));
+    m_builder.clearInsertionPoint();
   }
 
   void visitImpl(const Syntax::ReturnStmt& returnStmt) {
