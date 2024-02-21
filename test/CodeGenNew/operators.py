@@ -86,3 +86,41 @@ def boolean_ops(a, b):
     # CHECK: %[[NOT:.*]] = arith.xori %[[I1]], %[[TRUE]]
     # CHECK: py.bool_fromI1 %[[NOT]]
     c = not a()
+
+
+# CHECK-LABEL: func "__main__.assign_ops"
+# CHECK-SAME: %[[A:[[:alnum:]]+]]
+# CHECK-SAME: %[[B:[[:alnum:]]+]]
+def assign_ops(a, b):
+    # CHECK: %[[A2:.*]] = binAssignOp %[[A]] __iadd__ %[[B]]
+    a += b
+
+    # CHECK: %[[A3:.*]] = binAssignOp %[[A2]] __isub__ %[[B]]
+    a -= b
+
+    # CHECK: %[[A4:.*]] = binAssignOp %[[A3]] __ior__ %[[B]]
+    a |= b
+
+    # CHECK: %[[A5:.*]] = binAssignOp %[[A4]] __ixor__ %[[B]]
+    a ^= b
+
+    # CHECK: %[[A6:.*]] = binAssignOp %[[A5]] __iand__ %[[B]]
+    a &= b
+
+    # CHECK: %[[A7:.*]] = binAssignOp %[[A6]] __ilshift__ %[[B]]
+    a <<= b
+
+    # CHECK: %[[A8:.*]] = binAssignOp %[[A7]] __irshift__ %[[B]]
+    a >>= b
+
+    # CHECK: %[[A9:.*]] = binAssignOp %[[A8]] __imul__ %[[B]]
+    a *= b
+
+    # CHECK: %[[A10:.*]] = binAssignOp %[[A9]] __idiv__ %[[B]]
+    a /= b
+
+    # CHECK: %[[A11:.*]] = binAssignOp %[[A10]] __ifloordiv__ %[[B]]
+    a //= b
+
+    # CHECK: binAssignOp %[[A11]] __imatmul__ %[[B]]
+    a @= b

@@ -957,12 +957,52 @@ private:
   void visitImpl(const Syntax::AssignmentStmt& assignmentStmt) {
     Value rhs = visit(assignmentStmt.maybeExpression);
     for (const auto& [target, token] : assignmentStmt.targets) {
+      HIR::BinaryAssignment assignment;
       switch (token.getTokenType()) {
       case TokenType::Assignment: visit(target, rhs); continue;
-      default:
+      case TokenType::PlusAssignment:
+        assignment = HIR::BinaryAssignment::Add;
+        break;
+      case TokenType::MinusAssignment:
+        assignment = HIR::BinaryAssignment::Sub;
+        break;
+      case TokenType::TimesAssignment:
+        assignment = HIR::BinaryAssignment::Mul;
+        break;
+      case TokenType::DivideAssignment:
+        assignment = HIR::BinaryAssignment::Div;
+        break;
+      case TokenType::IntDivideAssignment:
+        assignment = HIR::BinaryAssignment::FloorDiv;
+        break;
+      case TokenType::RemainderAssignment:
+        assignment = HIR::BinaryAssignment::Mod;
+        break;
+      case TokenType::AtAssignment:
+        assignment = HIR::BinaryAssignment::MatMul;
+        break;
+      case TokenType::BitAndAssignment:
+        assignment = HIR::BinaryAssignment::And;
+        break;
+      case TokenType::BitOrAssignment:
+        assignment = HIR::BinaryAssignment::Or;
+        break;
+      case TokenType::BitXorAssignment:
+        assignment = HIR::BinaryAssignment::Xor;
+        break;
+      case TokenType::ShiftRightAssignment:
+        assignment = HIR::BinaryAssignment::RShift;
+        break;
+      case TokenType::ShiftLeftAssignment:
+        assignment = HIR::BinaryAssignment::LShift;
+        break;
+      case TokenType::PowerOfAssignment:
         // TODO:
-        PYLIR_UNREACHABLE;
+      default: PYLIR_UNREACHABLE;
       }
+
+      Value lhs = visit(target);
+      visit(target, create<HIR::BinAssignOp>(assignment, lhs, rhs));
     }
   }
 
