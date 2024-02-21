@@ -29,3 +29,6 @@ pylir.intr.int.cmp("ne", 0, 1)
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
 # CHECK: py.function_call %[[ZERO]](%[[ONE]], %[[TWO]], %[[THREE]])
 pylir.intr.function.call(0, 1, 2, 3)
+
+# CHECK: py.constant(#py.tuple<({{.*}})>)
+pylir.intr.function.__slots__
