@@ -192,11 +192,11 @@ class CodeGen {
 
   std::vector<ModuleImport> importModules(llvm::ArrayRef<ModuleSpec> specs);
 
-  mlir::Value callIntrinsic(Syntax::Intrinsic&& intrinsic,
+  mlir::Value callIntrinsic(const Syntax::Intrinsic& intrinsic,
                             llvm::ArrayRef<Syntax::Argument> arguments,
                             const Syntax::Call& call);
 
-  mlir::Value intrinsicConstant(Syntax::Intrinsic&& intrinsic);
+  mlir::Value intrinsicConstant(const Syntax::Intrinsic& intrinsic);
 
   std::optional<bool>
   checkDecoratorIntrinsics(llvm::ArrayRef<Syntax::Decorator> decorators,
@@ -509,6 +509,8 @@ public:
   mlir::Value visit(const Syntax::UnaryOp& unaryOp);
 
   mlir::Value visit(const Syntax::AttributeRef& attributeRef);
+
+  mlir::Value visit(const Syntax::Intrinsic& intrinsic);
 
   mlir::Value visit(const Syntax::Slice& slice);
 

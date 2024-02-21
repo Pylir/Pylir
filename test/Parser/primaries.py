@@ -108,11 +108,21 @@ a(b,c = 3, *b)
 # CHECK-NEXT: |     `-atom b
 
 a(**b,c = 3)
-# CHECK-NEXT: `-call
-# CHECK-NEXT:   |-callable: atom a
-# CHECK-NEXT:   |-argument
-# CHECK-NEXT:   | `-mapped
-# CHECK-NEXT:   |   `-atom b
-# CHECK-NEXT:   `-argument
-# CHECK-NEXT:     `-keyword item c
-# CHECK-NEXT:       `-atom 3
+# CHECK-NEXT: |-call
+# CHECK-NEXT: | |-callable: atom a
+# CHECK-NEXT: | |-argument
+# CHECK-NEXT: | | `-mapped
+# CHECK-NEXT: | |   `-atom b
+# CHECK-NEXT: | `-argument
+# CHECK-NEXT: |   `-keyword item c
+# CHECK-NEXT: |     `-atom 3
+
+pylir.intr.const_export
+# CHECK-NEXT: |-intrinsic pylir.intr.const_export
+pylir.intr.const_export()
+# CHECK-NEXT: |-call
+# CHECK-NEXT: | `-callable: intrinsic pylir.intr.const_export
+pylir.intr.const_export[0]
+# CHECK-NEXT: `-subscription
+# CHECK-NEXT:   |-object: intrinsic pylir.intr.const_export
+# CHECK-NEXT:   `-index: atom 0

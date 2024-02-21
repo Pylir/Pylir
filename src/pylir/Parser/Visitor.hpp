@@ -150,6 +150,8 @@ public:
       getImpl()->visit(iter);
   }
 
+  void visit(Intrinsic&) {}
+
   void visit(CompFor& compFor) {
     getImpl()->visit(*compFor.targets);
     getImpl()->visit(*compFor.test);

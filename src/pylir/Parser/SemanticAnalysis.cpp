@@ -428,23 +428,21 @@ namespace {
 
 /// Checks whether 'decorators' contains '@pylir.intr.const_export'. Returns
 /// the instance of 'Syntax::Intrinsic' if contained.
-std::optional<Syntax::Intrinsic>
+Syntax::Intrinsic*
 hasConstDecorator(llvm::ArrayRef<Syntax::Decorator> decorators) {
   for (const Syntax::Decorator& decorator : decorators) {
-    std::optional<Syntax::Intrinsic> intrinsic =
-        Syntax::checkForIntrinsic(*decorator.expression);
+    auto* intrinsic = decorator.expression->dyn_cast<Syntax::Intrinsic>();
     if (intrinsic && intrinsic->name == "pylir.intr.const_export")
       return intrinsic;
   }
-  return std::nullopt;
+  return nullptr;
 }
 } // namespace
 
 void pylir::SemanticAnalysis::verifyCommonConstDecorator(
     llvm::ArrayRef<Syntax::Decorator> decorators, BaseToken nameLocation,
     bool& isExported, bool& isConst) {
-  std::optional<Syntax::Intrinsic> isConstExport =
-      hasConstDecorator(decorators);
+  Syntax::Intrinsic* isConstExport = hasConstDecorator(decorators);
   if (isConstExport) {
     isExported = true;
     if (m_currentScopeOwner) {
@@ -460,7 +458,7 @@ void pylir::SemanticAnalysis::verifyCommonConstDecorator(
     return;
 
   for (const Syntax::Decorator& decorator : decorators) {
-    if (Syntax::checkForIntrinsic(*decorator.expression))
+    if (llvm::isa<Syntax::Intrinsic>(*decorator.expression))
       continue;
 
     createError(decorator,
@@ -639,11 +637,8 @@ public:
     Visitor::visit(tupleConstruct);
   }
 
-  void visit(Syntax::AttributeRef& attributeRef) {
+  void visit(Syntax::Intrinsic&) {
     // Be very permissive with intrinsics for now.
-    if (Syntax::checkForIntrinsic(attributeRef))
-      return;
-    m_isConstant = false;
   }
 
   void visit(Syntax::Atom& atom) {

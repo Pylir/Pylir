@@ -687,6 +687,10 @@ std::string pylir::Dumper::dump(const Syntax::TupleConstruct& tupleConstruct) {
   return builder.emit();
 }
 
+std::string pylir::Dumper::dump(const Syntax::Intrinsic& intrinsic) {
+  return createBuilder("intrinsic {}", intrinsic.name).emit();
+}
+
 std::string pylir::Dumper::dump(const Syntax::DictDisplay& dictDisplay) {
   auto builder = createBuilder("dict display");
   pylir::match(

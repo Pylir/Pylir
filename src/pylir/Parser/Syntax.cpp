@@ -4,40 +4,9 @@
 
 #include "Syntax.hpp"
 
-#include <llvm/ADT/StringExtras.h>
-
 using namespace pylir;
 using namespace pylir::Diag;
 using namespace pylir::Syntax;
-
-std::optional<Intrinsic>
-Syntax::checkForIntrinsic(const Expression& expression) {
-  // Collect all the chained attribute references and their identifiers up until
-  // the atom.
-  llvm::SmallVector<IdentifierToken> identifiers;
-  const Expression* current = &expression;
-  while (const auto* ref = current->dyn_cast<AttributeRef>()) {
-    identifiers.push_back(ref->identifier);
-    current = ref->object.get();
-  }
-
-  // If its not an atom or not an identifier its not an intrinsic.
-  const auto* atom = current->dyn_cast<Atom>();
-  if (!atom || atom->token.getTokenType() != TokenType::Identifier)
-    return std::nullopt;
-
-  identifiers.emplace_back(atom->token);
-  std::reverse(identifiers.begin(), identifiers.end());
-  // Intrinsics always start with 'pylir' and 'intr'.
-  if (identifiers.size() < 2 || identifiers[0].getValue() != "pylir" ||
-      identifiers[1].getValue() != "intr")
-    return std::nullopt;
-
-  std::string name = llvm::join(
-      llvm::map_range(identifiers, std::mem_fn(&IdentifierToken::getValue)),
-      ".");
-  return Intrinsic{std::move(name), std::move(identifiers)};
-}
 
 std::pair<std::size_t, std::size_t> LocationProvider<TupleConstruct>::getRange(
     const TupleConstruct& value) noexcept {

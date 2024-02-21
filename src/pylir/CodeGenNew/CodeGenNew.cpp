@@ -1313,9 +1313,13 @@ private:
     PYLIR_UNREACHABLE;
   }
 
+  Value visitImpl([[maybe_unused]] const Syntax::Intrinsic& intrinsic) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
   Value visitImpl(const Syntax::Call& call) {
-    if (std::optional<Syntax::Intrinsic> intr =
-            checkForIntrinsic(*call.expression)) {
+    if (auto* intr = call.expression->dyn_cast<Syntax::Intrinsic>()) {
       const auto* args =
           std::get_if<std::vector<Syntax::Argument>>(&call.variant);
       if (!args) {
@@ -1361,7 +1365,7 @@ private:
 
   /// Performs the associated action for calling 'intrinsic' using 'arguments'.
   /// Returns a null value if an error occurred.
-  Value callIntrinsic(Syntax::Intrinsic&& intrinsic,
+  Value callIntrinsic(const Syntax::Intrinsic& intrinsic,
                       ArrayRef<Syntax::Argument> arguments,
                       const Syntax::Call& call) {
     std::string_view intrName = intrinsic.name;

@@ -18,7 +18,7 @@ struct Expression
           struct Conditional, struct Call, struct Lambda, struct UnaryOp,
           struct Yield, struct Generator, struct TupleConstruct,
           struct ListDisplay, struct SetDisplay, struct DictDisplay,
-          struct Comparison> {
+          struct Comparison, struct Intrinsic> {
   using AbstractIntrusiveVariant::AbstractIntrusiveVariant;
 };
 
@@ -97,6 +97,15 @@ struct Conditional : Expression::Base<Conditional> {
   IntrVarPtr<Expression> condition;
   BaseToken elseToken;
   IntrVarPtr<Expression> elseValue;
+};
+
+struct Intrinsic : Expression::Base<Intrinsic> {
+  /// Name of the intrinsic. These are all identifier joined with dots.
+  /// Includes the 'pylir.intr' prefix.
+  std::string name;
+  /// All identifier tokens making up the name. Main use-case is for the
+  /// purpose of the location in the source code.
+  llvm::SmallVector<IdentifierToken> identifiers;
 };
 
 struct Argument {
@@ -455,22 +464,6 @@ struct FileInput {
   Suite input;
   IdentifierSet globals;
 };
-
-struct Intrinsic {
-  /// Name of the intrinsic. These are all identifier joined with dots.
-  /// Includes the 'pylir.intr' prefix.
-  std::string name;
-  /// All identifier tokens making up the name. Main use-case is for the
-  /// purpose of the location in the source code.
-  llvm::SmallVector<IdentifierToken> identifiers;
-};
-
-/// Checks whether 'expression' is a reference to an intrinsic. An intrinsic
-/// consists of a series of attribute references resulting in the syntax:
-/// "pylir" `.` "intr" { `.` identifier }.
-/// Returns an empty optional if the expression is not an intrinsic reference.
-std::optional<Intrinsic>
-checkForIntrinsic(const Syntax::Expression& expression);
 
 } // namespace pylir::Syntax
 

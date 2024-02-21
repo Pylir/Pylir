@@ -141,6 +141,8 @@ public:
 
   std::string dump(const Syntax::TupleConstruct& tupleConstruct);
 
+  std::string dump(const Syntax::Intrinsic& intrinsic);
+
   std::string dump(const Syntax::CompIf& compIf);
 
   std::string dump(const Syntax::CompFor& compFor);

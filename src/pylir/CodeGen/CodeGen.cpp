@@ -682,7 +682,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison) {
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Call& call) {
   auto locExit = changeLoc(call);
-  if (auto intr = checkForIntrinsic(*call.expression)) {
+  if (auto* intr = call.expression->dyn_cast<Syntax::Intrinsic>()) {
     const auto* args =
         std::get_if<std::vector<Syntax::Argument>>(&call.variant);
     if (!args) {
@@ -690,8 +690,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Call& call) {
       createError(compr,
                   Diag::INTRINSICS_DO_NOT_SUPPORT_COMPREHENSION_ARGUMENTS)
           .addHighlight(compr)
-          .addHighlight(intr->identifiers.front(), intr->identifiers.back(),
-                        Diag::flags::secondaryColour);
+          .addHighlight(*intr, Diag::flags::secondaryColour);
       return {};
     }
     return callIntrinsic(std::move(*intr), *args, call);
@@ -1437,7 +1436,7 @@ std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(
     const BaseToken& location) {
   bool constExport = false;
   for (const auto& iter : decorators) {
-    auto intr = checkForIntrinsic(*iter.expression);
+    auto* intr = iter.expression->dyn_cast<Syntax::Intrinsic>();
     if (!intr)
       continue;
     if (intr->name == "pylir.intr.const_export") {
@@ -1454,7 +1453,7 @@ std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(
 
   if (constExport || additionalConstCondition) {
     for (const auto& iter : decorators) {
-      if (checkForIntrinsic(*iter.expression))
+      if (llvm::isa<Syntax::Intrinsic>(*iter.expression))
         continue;
       createError(iter,
                   Diag::DECORATORS_ON_A_CONST_EXPORT_OBJECT_ARE_NOT_SUPPORTED)
@@ -1682,7 +1681,7 @@ mlir::Value pylir::CodeGen::visitFunction(
     m_builder.createSetSlot(value, Builtins::FunctionSlots::Closure, closure);
   }
   for (const auto& iter : llvm::reverse(decorators)) {
-    if (checkForIntrinsic(*iter.expression))
+    if (llvm::isa<Syntax::Intrinsic>(*iter.expression))
       continue;
     auto locExit2 = changeLoc(iter);
     auto decorator = visit(*iter.expression);
@@ -2248,9 +2247,6 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda) {
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef) {
   auto locExit = changeLoc(attributeRef, attributeRef.identifier);
-  if (auto intr = checkForIntrinsic(attributeRef)) {
-    return intrinsicConstant(std::move(*intr));
-  }
   auto object = visit(*attributeRef.object);
   if (!object) {
     return {};
@@ -2258,6 +2254,11 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef) {
   return m_builder.createPylirGetAttributeIntrinsic(
       object, m_builder.createConstant(attributeRef.identifier.getValue()),
       m_currentExceptBlock);
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::Intrinsic& intrinsic) {
+  auto locExit = changeLoc(intrinsic);
+  return intrinsicConstant(intrinsic);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Generator&) {
@@ -2465,7 +2466,7 @@ pylir::CodeGen::ModuleSpec::ModuleSpec(
 }
 
 mlir::Value
-pylir::CodeGen::callIntrinsic(Syntax::Intrinsic&& intrinsic,
+pylir::CodeGen::callIntrinsic(const Syntax::Intrinsic& intrinsic,
                               llvm::ArrayRef<Syntax::Argument> arguments,
                               const Syntax::Call& call) {
   std::string_view intrName = intrinsic.name;
@@ -2523,7 +2524,8 @@ pylir::CodeGen::callIntrinsic(Syntax::Intrinsic&& intrinsic,
   return {};
 }
 
-mlir::Value pylir::CodeGen::intrinsicConstant(Syntax::Intrinsic&& intrinsic) {
+mlir::Value
+pylir::CodeGen::intrinsicConstant(const Syntax::Intrinsic& intrinsic) {
   std::string_view intrName = intrinsic.name;
   if (intrName == "pylir.intr.type.__slots__") {
     llvm::SmallVector<mlir::Attribute> attrs;
