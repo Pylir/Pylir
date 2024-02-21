@@ -1337,9 +1337,57 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  Value visitImpl([[maybe_unused]] const Syntax::Intrinsic& intrinsic) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Intrinsic& intrinsic) {
+    std::string_view intrName = intrinsic.name;
+    if (intrName == "pylir.intr.type.__slots__") {
+      SmallVector<Attribute> attrs;
+#define TYPE_SLOT(slot, ...) \
+  attrs.push_back(m_builder.getAttr<Py::StrAttr>(#slot));
+#include <pylir/Interfaces/Slots.def>
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::TupleAttr>(attrs));
+    }
+    if (intrName == "pylir.intr.function.__slots__") {
+      SmallVector<Attribute> attrs;
+#define FUNCTION_SLOT(slot, ...) \
+  attrs.push_back(m_builder.getAttr<Py::StrAttr>(#slot));
+#include <pylir/Interfaces/Slots.def>
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::TupleAttr>(attrs));
+    }
+    if (intrName == "pylir.intr.BaseException.__slots__") {
+      SmallVector<Attribute> attrs;
+#define BASEEXCEPTION_SLOT(slot, ...) \
+  attrs.push_back(m_builder.getAttr<Py::StrAttr>(#slot));
+#include <pylir/Interfaces/Slots.def>
+      return create<Py::ConstantOp>(m_builder.getAttr<Py::TupleAttr>(attrs));
+    }
+
+#define TYPE_SLOT(pySlotName, cppSlotName)                        \
+  if (intrName == "pylir.intr.type." #pySlotName)                 \
+    return create<Py::ConstantOp>(m_builder.getAttr<Py::IntAttr>( \
+        BigInt(static_cast<std::size_t>(Builtins::TypeSlots::cppSlotName))));
+
+#include <pylir/Interfaces/Slots.def>
+
+#define FUNCTION_SLOT(pySlotName, cppSlotName)                           \
+  if (intrName == "pylir.intr.function." #pySlotName)                    \
+    return create<Py::ConstantOp>(m_builder.getAttr<Py::IntAttr>(BigInt( \
+        static_cast<std::size_t>(Builtins::FunctionSlots::cppSlotName))));
+
+#include <pylir/Interfaces/Slots.def>
+
+#define BASEEXCEPTION_SLOT(pySlotName, cppSlotName)                     \
+  if (intrName == "pylir.intr.BaseException." #pySlotName)              \
+    return create<Py::ConstantOp>(                                      \
+        m_builder.getAttr<Py::IntAttr>(BigInt(static_cast<std::size_t>( \
+            Builtins::BaseExceptionSlots::cppSlotName))));
+
+#include <pylir/Interfaces/Slots.def>
+
+    createError(intrinsic.identifiers.front(), Diag::UNKNOWN_INTRINSIC_N,
+                intrName)
+        .addHighlight(intrinsic.identifiers.front(),
+                      intrinsic.identifiers.back());
+    return {};
   }
 
   Value visitImpl(const Syntax::Call& call) {
