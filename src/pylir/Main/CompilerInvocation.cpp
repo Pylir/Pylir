@@ -178,6 +178,12 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(
     const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
     Diag::DiagnosticsManager& diagManager) {
   const auto& args = commandLine.getArgs();
+
+  llvm::ThreadPoolStrategy strategy = llvm::hardware_concurrency();
+  if (!args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true))
+    strategy = llvm::hardware_concurrency(1);
+  m_threadPool.emplace(strategy);
+
   std::optional<llvm::ToolOutputFile> outputFile;
   if (!commandLine.onlyPrint()) {
     if (auto* arg = args.getLastArg(OPT_M)) {
@@ -343,7 +349,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
     if (action == SyntaxOnly)
       return mlir::success();
 
-    ensureMLIRContext(args);
+    ensureMLIRContext();
 
     auto module =
         codegenPythonToMLIR(args, commandLine, diagManager, subDiagManager);
@@ -360,7 +366,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
   }
   case FileType::MLIR: {
     if (type == FileType::MLIR) {
-      ensureMLIRContext(args);
+      ensureMLIRContext();
       m_mlirContext->allowUnregisteredDialects(false);
       auto content = readWholeFile(inputFile, commandLine);
       if (mlir::failed(content))
@@ -638,8 +644,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
   return mlir::success();
 }
 
-void pylir::CompilerInvocation::ensureMLIRContext(
-    const llvm::opt::InputArgList& args) {
+void pylir::CompilerInvocation::ensureMLIRContext() {
   if (m_mlirContext)
     return;
 
@@ -652,8 +657,8 @@ void pylir::CompilerInvocation::ensureMLIRContext(
   registry.insert<mlir::DLTIDialect>();
   pylir::registerExternalModels(registry);
   m_mlirContext.emplace(registry);
-  m_mlirContext->enableMultithreading(
-      args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
+  m_mlirContext->disableMultithreading();
+  m_mlirContext->setThreadPool(*m_threadPool);
   m_mlirContext->getDiagEngine().registerHandler(
       [](mlir::Diagnostic& diagnostic) {
         diagnostic.print(llvm::errs());
@@ -907,19 +912,12 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
     llvm::sys::path::append(libDirPath, "..", "lib");
     importPaths.emplace_back(libDirPath);
   }
-  options.importPaths = std::move(importPaths);
 
   // Protects 'futures' and 'loaded'.
   std::mutex dataStructureMutex;
-  // std::list is used deliberately here as we need iteration stability on
-  // push_back. This is important for the case where multi threading is
-  // disabled: We are used deferred launches in futures to have as compatible of
-  // interfaces as possible and these are only launched when the item to be
-  // computed is retrieved. That retrieval may however import more item and
-  // append to 'futures'. Since we are already mid-iteration, this has to be
-  // possible.
-  std::list<std::pair<std::shared_future<mlir::ModuleOp>, std::string>> futures;
-  llvm::StringSet<> loaded;
+  std::vector<std::pair<std::shared_future<mlir::ModuleOp>, std::string>>
+      futures;
+  llvm::StringMap<std::string> loaded;
 
   // Protects 'm_fileInputs' and 'm_documents'.
   std::mutex sourceDSMutex;
@@ -928,61 +926,88 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
   if (args.hasArg(OPT_Xnew_codegen))
     codeGenBackend = pylir::codegenNew;
 
-  options.moduleLoadCallback = [&](CodeGenOptions::LoadRequest&& request) {
+  llvm::ThreadPoolTaskGroup taskGroup(*m_threadPool);
+  options
+      .moduleLoadCallback = [&](llvm::StringRef absoluteModule,
+                                Diag::DiagnosticsDocManager* diagnostics,
+                                std::pair<std::size_t, std::size_t> location) {
     std::unique_lock lock{dataStructureMutex};
-    auto qualifier = request.qualifier;
-    if (!loaded.insert(qualifier).second)
+    auto [iter, inserted] = loaded.try_emplace(absoluteModule, "");
+    if (!inserted)
       return;
 
-    // NOTE: we can't return a mlir::OwningOpRef<mlir::ModuleOp> here, because
-    // LLVMs threadpool uses 'std::shared_future's which do not have a non-const
-    // 'get' method that we could use to move it out of the future.
-    auto action = [&,
-                   request = std::move(request)]() mutable -> mlir::ModuleOp {
-      std::optional exit = llvm::make_scope_exit(
-          [&] { llvm::sys::fs::closeFile(request.handle); });
-      llvm::sys::fs::file_status status;
-      {
-        auto error = llvm::sys::fs::status(request.handle, status);
-        if (error) {
-          Diag::DiagnosticsBuilder(*request.diagnosticsDocManager,
-                                   Diag::Severity::Error, request.location,
-                                   pylir::Diag::FAILED_TO_ACCESS_FILE_N,
-                                   request.filePath)
-              .addHighlight(request.location);
-          return nullptr;
-        }
+    // The path to check depends on whether this is a top level module (no '.')
+    // or a submodule. Submodules can only be loaded after their parent module
+    // was loaded and need to be in a subdirectory of its parent package.
+    std::vector<std::string> pathsToCheck;
+    auto [parentPackage, thisModule] = absoluteModule.rsplit('.');
+    if (thisModule.empty()) {
+      // Top level module.
+      pathsToCheck = importPaths;
+      thisModule = parentPackage;
+    } else {
+      std::string parentPath = loaded.lookup(parentPackage);
+      PYLIR_ASSERT(!parentPath.empty() &&
+                   "parent package must have been loaded previously");
+      if (!llvm::StringRef(parentPath).ends_with("__init__.py")) {
+        // TODO: Should this be diagnosed? Probably.
       }
-      std::string content(status.getSize(), '\0');
-      auto read = llvm::sys::fs::readNativeFile(
-          request.handle, {content.data(), content.size()});
-      if (!read) {
-        Diag::DiagnosticsBuilder(*request.diagnosticsDocManager,
-                                 Diag::Severity::Error, request.location,
-                                 pylir::Diag::FAILED_TO_READ_FILE_N,
-                                 request.filePath)
-            .addHighlight(request.location);
-        return nullptr;
-      }
-      exit.reset();
+      pathsToCheck.emplace_back(llvm::sys::path::parent_path(parentPath));
+    }
 
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer(
+        std::errc::no_such_file_or_directory);
+    for (llvm::StringRef candidate : pathsToCheck) {
+      // Prefer packages to plain modules.
+      llvm::SmallString<128> path = candidate;
+      llvm::sys::path::append(path, thisModule, "__init__.py");
+
+      buffer = llvm::MemoryBuffer::getFile(path);
+      if (buffer)
+        break;
+
+      path = candidate;
+      llvm::sys::path::append(path, thisModule + ".py");
+
+      buffer = llvm::MemoryBuffer::getFile(path);
+      if (buffer)
+        break;
+    }
+
+    if (!buffer) {
+      // TODO: This is a source of non-determinism as the location being used
+      //       is dependent on the scheduling of threads.
+      Diag::DiagnosticsBuilder(*diagnostics, Diag::Severity::Error, location,
+                               Diag::FAILED_TO_FIND_MODULE_N, absoluteModule)
+          .addHighlight(location);
+      return;
+    }
+    iter->second = (*buffer)->getBufferIdentifier();
+
+    auto action = [=, &sourceDSMutex, &diagManager, &options,
+                   buffer = std::shared_ptr(std::move(*buffer)),
+                   absoluteModule =
+                       absoluteModule.str()]() mutable -> mlir::ModuleOp {
       std::unique_lock sourceLock{sourceDSMutex};
-      auto& document = addDocument(std::move(content), request.filePath);
+      Diag::Document& document =
+          addDocument(buffer->getBuffer(), buffer->getBufferIdentifier().str());
       sourceLock.unlock();
 
-      auto docManager = diagManager.createSubDiagnosticManager(document);
-      pylir::Parser parser(docManager);
-      auto tree = parser.parseFileInput();
+      Diag::DiagnosticsDocManager docManager =
+          diagManager.createSubDiagnosticManager(document);
+      Parser parser(docManager);
+      std::optional<Syntax::FileInput> tree = parser.parseFileInput();
       if (!tree || docManager.errorsOccurred())
         return nullptr;
 
       sourceLock.lock();
-      auto& fileInput = m_fileInputs.emplace_back(std::move(*tree));
+      Syntax::FileInput& fileInput =
+          m_fileInputs.emplace_back(std::move(*tree));
       sourceLock.unlock();
 
-      auto copyOption = options;
-      copyOption.qualifier = std::move(request.qualifier);
-      auto res =
+      CodeGenOptions copyOption = options;
+      copyOption.qualifier = std::move(absoluteModule);
+      mlir::OwningOpRef<mlir::ModuleOp> res =
           codeGenBackend(&*m_mlirContext, fileInput, docManager, copyOption);
       if (docManager.errorsOccurred())
         return nullptr;
@@ -990,52 +1015,49 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
       return res.release();
     };
 
-    if (m_mlirContext->isMultithreadingEnabled())
-      futures.emplace_back(
-          m_mlirContext->getThreadPool().async(std::move(action)),
-          std::move(qualifier));
-    else
-      futures.emplace_back(
-          std::async(std::launch::deferred, std::move(action)).share(),
-          std::move(qualifier));
+    futures.emplace_back(m_threadPool->async(taskGroup, std::move(action)),
+                         absoluteModule.str());
   };
 
-  auto mainModule = codeGenBackend(&*m_mlirContext, m_fileInputs.front(),
-                                   mainModuleDiagManager, options);
-  if (mainModuleDiagManager.errorsOccurred()) {
-    // Despite the errors that occurred in the main module, we still want to
-    // codegen and wait for all imports to occur to emit as many helpful errors
-    // as possible. This is also necessary to not leak the memory of the modules
-    // they're creating.
-    llvm::for_each(llvm::make_first_range(futures), [](auto&& future) {
-      if (auto module = future.get()) {
-        module.erase();
-      }
-    });
-    return mlir::failure();
-  }
-  std::vector<mlir::OwningOpRef<mlir::ModuleOp>> importedModules;
-  importedModules.push_back(std::move(mainModule));
+  // Also place the main module codegen a task on the threadpool. This is
+  // purely for uniformity and debuggability when using '-Xsingle-threaded'.
+  // Having all code stay in the same thread works better in 'gdb' and 'lldb'.
+  {
+    std::unique_lock lock{dataStructureMutex};
 
-  // The real size of `futures` is unknown as it grows while we are iterating
-  // through here. Hence, we NEED to use a back inserter.
-  std::vector<std::pair<mlir::OwningOpRef<mlir::ModuleOp>, std::string>>
-      calculatedImports;
-  std::transform(std::move_iterator(futures.begin()),
-                 std::move_iterator(futures.end()),
-                 std::back_inserter(calculatedImports), [](auto&& pair) {
-                   return std::pair{pair.first.get(), std::move(pair.second)};
-                 });
-  if (!llvm::all_of(llvm::make_first_range(calculatedImports),
+    futures.emplace_back(
+        m_threadPool->async(taskGroup,
+                            [&]() -> mlir::ModuleOp {
+                              mlir::OwningOpRef<mlir::ModuleOp> mainModule =
+                                  codeGenBackend(
+                                      &*m_mlirContext, m_fileInputs.front(),
+                                      mainModuleDiagManager, options);
+                              if (mainModuleDiagManager.errorsOccurred())
+                                return nullptr;
+
+                              return mainModule.release();
+                            }),
+        options.qualifier);
+  }
+
+  // Wait for all codegen to be done.
+  taskGroup.wait();
+
+  // The contents of 'futures' is now final. Sort it into a deterministic order
+  // for the linker step.
+  std::sort(futures.begin(), futures.end(), llvm::less_second{});
+
+  std::vector<mlir::OwningOpRef<mlir::ModuleOp>> importedModules(
+      futures.size());
+  llvm::transform(llvm::make_first_range(futures), importedModules.begin(),
+                  [](const std::shared_future<mlir::ModuleOp>& future) {
+                    return future.get();
+                  });
+
+  // If any returned null, then there were errors.
+  if (!llvm::all_of(importedModules,
                     llvm::identity<mlir::OwningOpRef<mlir::ModuleOp>>{}))
     return mlir::failure();
-
-  std::sort(calculatedImports.begin(), calculatedImports.end(),
-            llvm::less_second{});
-  std::transform(std::move_iterator(calculatedImports.begin()),
-                 std::move_iterator(calculatedImports.end()),
-                 std::back_inserter(importedModules),
-                 [](auto&& pair) { return std::move(pair.first); });
 
   return linkModules(importedModules);
 }

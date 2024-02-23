@@ -165,6 +165,7 @@ class CodeGen {
                     mlir::ValueRange endArgs,
                     llvm::function_ref<void(mlir::Value)> iterationCallback);
 
+  /*
   struct ModuleSpec {
     std::size_t dots;
     std::pair<std::size_t, std::size_t> dotsLocation;
@@ -191,6 +192,7 @@ class CodeGen {
   };
 
   std::vector<ModuleImport> importModules(llvm::ArrayRef<ModuleSpec> specs);
+*/
 
   mlir::Value callIntrinsic(const Syntax::Intrinsic& intrinsic,
                             llvm::ArrayRef<Syntax::Argument> arguments,

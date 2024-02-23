@@ -496,13 +496,17 @@ public:
   std::optional<Syntax::AssertStmt> parseAssertStmt();
 
   /**
-   * import_stmt     ::=  "import" module ["as" identifier] { "," module ["as"
-   * identifier] } |  "from" relative_module "import" identifier ["as"
-   * identifier] { "," identifier ["as" identifier] } |  "from" relative_module
-   * "import" "(" identifier ["as" identifier] { "," identifier ["as"
-   * identifier] } [","] ")" |  "from" relative_module "import" "*" module ::=
-   * { identifier "." } identifier relative_module ::=  { "." } module |  "." {
-   * "." }
+   * import_stmt     ::= "import" module ["as" identifier]
+   *                     { "," module ["as" identifier] }
+   *                   | "from" relative_module "import" identifier
+   *                     ["as" identifier] { "," identifier ["as" identifier] }
+   *                   | "from" relative_module "import"
+   *                     "(" identifier ["as" identifier] { "," identifier
+   *                         ["as" identifier] } [","] ")"
+   *                   | "from" relative_module "import" "*"
+   *
+   * module ::= { identifier "." } identifier
+   * relative_module ::=  { "." } module |  "." { "." }
    */
   std::optional<Syntax::ImportStmt> parseImportStmt();
 
