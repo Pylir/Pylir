@@ -17,16 +17,10 @@
 namespace pylir {
 
 struct CodeGenOptions {
-  std::vector<std::string> importPaths;
-
-  struct LoadRequest {
-    llvm::sys::fs::file_t handle;
-    std::string qualifier;
-    std::pair<std::size_t, std::size_t> location;
-    Diag::DiagnosticsDocManager* diagnosticsDocManager;
-    std::string filePath;
-  };
-  std::function<void(LoadRequest&&)> moduleLoadCallback;
+  std::function<void(llvm::StringRef absoluteModule,
+                     Diag::DiagnosticsDocManager* diagnostics,
+                     std::pair<std::size_t, std::size_t> location)>
+      moduleLoadCallback;
   std::string qualifier;
   bool implicitBuiltinsImport;
 };

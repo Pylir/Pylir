@@ -13,6 +13,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/Option/Arg.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/ThreadPool.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Target/TargetMachine.h>
 
@@ -32,6 +33,7 @@ namespace pylir {
 struct CodeGenOptions;
 
 class CompilerInvocation {
+  std::optional<llvm::ThreadPool> m_threadPool;
   std::optional<mlir::MLIRContext> m_mlirContext;
   std::unique_ptr<llvm::LLVMContext> m_llvmContext;
   std::list<Diag::Document> m_documents;
@@ -50,7 +52,7 @@ public:
   enum Action { SyntaxOnly, ObjectFile, Assembly, Link };
 
 private:
-  void ensureMLIRContext(const llvm::opt::InputArgList& args);
+  void ensureMLIRContext();
 
   mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args,
                                      const pylir::Toolchain& toolchain);

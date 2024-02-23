@@ -69,7 +69,8 @@ pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput) {
 
     // Initialize builtins from main module.
     if (m_qualifiers.empty() && m_options.implicitBuiltinsImport) {
-      importModules({ModuleSpec({ModuleSpec::Component{"builtins", {0, 1}}})});
+      m_options.moduleLoadCallback("builtins", m_docManager,
+                                   /*location=*/{0, 1});
       m_builder.create<Py::CallOp>(mlir::TypeRange{}, "builtins.__init__");
     }
 
@@ -2276,8 +2277,6 @@ void pylir::CodeGen::visit(const Syntax::DelStmt& delStmt) {
 }
 
 void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt) {
-  std::vector<ModuleSpec> specs;
-
   auto moduleIsIntrinsic = [](const Syntax::ImportStmt::Module& module) {
     if (module.identifiers.size() < 2) {
       return false;
@@ -2286,183 +2285,70 @@ void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt) {
            module.identifiers[1].getValue() == "intr";
   };
 
-  pylir::match(
+  struct ModuleSpec {
+    std::size_t dots = 0;
+    std::vector<IdentifierToken> identifiers;
+  };
+
+  llvm::SmallVector<ModuleSpec> specs;
+  match(
       importStmt.variant,
       [&](const Syntax::ImportStmt::ImportAs& importAs) {
         for (const auto& iter : importAs.modules) {
           if (!iter.second && moduleIsIntrinsic(iter.first))
             continue;
-          specs.emplace_back(iter.first);
+          specs.push_back({0, iter.first.identifiers});
         }
       },
-      [&](const Syntax::ImportStmt::FromImport& fromImport) {
-        specs.emplace_back(fromImport.relativeModule);
+      [&](const Syntax::ImportStmt::FromImport&) {
+        // TODO:
+        PYLIR_UNREACHABLE;
       },
-      [&](const Syntax::ImportStmt::ImportAll& importAll) {
-        specs.emplace_back(importAll.relativeModule);
+      [&](const Syntax::ImportStmt::ImportAll&) {
+        // TODO:
+        PYLIR_UNREACHABLE;
       });
 
-  auto result = importModules(specs);
-  for (auto& iter : result) {
-    if (!iter.successful) {
-      // TODO: throw ModuleNotFoundError
-      continue;
+  for (const ModuleSpec& moduleSpec : specs) {
+    llvm::SmallVector<std::string> moduleParts;
+
+    if (moduleSpec.dots != 0) {
+      llvm::SmallVector<llvm::StringRef> split;
+      llvm::StringRef(m_qualifiers).split(split, '.');
+      if (split.size() < moduleSpec.dots) {
+        // exceeding package level.
+        // TODO: diagnostic?
+        return;
+      }
+      llvm::append_range(moduleParts,
+                         llvm::ArrayRef(split).drop_back(moduleSpec.dots - 1));
     }
-    // TODO: throw ImportError on init failure
-    // TODO: somehow handle that modules aren't initialized multiple times
-    //  (best via sys.modules once we have that)
-    m_builder.create<Py::CallOp>(mlir::TypeRange{},
-                                 iter.moduleSymbolName + ".__init__");
+    llvm::append_range(
+        moduleParts, llvm::map_range(moduleSpec.identifiers,
+                                     std::mem_fn(&IdentifierToken::getValue)));
+
+    std::string moduleQualifier;
+    for (llvm::StringRef part : moduleParts) {
+      if (moduleQualifier.empty())
+        moduleQualifier = part;
+      else
+        moduleQualifier.append(".").append(part);
+
+      m_options.moduleLoadCallback(moduleQualifier, m_docManager,
+                                   Diag::rangeLoc(moduleSpec.identifiers));
+
+      // TODO: throw ImportError on init failure
+      // TODO: somehow handle that modules aren't initialized multiple times
+      //  (best via sys.modules once we have that)
+      m_builder.create<Py::CallOp>(mlir::TypeRange{},
+                                   moduleQualifier + ".__init__");
+    }
   }
 }
 
 void pylir::CodeGen::visit(const Syntax::FutureStmt&) {
   // TODO:
   PYLIR_UNREACHABLE;
-}
-
-std::vector<pylir::CodeGen::ModuleImport>
-pylir::CodeGen::importModules(llvm::ArrayRef<ModuleSpec> specs) {
-  std::vector<pylir::CodeGen::ModuleImport> imports;
-  for (const auto& iter : specs) {
-    llvm::SmallString<100> relativePathSS(
-        m_docManager->getDocument().getFilename());
-    llvm::sys::fs::make_absolute(relativePathSS);
-    for (std::size_t i = 0; i < iter.dots; i++) {
-      llvm::sys::path::append(relativePathSS, "..");
-    }
-    std::string relativePath{relativePathSS};
-
-    std::pair<std::size_t, std::size_t> location;
-    std::string moduleQualifier;
-    llvm::ArrayRef<std::string> importPathsToCheck;
-    if (iter.dots != 0) {
-      importPathsToCheck = relativePath;
-      location = iter.dotsLocation;
-      llvm::SmallVector<llvm::StringRef> split;
-      llvm::StringRef{m_options.qualifier}.split(split, '.');
-      // Amount of dots exceed package level
-      if (split.size() < iter.dots) {
-        imports.push_back({"", false, location});
-        continue;
-      }
-      moduleQualifier =
-          llvm::join(llvm::ArrayRef(split).drop_back(iter.dots - 1), ".");
-    } else {
-      importPathsToCheck = m_options.importPaths;
-      PYLIR_ASSERT(!iter.components.empty());
-      moduleQualifier = iter.components.front().name;
-      location = iter.components.front().location;
-    }
-
-    // When importing submodules, they need to be subdirectories/files from the
-    // parent package. Hence, we do the following here: We search only for the
-    // most top level module first to find the path we'll be working with, and
-    // only then attempt to find submodules relative to that path.
-
-    std::optional<llvm::StringRef> topLevelModule;
-    if (!iter.components.empty()) {
-      topLevelModule = iter.components.front().name;
-    }
-
-    bool lastWasPackage = false;
-
-    auto testPathForImport = [&](llvm::StringRef path)
-        -> std::optional<std::pair<llvm::sys::fs::file_t, std::string>> {
-      // First check if this is a package import by trying to open a contained
-      // __init__.py
-      llvm::SmallString<100> initFilePath = path;
-      llvm::sys::path::append(initFilePath, "__init__.py");
-
-      auto fs = llvm::sys::fs::openNativeFileForRead(initFilePath);
-      if (fs) {
-        lastWasPackage = true;
-        return std::pair{fs.get(), std::string(initFilePath)};
-      }
-      llvm::consumeError(fs.takeError());
-
-      // Otherwise try module import a source file.
-      fs = llvm::sys::fs::openNativeFileForRead((path + ".py").str());
-      if (fs) {
-        return std::pair{fs.get(), (path + ".py").str()};
-      }
-      llvm::consumeError(fs.takeError());
-      return std::nullopt;
-    };
-
-    llvm::SmallString<100> successPath;
-    bool success = false;
-    for (const auto& path : importPathsToCheck) {
-      successPath = path;
-      if (topLevelModule) {
-        llvm::sys::path::append(successPath, *topLevelModule);
-      }
-      if (auto opt = testPathForImport(successPath)) {
-        auto [fs, filePath] = std::move(*opt);
-        m_options.moduleLoadCallback(
-            {fs, moduleQualifier, location, m_docManager, std::move(filePath)});
-        imports.push_back({moduleQualifier, true, location});
-        success = true;
-        break;
-      }
-    }
-
-    if (!success) {
-      imports.push_back({moduleQualifier, false, location});
-      continue;
-    }
-
-    // Early exit for pure relative path
-    if (iter.components.empty())
-      continue;
-
-    for (const auto& subModule : llvm::drop_begin(iter.components)) {
-      moduleQualifier += ".";
-      moduleQualifier += subModule.name;
-      if (!lastWasPackage) {
-        imports.push_back({moduleQualifier, false, location});
-        break;
-      }
-
-      llvm::sys::path::append(successPath, subModule.name);
-      if (auto opt = testPathForImport(successPath)) {
-        auto [fs, filePath] = std::move(*opt);
-        m_options.moduleLoadCallback(
-            {fs, moduleQualifier, location, m_docManager, std::move(filePath)});
-        imports.push_back({moduleQualifier, true, location});
-        continue;
-      }
-      imports.push_back({moduleQualifier, false, location});
-      break;
-    }
-  }
-  return imports;
-}
-
-pylir::CodeGen::ModuleSpec::ModuleSpec(
-    const pylir::Syntax::ImportStmt::Module& module)
-    : dots{}, dotsLocation{}, components(module.identifiers.size()) {
-  llvm::transform(
-      module.identifiers, components.begin(), [](const IdentifierToken& token) {
-        return Component{std::string(token.getValue()), Diag::rangeLoc(token)};
-      });
-}
-
-pylir::CodeGen::ModuleSpec::ModuleSpec(
-    const pylir::Syntax::ImportStmt::RelativeModule& relativeModule)
-    : dots(relativeModule.dots.size()),
-      dotsLocation(Diag::rangeLoc(relativeModule.dots.front()).first,
-                   Diag::rangeLoc(relativeModule.dots.back()).second),
-      components(relativeModule.module
-                     ? relativeModule.module->identifiers.size()
-                     : 0) {
-  if (relativeModule.module) {
-    llvm::transform(relativeModule.module->identifiers, components.begin(),
-                    [](const IdentifierToken& token) {
-                      return Component{std::string(token.getValue()),
-                                       Diag::rangeLoc(token)};
-                    });
-  }
 }
 
 mlir::Value

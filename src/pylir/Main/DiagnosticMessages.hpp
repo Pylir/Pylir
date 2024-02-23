@@ -30,6 +30,9 @@ constexpr auto FAILED_TO_OPEN_OUTPUT_FILE_N_FOR_WRITING =
 constexpr auto FAILED_TO_ACCESS_FILE_N =
     FMT_STRING("failed to access file '{}'");
 
+constexpr auto FAILED_TO_FIND_MODULE_N =
+    FMT_STRING("failed to find module '{}'");
+
 constexpr auto FAILED_TO_READ_FILE_N = FMT_STRING("failed to read file '{}'");
 
 constexpr auto FAILED_TO_CREATE_TEMPORARY_FILE_N =

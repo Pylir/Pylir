@@ -281,20 +281,29 @@ struct RaiseStmt : SimpleStmt::Base<RaiseStmt> {
 };
 
 struct ImportStmt : SimpleStmt::Base<ImportStmt> {
+  /// module ::= { identifier "." } identifier
   struct Module {
     std::vector<IdentifierToken> identifiers;
   };
 
+  /// relative_module ::=  { "." } module |  "." { "." }
   struct RelativeModule {
     std::vector<BaseToken> dots;
     std::optional<Module> module;
   };
 
+  /// "import" module ["as" identifier] { "," module ["as" identifier] }
   struct ImportAs {
     BaseToken import;
     std::vector<std::pair<Module, std::optional<IdentifierToken>>> modules;
   };
 
+  /// "from" relative_module "import" identifier ["as" identifier]
+  ///       { "," identifier ["as" identifier] }
+  /// | "from" relative_module "import"
+  ///   "(" identifier ["as" identifier]
+  ///     { "," identifier ["as" identifier] }
+  ///   [","] ")"
   struct FromImport {
     BaseToken from;
     RelativeModule relativeModule;
@@ -303,6 +312,7 @@ struct ImportStmt : SimpleStmt::Base<ImportStmt> {
         imports;
   };
 
+  /// "from" relative_module "import" "*"
   struct ImportAll {
     BaseToken from;
     RelativeModule relativeModule;
