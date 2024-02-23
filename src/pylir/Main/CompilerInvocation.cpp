@@ -927,97 +927,100 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
     codeGenBackend = pylir::codegenNew;
 
   llvm::ThreadPoolTaskGroup taskGroup(*m_threadPool);
-  options
-      .moduleLoadCallback = [&](llvm::StringRef absoluteModule,
-                                Diag::DiagnosticsDocManager* diagnostics,
-                                std::pair<std::size_t, std::size_t> location) {
-    std::unique_lock lock{dataStructureMutex};
-    auto [iter, inserted] = loaded.try_emplace(absoluteModule, "");
-    if (!inserted)
-      return;
+  options.moduleLoadCallback =
+      [&](llvm::StringRef absoluteModule,
+          Diag::DiagnosticsDocManager* diagnostics,
+          std::pair<std::size_t, std::size_t> location) {
+        std::unique_lock lock{dataStructureMutex};
+        auto [iter, inserted] = loaded.try_emplace(absoluteModule, "");
+        if (!inserted)
+          return;
 
-    // The path to check depends on whether this is a top level module (no '.')
-    // or a submodule. Submodules can only be loaded after their parent module
-    // was loaded and need to be in a subdirectory of its parent package.
-    std::vector<std::string> pathsToCheck;
-    auto [parentPackage, thisModule] = absoluteModule.rsplit('.');
-    if (thisModule.empty()) {
-      // Top level module.
-      pathsToCheck = importPaths;
-      thisModule = parentPackage;
-    } else {
-      std::string parentPath = loaded.lookup(parentPackage);
-      PYLIR_ASSERT(!parentPath.empty() &&
-                   "parent package must have been loaded previously");
-      if (!llvm::StringRef(parentPath).ends_with("__init__.py")) {
-        // TODO: Should this be diagnosed? Probably.
-      }
-      pathsToCheck.emplace_back(llvm::sys::path::parent_path(parentPath));
-    }
+        // The path to check depends on whether this is a top level module (no
+        // '.') or a submodule. Submodules can only be loaded after their parent
+        // module was loaded and need to be in a subdirectory of its parent
+        // package.
+        std::vector<std::string> pathsToCheck;
+        auto [parentPackage, thisModule] = absoluteModule.rsplit('.');
+        if (thisModule.empty()) {
+          // Top level module.
+          pathsToCheck = importPaths;
+          thisModule = parentPackage;
+        } else {
+          std::string parentPath = loaded.lookup(parentPackage);
+          PYLIR_ASSERT(!parentPath.empty() &&
+                       "parent package must have been loaded previously");
+          if (!llvm::StringRef(parentPath).ends_with("__init__.py")) {
+            // TODO: Should this be diagnosed? Probably.
+          }
+          pathsToCheck.emplace_back(llvm::sys::path::parent_path(parentPath));
+        }
 
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer(
-        std::errc::no_such_file_or_directory);
-    for (llvm::StringRef candidate : pathsToCheck) {
-      // Prefer packages to plain modules.
-      llvm::SmallString<128> path = candidate;
-      llvm::sys::path::append(path, thisModule, "__init__.py");
+        llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer(
+            std::errc::no_such_file_or_directory);
+        for (llvm::StringRef candidate : pathsToCheck) {
+          // Prefer packages to plain modules.
+          llvm::SmallString<128> path = candidate;
+          llvm::sys::path::append(path, thisModule, "__init__.py");
 
-      buffer = llvm::MemoryBuffer::getFile(path);
-      if (buffer)
-        break;
+          buffer = llvm::MemoryBuffer::getFile(path);
+          if (buffer)
+            break;
 
-      path = candidate;
-      llvm::sys::path::append(path, thisModule + ".py");
+          path = candidate;
+          llvm::sys::path::append(path, thisModule + ".py");
 
-      buffer = llvm::MemoryBuffer::getFile(path);
-      if (buffer)
-        break;
-    }
+          buffer = llvm::MemoryBuffer::getFile(path);
+          if (buffer)
+            break;
+        }
 
-    if (!buffer) {
-      // TODO: This is a source of non-determinism as the location being used
-      //       is dependent on the scheduling of threads.
-      Diag::DiagnosticsBuilder(*diagnostics, Diag::Severity::Error, location,
-                               Diag::FAILED_TO_FIND_MODULE_N, absoluteModule)
-          .addHighlight(location);
-      return;
-    }
-    iter->second = (*buffer)->getBufferIdentifier();
+        if (!buffer) {
+          // TODO: This is a source of non-determinism as the location being
+          // used
+          //       is dependent on the scheduling of threads.
+          Diag::DiagnosticsBuilder(*diagnostics, Diag::Severity::Error,
+                                   location, Diag::FAILED_TO_FIND_MODULE_N,
+                                   absoluteModule)
+              .addHighlight(location);
+          return;
+        }
+        iter->second = (*buffer)->getBufferIdentifier();
 
-    auto action = [=, &sourceDSMutex, &diagManager, &options,
-                   buffer = std::shared_ptr(std::move(*buffer)),
-                   absoluteModule =
-                       absoluteModule.str()]() mutable -> mlir::ModuleOp {
-      std::unique_lock sourceLock{sourceDSMutex};
-      Diag::Document& document =
-          addDocument(buffer->getBuffer(), buffer->getBufferIdentifier().str());
-      sourceLock.unlock();
+        auto action = [=, &sourceDSMutex, &diagManager, &options,
+                       buffer = std::shared_ptr(std::move(*buffer)),
+                       absoluteModule =
+                           absoluteModule.str()]() mutable -> mlir::ModuleOp {
+          std::unique_lock sourceLock{sourceDSMutex};
+          Diag::Document& document = addDocument(
+              buffer->getBuffer(), buffer->getBufferIdentifier().str());
+          sourceLock.unlock();
 
-      Diag::DiagnosticsDocManager docManager =
-          diagManager.createSubDiagnosticManager(document);
-      Parser parser(docManager);
-      std::optional<Syntax::FileInput> tree = parser.parseFileInput();
-      if (!tree || docManager.errorsOccurred())
-        return nullptr;
+          Diag::DiagnosticsDocManager docManager =
+              diagManager.createSubDiagnosticManager(document);
+          Parser parser(docManager);
+          std::optional<Syntax::FileInput> tree = parser.parseFileInput();
+          if (!tree || docManager.errorsOccurred())
+            return nullptr;
 
-      sourceLock.lock();
-      Syntax::FileInput& fileInput =
-          m_fileInputs.emplace_back(std::move(*tree));
-      sourceLock.unlock();
+          sourceLock.lock();
+          Syntax::FileInput& fileInput =
+              m_fileInputs.emplace_back(std::move(*tree));
+          sourceLock.unlock();
 
-      CodeGenOptions copyOption = options;
-      copyOption.qualifier = std::move(absoluteModule);
-      mlir::OwningOpRef<mlir::ModuleOp> res =
-          codeGenBackend(&*m_mlirContext, fileInput, docManager, copyOption);
-      if (docManager.errorsOccurred())
-        return nullptr;
+          CodeGenOptions copyOption = options;
+          copyOption.qualifier = std::move(absoluteModule);
+          mlir::OwningOpRef<mlir::ModuleOp> res = codeGenBackend(
+              &*m_mlirContext, fileInput, docManager, copyOption);
+          if (docManager.errorsOccurred())
+            return nullptr;
 
-      return res.release();
-    };
+          return res.release();
+        };
 
-    futures.emplace_back(m_threadPool->async(taskGroup, std::move(action)),
-                         absoluteModule.str());
-  };
+        futures.emplace_back(m_threadPool->async(taskGroup, std::move(action)),
+                             absoluteModule.str());
+      };
 
   // Also place the main module codegen a task on the threadpool. This is
   // purely for uniformity and debuggability when using '-Xsingle-threaded'.
