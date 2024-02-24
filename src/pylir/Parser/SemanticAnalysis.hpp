@@ -14,7 +14,7 @@
 
 namespace pylir {
 class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis> {
-  Diag::DiagnosticsDocManager* m_manager;
+  Diag::DiagnosticsDocManager<>* m_manager;
   IdentifierSet* m_globals = nullptr;
 
   using ScopeOwner =
@@ -57,7 +57,7 @@ class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis> {
   void verifyIsConstant(Syntax::Expression& expression);
 
 public:
-  explicit SemanticAnalysis(Diag::DiagnosticsDocManager& manager)
+  explicit SemanticAnalysis(Diag::DiagnosticsDocManager<>& manager)
       : m_manager(&manager) {}
 
   using Visitor::visit;

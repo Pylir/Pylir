@@ -874,7 +874,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
 pylir::CompilerInvocation::codegenPythonToMLIR(
     const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
     Diag::DiagnosticsManager& diagManager,
-    Diag::DiagnosticsDocManager& mainModuleDiagManager) {
+    Diag::DiagnosticsDocManager<>& mainModuleDiagManager) {
   pylir::CodeGenOptions options{};
   options.implicitBuiltinsImport =
       args.hasFlag(OPT_Xbuiltins, OPT_Xno_builtins, true);
@@ -929,8 +929,7 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
   llvm::ThreadPoolTaskGroup taskGroup(*m_threadPool);
   options.moduleLoadCallback =
       [&](llvm::StringRef absoluteModule,
-          Diag::DiagnosticsDocManager* diagnostics,
-          std::pair<std::size_t, std::size_t> location) {
+          Diag::DiagnosticsDocManager<>* diagnostics, Diag::Location location) {
         std::unique_lock lock{dataStructureMutex};
         auto [iter, inserted] = loaded.try_emplace(absoluteModule, "");
         if (!inserted)

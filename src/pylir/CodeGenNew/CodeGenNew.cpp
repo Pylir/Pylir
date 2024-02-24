@@ -29,7 +29,7 @@ class CodeGenNew {
   ImplicitLocOpBuilder m_builder;
   ModuleOp m_module;
   SymbolTable m_symbolTable;
-  Diag::DiagnosticsDocManager* m_docManager;
+  Diag::DiagnosticsDocManager<>* m_docManager;
   std::string m_qualifiers;
   Value m_globalDictionary;
   llvm::DenseMap<llvm::StringRef, Py::GlobalValueAttr> m_builtinNamespace;
@@ -197,13 +197,16 @@ class CodeGenNew {
 
   template <class AST>
   Location getLoc(const AST& astObject) {
-    auto [line, col] =
-        m_docManager->getDocument().getLineCol(Diag::pointLoc(astObject));
-    return mlir::OpaqueLoc::get(
-        &astObject,
-        mlir::FileLineColLoc::get(
-            m_builder.getStringAttr(m_docManager->getDocument().getFilename()),
-            line, col));
+    std::optional<std::size_t> offset = Diag::pointLoc(astObject);
+    Location loc = m_builder.getUnknownLoc();
+    if (offset) {
+      auto [line, col] = m_docManager->getDocument().getLineCol(*offset);
+      loc = FileLineColLoc::get(
+          m_builder.getStringAttr(m_docManager->getDocument().getFilename()),
+          line, col);
+    }
+
+    return OpaqueLoc::get(&astObject, loc);
   }
 
   /// Create the operation 'T' using 'args'. This should be preferred over using
@@ -377,7 +380,7 @@ class CodeGenNew {
   void executeFinallys(FinallyExitReason exitReason);
 
 public:
-  CodeGenNew(MLIRContext* context, Diag::DiagnosticsDocManager& manager,
+  CodeGenNew(MLIRContext* context, Diag::DiagnosticsDocManager<>& manager,
              CodeGenOptions&& options)
       : m_options(std::move(options)),
         m_builder(mlir::UnknownLoc::get(context), context),
@@ -398,16 +401,14 @@ public:
     }
   }
 
-  template <class T, class S, class... Args,
-            std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+  template <class T, class S, class... Args>
   auto createError(const T& location, const S& message, Args&&... args) {
     return Diag::DiagnosticsBuilder(*m_docManager, Diag::Severity::Error,
                                     location, message,
                                     std::forward<Args>(args)...);
   }
 
-  template <class T, class S, class... Args,
-            std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+  template <class T, class S, class... Args>
   auto createWarning(const T& location, const S& message, Args&&... args) {
     return Diag::DiagnosticsBuilder(*m_docManager, Diag::Severity::Warning,
                                     location, message,
@@ -1690,7 +1691,7 @@ void CodeGenNew::executeFinallys(CodeGenNew::FinallyExitReason exitReason) {
 
 mlir::OwningOpRef<mlir::ModuleOp>
 pylir::codegenNew(mlir::MLIRContext* context, const Syntax::FileInput& input,
-                  Diag::DiagnosticsDocManager& docManager,
+                  Diag::DiagnosticsDocManager<>& docManager,
                   CodeGenOptions options) {
   CodeGenNew codegen(context, docManager, std::move(options));
   return codegen.visit(input);

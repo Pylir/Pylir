@@ -25,7 +25,7 @@
 #include <unordered_set>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context,
-                        Diag::DiagnosticsDocManager& docManager,
+                        Diag::DiagnosticsDocManager<>& docManager,
                         CodeGenOptions&& options)
     : m_options(std::move(options)), m_builder([&] {
         context->loadDialect<pylir::Py::PylirPyDialect>();

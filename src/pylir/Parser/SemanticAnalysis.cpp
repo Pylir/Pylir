@@ -557,9 +557,7 @@ void pylir::SemanticAnalysis::visit(Syntax::ClassDef& classDef) {
       if (valid)
         continue;
 
-      std::pair<std::size_t, std::size_t> loc =
-          match(variant,
-                [](const auto& pointer) { return Diag::rangeLoc(*pointer); });
+      Diag::Location loc = Diag::rangeLoc(variant);
       createError(
           loc,
           Diag::

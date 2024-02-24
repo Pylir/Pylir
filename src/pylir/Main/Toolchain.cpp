@@ -35,6 +35,9 @@ void pylir::Toolchain::parseSanitizers(cli::CommandLine& commandLine) {
       } else if (sanitizer == "undefined") {
         m_useUndefinedSanitizer = true;
       } else {
+        static_assert(Diag::hasLocationProvider_v<const llvm::opt::Arg*,
+                                                  cli::CommandLine>);
+
         commandLine.createError(iter, Diag::UNKNOWN_SANITIZER_N, sanitizer)
             .addHighlight(iter);
         return;

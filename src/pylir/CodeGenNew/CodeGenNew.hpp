@@ -14,5 +14,5 @@ namespace pylir {
 
 mlir::OwningOpRef<mlir::ModuleOp>
 codegenNew(mlir::MLIRContext* context, const Syntax::FileInput& input,
-           Diag::DiagnosticsDocManager& docManager, CodeGenOptions options);
+           Diag::DiagnosticsDocManager<>& docManager, CodeGenOptions options);
 } // namespace pylir

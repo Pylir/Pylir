@@ -7,6 +7,7 @@
 #include <llvm/Support/FileSystem.h>
 
 #include <pylir/Diagnostics/DiagnosticsManager.hpp>
+#include <pylir/Diagnostics/LocationProvider.hpp>
 
 #include <cstddef>
 #include <functional>
@@ -18,8 +19,8 @@ namespace pylir {
 
 struct CodeGenOptions {
   std::function<void(llvm::StringRef absoluteModule,
-                     Diag::DiagnosticsDocManager* diagnostics,
-                     std::pair<std::size_t, std::size_t> location)>
+                     Diag::DiagnosticsDocManager<>* diagnostics,
+                     Diag::Location location)>
       moduleLoadCallback;
   std::string qualifier;
   bool implicitBuiltinsImport;

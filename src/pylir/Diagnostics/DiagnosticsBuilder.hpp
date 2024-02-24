@@ -301,6 +301,46 @@ class DiagnosticsBuilder {
     return emphasis;
   }
 
+  struct IsDiagnosticsDocManagerBuilder {
+    template <class T>
+    std::true_type operator()(const DiagnosticsDocManager<T>&) {
+      return {};
+    }
+
+    std::false_type operator()(const DiagnosticsNoDocManager&) {
+      return {};
+    }
+  };
+
+  constexpr static bool isDiagnosticsDocManagerBuilder() {
+    return decltype(IsDiagnosticsDocManagerBuilder{}(
+        std::declval<Manager>())){};
+  }
+
+  constexpr static bool hasContext() {
+    return isDiagnosticsDocManagerBuilder() &&
+           !std::is_same_v<Manager, DiagnosticsDocManager<void>>;
+  }
+
+  template <class T>
+  static T getContextType(const DiagnosticsDocManager<T>&);
+
+  static void getContextType(const DiagnosticsNoDocManager&);
+
+  using Context = decltype(getContextType(std::declval<const Manager&>()));
+
+  template <class T>
+  auto rangeLoc(const T& value) const {
+    if constexpr (hasContext())
+      return Diag::rangeLoc(value, m_diagnosticManagerBase->getContext());
+    else
+      return Diag::rangeLoc(value);
+  }
+
+  template <class... Args>
+  constexpr static bool areLocationProviders =
+      (true && ... && hasLocationProvider_v<Args, Context>);
+
 public:
   /// Creates a new DiagnosticBuilder for a message with the given 'severity'
   /// with a diagnostic at 'location' within the document of
@@ -316,30 +356,43 @@ public:
   ///
   /// Upon destruction, the final 'Diagnostic' will be reported to
   /// 'subDiagnosticManager'.
-  template <class T, class S, class... Args>
-  DiagnosticsBuilder(DiagnosticsDocManager& subDiagnosticManager,
+  template <class Context, class T, class S, class... Args>
+  DiagnosticsBuilder(DiagnosticsDocManager<Context>& subDiagnosticManager,
                      Severity severity, const T& location, const S& message,
                      Args&&... args)
-      : m_diagnostic{{Diagnostic::Message{
-            severity,
-            &subDiagnosticManager.getDocument(),
-            rangeLoc(location, subDiagnosticManager.getContext()).first,
-            fmt::format(message, std::forward<Args>(args)...),
-            {}}}},
-        m_diagnosticManagerBase(&subDiagnosticManager) {}
+      : m_diagnosticManagerBase(&subDiagnosticManager) {
+    Location loc = rangeLoc(location);
+    m_diagnostic = {{Diagnostic::Message{
+        severity,
+        loc ? &subDiagnosticManager.getDocument() : nullptr,
+        loc ? loc->first : 0,
+        fmt::format(message, std::forward<Args>(args)...),
+        {}}}};
+  }
+
+  template <class T, class S, class... Args>
+  DiagnosticsBuilder(DiagnosticsDocManager<void>& subDiagnosticManager,
+                     Severity severity, const T& location, const S& message,
+                     Args&&... args)
+      : DiagnosticsBuilder(subDiagnosticManager.getDocument(), severity,
+                           location, message, std::forward<Args>(args)...) {
+    m_diagnosticManagerBase = &subDiagnosticManager;
+  }
 
   /// Like the constructor above, but does not report any diagnostic upon
   /// destruction.
   template <class T, class S, class... Args>
   DiagnosticsBuilder(const Document& doc, Severity severity, const T& location,
                      const S& message, Args&&... args)
-      : m_diagnostic{{Diagnostic::Message{
-            severity,
-            &doc,
-            rangeLoc(location, nullptr).first,
-            fmt::format(message, std::forward<Args>(args)...),
-            {}}}},
-        m_diagnosticManagerBase(nullptr) {}
+      : m_diagnosticManagerBase(nullptr) {
+    Location loc = rangeLoc(location);
+    m_diagnostic = {
+        {Diagnostic::Message{severity,
+                             loc ? &doc : nullptr,
+                             loc ? loc->first : 0,
+                             fmt::format(message, std::forward<Args>(args)...),
+                             {}}}};
+  }
 
   /// Creates a new DiagnosticBuilder for a message with the given 'severity'.
   /// The severity specifies the kind of message this diagnostic is producing.
@@ -401,70 +454,60 @@ public:
   ///
   /// where the range was 'start' token to 'end' token respectively and just the
   /// 'o' character in 'dot'.
-  template <class T, class U, class... Flags, class M = Manager>
+  template <class T, class U, class... Flags>
   auto addHighlight(const T& start, const U& end, Flags&&... flags)
-      -> std::enable_if_t<
-          hasLocationProvider_v<T> && hasLocationProvider_v<U> &&
-              std::conjunction_v<
-                  flags::detail::IsFlag<std::decay_t<Flags>>...> &&
-              std::is_same_v<M, DiagnosticsDocManager>,
-          DiagnosticsBuilder&&> {
+      -> std::enable_if_t<areLocationProviders<T, U> &&
+                              std::conjunction_v<flags::detail::IsFlag<
+                                  std::decay_t<Flags>>...> &&
+                              isDiagnosticsDocManagerBuilder(),
+                          DiagnosticsBuilder&&> {
     verify<Flags...>();
-    m_diagnostic.messages.back().highlights.push_back(
-        {rangeLoc(start, m_diagnosticManagerBase
-                             ? m_diagnosticManagerBase->getContext()
-                             : nullptr)
-             .first,
-         rangeLoc(end, m_diagnosticManagerBase
-                           ? m_diagnosticManagerBase->getContext()
-                           : nullptr)
-             .second,
-         flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
-         getColour<Flags...>(), getEmphasis(flags...)});
+    if (Location loc = std::initializer_list<LazyLocation>{start, end})
+      m_diagnostic.messages.back().highlights.push_back(
+          {loc->first, loc->second,
+           flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
+           getColour<Flags...>(), getEmphasis(flags...)});
     return std::move(*this);
   }
 
   /// Overload of the above but with a single position instead of a range.
-  template <class T, class... Flags, class M = Manager>
+  template <class T, class... Flags>
   auto addHighlight(const T& pos, Flags&&... flags) -> std::enable_if_t<
-      hasLocationProvider_v<T> &&
+      areLocationProviders<T> &&
           std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...> &&
-          std::is_same_v<M, DiagnosticsDocManager>,
+          isDiagnosticsDocManagerBuilder(),
       DiagnosticsBuilder&&> {
     verify<Flags...>();
-    auto [start, end] = rangeLoc(
-        pos, m_diagnosticManagerBase ? m_diagnosticManagerBase->getContext()
-                                     : nullptr);
-    m_diagnostic.messages.back().highlights.push_back(
-        {start, end,
-         flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
-         getColour<Flags...>(), getEmphasis(flags...)});
+    if (Location loc = rangeLoc(pos))
+      m_diagnostic.messages.back().highlights.push_back(
+          {loc->first, loc->second,
+           flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
+           getColour<Flags...>(), getEmphasis(flags...)});
     return std::move(*this);
   }
 
   /// Overload of the above but with a 'label' parameter passed to the 'label'
   /// flag for convenience.
-  template <class T, class U, class... Flags, class M = Manager>
+  template <class T, class U, class... Flags>
   auto addHighlight(const T& start, const U& end, std::string label,
                     Flags&&... flags)
-      -> std::enable_if_t<
-          hasLocationProvider_v<T> && hasLocationProvider_v<U> &&
-              std::conjunction_v<
-                  flags::detail::IsFlag<std::decay_t<Flags>>...> &&
-              std::is_same_v<M, DiagnosticsDocManager>,
-          DiagnosticsBuilder&&> {
+      -> std::enable_if_t<areLocationProviders<T, U> &&
+                              std::conjunction_v<flags::detail::IsFlag<
+                                  std::decay_t<Flags>>...> &&
+                              isDiagnosticsDocManagerBuilder(),
+                          DiagnosticsBuilder&&> {
     return addHighlight(start, end, flags::label = std::move(label),
                         std::forward<Flags>(flags)...);
   }
 
   /// Overload of the above but with a single positon and a 'label' parameter
   /// passed to the 'label' flag for convenience.
-  template <class T, class... Flags, class M = Manager>
+  template <class T, class... Flags>
   auto addHighlight(const T& pos, std::string label, Flags&&... flags)
-      -> std::enable_if_t<hasLocationProvider_v<T> &&
+      -> std::enable_if_t<areLocationProviders<T> &&
                               std::conjunction_v<flags::detail::IsFlag<
                                   std::decay_t<Flags>>...> &&
-                              std::is_same_v<M, DiagnosticsDocManager>,
+                              isDiagnosticsDocManagerBuilder(),
                           DiagnosticsBuilder&&> {
     return addHighlight(pos, flags::label = std::move(label),
                         std::forward<Flags>(flags)...);
@@ -474,18 +517,16 @@ public:
   /// 'args' serve the same purpose as in the constructor. The document and
   /// context are taken from the 'DiagnosticsDocManager' it was initially
   /// constructed with.
-  template <class T, class S, class... Args, class M = Manager>
+  template <class T, class S, class... Args>
   auto addNote(const T& location, const S& message, Args&&... args)
-      -> std::enable_if_t<hasLocationProvider_v<T> &&
-                              std::is_same_v<M, DiagnosticsDocManager>,
+      -> std::enable_if_t<areLocationProviders<T> &&
+                              isDiagnosticsDocManagerBuilder(),
                           DiagnosticsBuilder&&> {
+    Location loc = rangeLoc(location);
     m_diagnostic.messages.push_back(
         {Severity::Note,
-         m_diagnostic.messages.back().document,
-         rangeLoc(location, m_diagnosticManagerBase
-                                ? m_diagnosticManagerBase->getContext()
-                                : nullptr)
-             .first,
+         loc ? m_diagnostic.messages.back().document : nullptr,
+         loc ? loc->first : 0,
          fmt::format(message, std::forward<Args>(args)...),
          {}});
     return std::move(*this);
@@ -507,13 +548,19 @@ public:
   }
 };
 
+template <class Context, class T, class S, class... Args>
+DiagnosticsBuilder(DiagnosticsDocManager<Context>&, Severity, const T&,
+                   const S&, Args&&...)
+    -> DiagnosticsBuilder<DiagnosticsDocManager<Context>>;
+
 template <class T, class S, class... Args>
-DiagnosticsBuilder(DiagnosticsDocManager&, Severity, const T&, const S&,
-                   Args&&...) -> DiagnosticsBuilder<DiagnosticsDocManager>;
+DiagnosticsBuilder(DiagnosticsDocManager<void>&, Severity, const T&, const S&,
+                   Args&&...)
+    -> DiagnosticsBuilder<DiagnosticsDocManager<void>>;
 
 template <class T, class S, class... Args>
 DiagnosticsBuilder(const Document&, Severity, const T&, const S&, Args&&...)
-    -> DiagnosticsBuilder<DiagnosticsDocManager>;
+    -> DiagnosticsBuilder<DiagnosticsDocManager<void>>;
 
 template <class S, class... Args>
 DiagnosticsBuilder(DiagnosticsNoDocManager&, Severity, const S&, Args&&...)

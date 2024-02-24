@@ -59,27 +59,52 @@ public:
   [[nodiscard]] const Warning* getWarning(llvm::StringRef warningName) const;
 };
 
-/// Subclass of 'SubDiagnosticsManagerBase' which references a document and
-/// context. When used with 'DiagnosticsBuilder' it enables and requires the use
-/// of locations to print out the offending part of source code within the
-/// document.
-class DiagnosticsDocManager final : public SubDiagnosticsManagerBase {
+namespace detail {
+template <class Context>
+class DiagnosticsDocManagerBase : public SubDiagnosticsManagerBase {
+protected:
   const Document& m_document;
-  const void* m_context;
+  const Context& m_context;
 
 public:
-  DiagnosticsDocManager(const Document& doc, const void* context,
-                        DiagnosticsManager* parent)
+  DiagnosticsDocManagerBase(const Document& doc, const Context& context,
+                            DiagnosticsManager* parent)
       : SubDiagnosticsManagerBase(parent), m_document(doc), m_context(context) {
+  }
+
+  [[nodiscard]] const Context& getContext() const {
+    return m_context;
   }
 
   [[nodiscard]] const Document& getDocument() const {
     return m_document;
   }
+};
 
-  [[nodiscard]] const void* getContext() const {
-    return m_context;
+template <>
+class DiagnosticsDocManagerBase<void> : public SubDiagnosticsManagerBase {
+protected:
+  const Document& m_document;
+
+public:
+  DiagnosticsDocManagerBase(const Document& doc, DiagnosticsManager* parent)
+      : SubDiagnosticsManagerBase(parent), m_document(doc) {}
+
+  [[nodiscard]] const Document& getDocument() const {
+    return m_document;
   }
+};
+} // namespace detail
+
+/// Subclass of 'SubDiagnosticsManagerBase' which references a document and
+/// optionally a context. When used with 'DiagnosticsBuilder' it enables and
+/// requires the use of locations to print out the offending part of source code
+/// within the document.
+template <class Context = void>
+class DiagnosticsDocManager final
+    : public detail::DiagnosticsDocManagerBase<Context> {
+public:
+  using detail::DiagnosticsDocManagerBase<Context>::DiagnosticsDocManagerBase;
 };
 
 /// Subclass of 'SubDiagnosticsManagerBase' for diagnostics without any file
@@ -136,11 +161,16 @@ public:
     return const_cast<DiagnosticsManager&>(*this).getWarning(warningName);
   }
 
+  /// Creates a new sub diagnostics manager for a document.
+  DiagnosticsDocManager<> createSubDiagnosticManager(const Document& document) {
+    return {document, this};
+  }
+
   /// Creates a new sub diagnostics manager for a document and optionally a
   /// context.
-  DiagnosticsDocManager
-  createSubDiagnosticManager(const Document& document,
-                             const void* context = nullptr) {
+  template <class Context>
+  DiagnosticsDocManager<Context>
+  createSubDiagnosticManager(const Document& document, const Context& context) {
     return {document, context, this};
   }
 

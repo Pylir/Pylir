@@ -68,7 +68,7 @@ private:
   codegenPythonToMLIR(const llvm::opt::InputArgList& args,
                       const cli::CommandLine& commandLine,
                       Diag::DiagnosticsManager& diagManager,
-                      Diag::DiagnosticsDocManager& mainModuleDiagManager);
+                      Diag::DiagnosticsDocManager<>& mainModuleDiagManager);
 
   mlir::LogicalResult
   ensureTargetMachine(const llvm::opt::InputArgList& args,

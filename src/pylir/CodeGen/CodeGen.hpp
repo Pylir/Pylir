@@ -31,7 +31,7 @@ class CodeGen {
   mlir::ModuleOp m_module;
   Py::FuncOp m_currentFunc;
   mlir::Region* m_currentRegion{};
-  Diag::DiagnosticsDocManager* m_docManager;
+  Diag::DiagnosticsDocManager<>* m_docManager;
   mlir::Value m_classNamespace{};
   std::unordered_map<std::string, std::size_t> m_implNames;
   std::unordered_map<std::string_view, Py::GlobalValueAttr> m_builtinNamespace;
@@ -205,24 +205,30 @@ class CodeGen {
 
   template <class AST>
   mlir::Location getLoc(const AST& astObject) {
-    auto [line, col] =
-        m_docManager->getDocument().getLineCol(Diag::pointLoc(astObject));
-    return mlir::OpaqueLoc::get(
-        &astObject,
-        mlir::FileLineColLoc::get(
-            m_builder.getStringAttr(m_docManager->getDocument().getFilename()),
-            line, col));
+    std::optional<std::size_t> offset = Diag::pointLoc(astObject);
+    mlir::Location loc = m_builder.getUnknownLoc();
+    if (offset) {
+      auto [line, col] = m_docManager->getDocument().getLineCol(*offset);
+      loc = mlir::FileLineColLoc::get(
+          m_builder.getStringAttr(m_docManager->getDocument().getFilename()),
+          line, col);
+    }
+
+    return mlir::OpaqueLoc::get(&astObject, loc);
   }
 
   template <class AST, class LineLoc>
   mlir::Location getLoc(const AST& astObject, const LineLoc& lineLoc) {
-    auto [line, col] =
-        m_docManager->getDocument().getLineCol(Diag::pointLoc(lineLoc));
-    return mlir::OpaqueLoc::get(
-        &astObject,
-        mlir::FileLineColLoc::get(
-            m_builder.getStringAttr(m_docManager->getDocument().getFilename()),
-            line, col));
+    std::optional<std::size_t> offset = Diag::pointLoc(lineLoc);
+    mlir::Location loc = m_builder.getUnknownLoc();
+    if (offset) {
+      auto [line, col] = m_docManager->getDocument().getLineCol(*offset);
+      loc = mlir::FileLineColLoc::get(
+          m_builder.getStringAttr(m_docManager->getDocument().getFilename()),
+          line, col);
+    }
+
+    return mlir::OpaqueLoc::get(&astObject, loc);
   }
 
   std::string formImplName(std::string_view symbol);
@@ -362,19 +368,17 @@ class CodeGen {
   }
 
 public:
-  CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager& docManager,
+  CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager<>& docManager,
           CodeGenOptions&& options);
 
-  template <class T, class S, class... Args,
-            std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+  template <class T, class S, class... Args>
   auto createError(const T& location, const S& message, Args&&... args) {
     return Diag::DiagnosticsBuilder(*m_docManager, Diag::Severity::Error,
                                     location, message,
                                     std::forward<Args>(args)...);
   }
 
-  template <class T, class S, class... Args,
-            std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+  template <class T, class S, class... Args>
   auto createWarning(const T& location, const S& message, Args&&... args) {
     return Diag::DiagnosticsBuilder(*m_docManager, Diag::Severity::Warning,
                                     location, message,
@@ -512,7 +516,7 @@ mlir::Value buildException(PyBuilder& builder, std::string_view kind,
 
 inline mlir::OwningOpRef<mlir::ModuleOp>
 codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,
-        Diag::DiagnosticsDocManager& docManager, CodeGenOptions options) {
+        Diag::DiagnosticsDocManager<>& docManager, CodeGenOptions options) {
   CodeGen codegen(context, docManager, std::move(options));
   return codegen.visit(input);
 }
