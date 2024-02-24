@@ -16,7 +16,7 @@
 #include <locale>
 #include <unordered_map>
 
-pylir::Lexer::Lexer(Diag::DiagnosticsDocManager& diagManager)
+pylir::Lexer::Lexer(Diag::DiagnosticsDocManager<>& diagManager)
     : m_current(diagManager.getDocument().begin()),
       m_diagManager(&diagManager) {}
 

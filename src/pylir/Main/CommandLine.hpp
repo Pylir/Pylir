@@ -30,7 +30,7 @@ class CommandLine {
   llvm::DenseMap<const llvm::opt::Arg*, std::pair<std::size_t, std::size_t>>
       m_argRanges;
   pylir::Diag::Document m_rendered;
-  pylir::Diag::DiagnosticsDocManager m_commandLineDM;
+  pylir::Diag::DiagnosticsDocManager<CommandLine> m_commandLineDM;
 
   friend struct pylir::Diag::LocationProvider<const llvm::opt::Arg*>;
 
@@ -58,16 +58,18 @@ public:
 
   void printVersion(llvm::raw_ostream& out) const;
 
-  template <class T, class S, class... Args,
-            std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+  template <
+      class T, class S, class... Args,
+      std::enable_if_t<Diag::hasLocationProvider_v<T, CommandLine>>* = nullptr>
   auto createError(const T& location, const S& message, Args&&... args) {
     return Diag::DiagnosticsBuilder(m_commandLineDM, Diag::Severity::Error,
                                     location, message,
                                     std::forward<Args>(args)...);
   }
 
-  template <class T, class S, class... Args,
-            std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+  template <
+      class T, class S, class... Args,
+      std::enable_if_t<Diag::hasLocationProvider_v<T, CommandLine>>* = nullptr>
   auto createWarning(const T& location, const S& message, Args&&... args) {
     return Diag::DiagnosticsBuilder(m_commandLineDM, Diag::Severity::Warning,
                                     location, message,
@@ -101,10 +103,9 @@ namespace pylir::Diag {
 template <>
 struct LocationProvider<const llvm::opt::Arg*> {
   static std::pair<std::size_t, std::size_t>
-  getRange(const llvm::opt::Arg* value, const void* context) noexcept {
-    const auto* commandLine =
-        reinterpret_cast<const pylir::cli::CommandLine*>(context);
-    return commandLine->m_argRanges.lookup(value);
+  getRange(const llvm::opt::Arg* value,
+           const cli::CommandLine& commandLine) noexcept {
+    return commandLine.m_argRanges.lookup(value);
   }
 };
 

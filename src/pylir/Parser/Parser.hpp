@@ -219,7 +219,7 @@ class Parser {
   static bool firstInCompoundStmt(TokenType tokenType);
 
 public:
-  explicit Parser(Diag::DiagnosticsDocManager& diagManager)
+  explicit Parser(Diag::DiagnosticsDocManager<>& diagManager)
       :
 #define HANDLE_FEATURE(x)
 #define HANDLE_REQUIRED_FEATURE(x) m_##x{true},

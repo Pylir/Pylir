@@ -64,7 +64,7 @@ pylir::cli::CommandLine::CommandLine(
           }(),
           "<command-line>"),
       m_commandLineDM(
-          diagnosticsManager.createSubDiagnosticManager(m_rendered, this)) {}
+          diagnosticsManager.createSubDiagnosticManager(m_rendered, *this)) {}
 
 void pylir::cli::CommandLine::printHelp(llvm::raw_ostream& out) const {
   m_table.printHelp(

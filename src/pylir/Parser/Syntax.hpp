@@ -481,241 +481,305 @@ namespace pylir::Diag {
 
 template <>
 struct LocationProvider<Syntax::TupleConstruct> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::TupleConstruct& value) noexcept;
+  static Location getRange(const Syntax::TupleConstruct& value) noexcept {
+    return {value.maybeOpenBracket, value.items, value.maybeCloseBracket};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Lambda> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Lambda& value) noexcept;
+  static Location getRange(const Syntax::Lambda& value) noexcept {
+    return {value.lambdaKeyword, value.expression};
+  }
 };
 
 template <class T>
 struct LocationProvider<T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>> {
-  static std::pair<std::size_t, std::size_t> getRange(const T& value) noexcept {
+  static Location getRange(const T& value) noexcept {
     return value.match([&](auto&& sub) { return rangeLoc(sub); });
   }
 
-  static std::size_t getPoint(const T& value) noexcept {
+  static std::optional<std::size_t> getPoint(const T& value) noexcept {
     return value.match([&](auto&& sub) { return pointLoc(sub); });
   }
 };
 
 template <>
 struct LocationProvider<Syntax::Conditional> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Conditional& value) noexcept;
+  static Location getRange(const Syntax::Conditional& value) noexcept {
+    return {value.trueValue, value.elseValue};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::BinOp> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::BinOp& value) noexcept;
+  static Location getRange(const Syntax::BinOp& value) noexcept {
+    return {value.lhs, value.rhs};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Comparison> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Comparison& value) noexcept;
+  static Location getRange(const Syntax::Comparison& value) noexcept {
+    return {value.first, value.rest.back().second};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::UnaryOp> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::UnaryOp& value) noexcept;
+  static Location getRange(const Syntax::UnaryOp& value) noexcept {
+    return {value.operation, value.expression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Call> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Call& value) noexcept;
+  static Location getRange(const Syntax::Call& value) noexcept {
+    return {value.expression, value.closeParenth};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::DictDisplay> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::DictDisplay& value) noexcept;
+  static Location getRange(const Syntax::DictDisplay& value) noexcept {
+    return {value.openBrace, value.closeBrace};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::SetDisplay> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::SetDisplay& value) noexcept;
+  static Location getRange(const Syntax::SetDisplay& value) noexcept {
+    return {value.openBrace, value.closeBrace};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::ListDisplay> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::ListDisplay& value) noexcept;
+  static Location getRange(const Syntax::ListDisplay& value) noexcept {
+    return {value.openSquare, value.closeSquare};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Yield> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Yield& value) noexcept;
+  static Location getRange(const Syntax::Yield& value) noexcept {
+    return {value.yieldToken, value.maybeExpression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Generator> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Generator& value) noexcept;
+  static Location getRange(const Syntax::Generator& value) noexcept {
+    return {value.openParenth, value.closeParenth};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Slice> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Slice& value) noexcept;
+  static Location getRange(const Syntax::Slice& value) noexcept {
+    return {value.maybeLowerBound, value.firstColon, value.maybeUpperBound,
+            value.maybeStride};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Subscription> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Subscription& value) noexcept;
+  static Location getRange(const Syntax::Subscription& value) noexcept {
+    return {value.object, value.closeSquareBracket};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::AttributeRef> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::AttributeRef& value) noexcept;
+  static Location getRange(const Syntax::AttributeRef& value) noexcept {
+    return {value.object, value.identifier};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Atom> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Atom& value) noexcept;
+  static Location getRange(const Syntax::Atom& value) noexcept {
+    return rangeLoc(value.token);
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::StarredItem> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::StarredItem& value) noexcept;
+  static Location getRange(const Syntax::StarredItem& value) noexcept {
+    return {value.maybeStar, value.expression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Assignment> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Assignment& value) noexcept;
+  static Location getRange(const Syntax::Assignment& value) noexcept {
+    return {value.variable, value.expression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Argument> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Argument& value) noexcept;
+  static Location getRange(const Syntax::Argument& value) noexcept {
+    return {value.maybeName, value.maybeExpansionsOrEqual, value.expression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Parameter> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Parameter& value) noexcept;
+  static Location getRange(const Syntax::Parameter& value) noexcept {
+    return {value.maybeStars, value.name, value.maybeType, value.maybeDefault};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::RaiseStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::RaiseStmt& value) noexcept;
-
-  static std::size_t getPoint(const Syntax::RaiseStmt& value) noexcept {
-    return pointLoc(value.raise);
+  static Location getRange(const Syntax::RaiseStmt& value) noexcept {
+    return {value.raise, value.maybeException, value.maybeCause};
   }
 };
 
 template <>
 struct LocationProvider<Syntax::ReturnStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::ReturnStmt& value) noexcept;
-
-  static std::size_t getPoint(const Syntax::ReturnStmt& value) noexcept {
-    return pointLoc(value.returnKeyword);
+  static Location getRange(const Syntax::ReturnStmt& value) noexcept {
+    return {value.returnKeyword, value.maybeExpression};
   }
 };
 
 template <>
 struct LocationProvider<Syntax::SingleTokenStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::SingleTokenStmt& value) noexcept;
-
-  static std::size_t getPoint(const Syntax::SingleTokenStmt& value) noexcept {
-    return pointLoc(value.token);
+  static Location getRange(const Syntax::SingleTokenStmt& value) noexcept {
+    return rangeLoc(value.token);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::AssignmentStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::AssignmentStmt& value) noexcept;
+  static Location getRange(const Syntax::AssignmentStmt& value) noexcept {
+    return {value.targets, value.maybeAnnotation, value.maybeExpression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::IfStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::IfStmt& value) noexcept;
+  static Location getRange(const Syntax::IfStmt& value) noexcept {
+    return {value.ifKeyword, value.suite, value.elifs, value.elseSection};
+  }
 
-  static std::size_t getPoint(const Syntax::IfStmt& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::IfStmt& value) noexcept {
     return pointLoc(value.ifKeyword);
   }
 };
 
 template <>
+struct LocationProvider<Syntax::IfStmt::Elif> {
+  static Location getRange(const Syntax::IfStmt::Elif& value) noexcept {
+    return {value.elif, value.suite};
+  }
+};
+
+template <>
+struct LocationProvider<Syntax::IfStmt::Else> {
+  static Location getRange(const Syntax::IfStmt::Else& value) noexcept {
+    return {value.elseKeyowrd, value.suite};
+  }
+};
+
+template <>
 struct LocationProvider<Syntax::Suite> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Suite& value) noexcept;
+  static Location getRange(const Syntax::Suite& value) noexcept {
+    return rangeLoc(value.statements);
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::FileInput> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::FileInput& value) noexcept;
+  static Location getRange(const Syntax::FileInput& value) noexcept {
+    return rangeLoc(value.input);
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::ExpressionStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::ExpressionStmt& value) noexcept;
+  static Location getRange(const Syntax::ExpressionStmt& value) noexcept {
+    return rangeLoc(value.expression);
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::AssertStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::AssertStmt& value) noexcept;
+  static Location getRange(const Syntax::AssertStmt& value) noexcept {
+    return {value.assertKeyword, value.condition, value.maybeMessage};
+  }
 
-  static std::size_t getPoint(const Syntax::AssertStmt& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::AssertStmt& value) noexcept {
     return pointLoc(value.assertKeyword);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::DelStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::DelStmt& value) noexcept;
+  static Location getRange(const Syntax::DelStmt& value) noexcept {
+    return {value.del, value.targetList};
+  }
 
-  static std::size_t getPoint(const Syntax::DelStmt& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::DelStmt& value) noexcept {
     return pointLoc(value.del);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::ImportStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::ImportStmt& value) noexcept;
+  static Location getRange(const Syntax::ImportStmt& value) noexcept {
+    return match(
+        value.variant,
+        [](const Syntax::ImportStmt::ImportAs& importAs) -> Location {
+          return {importAs.import, importAs.modules};
+        },
+        [](const Syntax::ImportStmt::ImportAll& importAll) -> Location {
+          return {importAll.from, importAll.star};
+        },
+        [](const Syntax::ImportStmt::FromImport& fromImport) -> Location {
+          return {fromImport.from, fromImport.imports};
+        });
+  }
 
-  static std::size_t getPoint(const Syntax::ImportStmt& value) noexcept;
+  static std::optional<std::size_t>
+  getPoint(const Syntax::ImportStmt& value) noexcept {
+    return pylir::match(value.variant, [](const auto& value) {
+      return pointLoc(value.import);
+    });
+  }
+};
+
+template <>
+struct LocationProvider<Syntax::ImportStmt::Module> {
+  static Location getRange(const Syntax::ImportStmt::Module& value) noexcept {
+    return rangeLoc(value.identifiers);
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::FutureStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::FutureStmt& value) noexcept;
+  static Location getRange(const Syntax::FutureStmt& value) noexcept {
+    return {value.from, value.imports};
+  }
 
-  static std::size_t getPoint(const Syntax::FutureStmt& value) noexcept;
+  static std::optional<std::size_t>
+  getPoint(const Syntax::FutureStmt& value) noexcept {
+    return pointLoc(value.future);
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::GlobalOrNonLocalStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::GlobalOrNonLocalStmt& value) noexcept;
+  static Location getRange(const Syntax::GlobalOrNonLocalStmt& value) noexcept {
+    return {value.token, value.identifiers};
+  }
 
-  static std::size_t
+  static std::optional<std::size_t>
   getPoint(const Syntax::GlobalOrNonLocalStmt& value) noexcept {
     return pointLoc(value.token);
   }
@@ -723,92 +787,130 @@ struct LocationProvider<Syntax::GlobalOrNonLocalStmt> {
 
 template <>
 struct LocationProvider<Syntax::WhileStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::WhileStmt& value) noexcept;
+  static Location getRange(const Syntax::WhileStmt& value) noexcept {
+    return {value.whileKeyword, value.suite};
+  }
 
-  static std::size_t getPoint(const Syntax::WhileStmt& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::WhileStmt& value) noexcept {
     return pointLoc(value.whileKeyword);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::ForStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::ForStmt& value) noexcept;
+  static Location getRange(const Syntax::ForStmt& value) noexcept {
+    return {value.maybeAsyncKeyword, value.forKeyword, value.suite,
+            value.elseSection};
+  }
 
-  static std::size_t getPoint(const Syntax::ForStmt& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::ForStmt& value) noexcept {
     return pointLoc(value.forKeyword);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::TryStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::TryStmt& value) noexcept;
+  static Location getRange(const Syntax::TryStmt& value) noexcept {
+    return {value.tryKeyword, value.excepts, value.maybeExceptAll,
+            value.elseSection, value.finally};
+  }
 
-  static std::size_t getPoint(const Syntax::TryStmt& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::TryStmt& value) noexcept {
     return pointLoc(value.tryKeyword);
   }
 };
 
 template <>
-struct LocationProvider<Syntax::WithStmt> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::WithStmt& value) noexcept;
+struct LocationProvider<Syntax::TryStmt::ExceptArgs> {
+  static Location getRange(const Syntax::TryStmt::ExceptArgs& value) noexcept {
+    return {value.exceptKeyword, value.suite};
+  }
+};
 
-  static std::size_t getPoint(const Syntax::WithStmt& value) noexcept {
+template <>
+struct LocationProvider<Syntax::TryStmt::ExceptAll> {
+  static Location getRange(const Syntax::TryStmt::ExceptAll& value) noexcept {
+    return {value.exceptKeyword, value.suite};
+  }
+};
+
+template <>
+struct LocationProvider<Syntax::TryStmt::Finally> {
+  static Location getRange(const Syntax::TryStmt::Finally& value) noexcept {
+    return {value.finally, value.suite};
+  }
+};
+
+template <>
+struct LocationProvider<Syntax::WithStmt> {
+  static Location getRange(const Syntax::WithStmt& value) noexcept {
+    return {value.maybeAsyncKeyword, value.withKeyword, value.suite};
+  }
+
+  static std::optional<std::size_t>
+  getPoint(const Syntax::WithStmt& value) noexcept {
     return pointLoc(value.withKeyword);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::FuncDef> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::FuncDef& value) noexcept;
+  static Location getRange(const Syntax::FuncDef& value) noexcept {
+    return {value.decorators, value.maybeAsyncKeyword, value.def, value.suite};
+  }
 
-  static std::size_t getPoint(const Syntax::FuncDef& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::FuncDef& value) noexcept {
     return pointLoc(value.funcName);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::Decorator> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Decorator& value) noexcept;
+  static Location getRange(const Syntax::Decorator& value) noexcept {
+    return {value.atSign, value.expression};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::ClassDef> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::ClassDef& value) noexcept;
+  static Location getRange(const Syntax::ClassDef& value) noexcept {
+    return {value.decorators, value.classKeyword, value.suite};
+  }
 
-  static std::size_t getPoint(const Syntax::ClassDef& value) noexcept {
+  static std::optional<std::size_t>
+  getPoint(const Syntax::ClassDef& value) noexcept {
     return pointLoc(value.className);
   }
 };
 
 template <>
 struct LocationProvider<Syntax::CompFor> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::CompFor& value) noexcept;
+  static Location getRange(const Syntax::CompFor& value) noexcept {
+    return {value.awaitToken, value.forToken, value.test, value.compIter};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::CompIf> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::CompIf& value) noexcept;
+  static Location getRange(const Syntax::CompIf& value) noexcept {
+    return {value.ifToken, value.test, value.compIter};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Comprehension> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Comprehension& value) noexcept;
+  static Location getRange(const Syntax::Comprehension& value) noexcept {
+    return {value.expression, value.compFor};
+  }
 };
 
 template <>
 struct LocationProvider<Syntax::Intrinsic> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const Syntax::Intrinsic& value) noexcept {
+  static Location getRange(const Syntax::Intrinsic& value) noexcept {
     return rangeLoc(value.identifiers);
   }
 };

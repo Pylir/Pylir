@@ -212,10 +212,11 @@ using IdentifierMap = llvm::MapVector<IdentifierToken, T>;
 namespace Diag {
 template <class T>
 struct LocationProvider<T, std::enable_if_t<std::is_base_of_v<BaseToken, T>>> {
-  static std::pair<std::size_t, std::size_t>
-  getRange(const BaseToken& value) noexcept {
-    return {value.getOffset(), value.getOffset() + value.getSize()};
+  static Location getRange(const BaseToken& value) noexcept {
+    return Location(value.getOffset(), value.getOffset() + value.getSize());
   }
+
+  using non_lazy = void;
 };
 } // namespace Diag
 

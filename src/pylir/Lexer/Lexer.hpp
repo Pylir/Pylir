@@ -22,7 +22,7 @@ namespace pylir {
 class Lexer {
   std::vector<Token> m_tokens;
   Diag::Document::const_iterator m_current;
-  Diag::DiagnosticsDocManager* m_diagManager;
+  Diag::DiagnosticsDocManager<>* m_diagManager;
   std::size_t m_depth = 0;
   std::stack<std::pair<std::size_t, std::size_t>> m_indentation{
       {{0, static_cast<std::size_t>(-1)}}};
@@ -47,7 +47,7 @@ public:
   using difference_type = iterator::difference_type;
   using size_type = std::size_t;
 
-  explicit Lexer(Diag::DiagnosticsDocManager& diagManager);
+  explicit Lexer(Diag::DiagnosticsDocManager<>& diagManager);
 
   ~Lexer() = default;
 
@@ -81,7 +81,7 @@ public:
                                     std::forward<Args>(args)...);
   }
 
-  [[nodiscard]] Diag::DiagnosticsDocManager& getDiagManager() const {
+  [[nodiscard]] Diag::DiagnosticsDocManager<>& getDiagManager() const {
     return *m_diagManager;
   }
 };
