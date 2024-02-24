@@ -4,14 +4,18 @@
 
 #pragma once
 
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/STLFunctionalExtras.h>
 
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
 
+#include <iterator>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace pylir::Diag {
 
