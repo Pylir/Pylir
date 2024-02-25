@@ -1080,9 +1080,72 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::ImportStmt& importStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::ImportStmt& importStmt) {
+    auto moduleIsIntrinsic = [](const Syntax::ImportStmt::Module& module) {
+      if (module.identifiers.size() < 2)
+        return false;
+
+      return module.identifiers[0].getValue() == "pylir" &&
+             module.identifiers[1].getValue() == "intr";
+    };
+
+    struct ModuleSpec {
+      std::size_t dots = 0;
+      std::vector<IdentifierToken> identifiers;
+    };
+
+    SmallVector<ModuleSpec> specs;
+    match(
+        importStmt.variant,
+        [&](const Syntax::ImportStmt::ImportAs& importAs) {
+          for (auto&& [module, maybeName] : importAs.modules) {
+            if (!maybeName && moduleIsIntrinsic(module))
+              continue;
+            specs.push_back({0, module.identifiers});
+          }
+        },
+        [&](const Syntax::ImportStmt::FromImport&) {
+          // TODO:
+          PYLIR_UNREACHABLE;
+        },
+        [&](const Syntax::ImportStmt::ImportAll&) {
+          // TODO:
+          PYLIR_UNREACHABLE;
+        });
+
+    for (const ModuleSpec& moduleSpec : specs) {
+      SmallVector<std::string> moduleParts;
+
+      if (moduleSpec.dots != 0) {
+        SmallVector<llvm::StringRef> split;
+        StringRef(m_qualifiers).split(split, '.');
+        if (split.size() < moduleSpec.dots) {
+          // exceeding package level.
+          // TODO: diagnostic?
+          return;
+        }
+        llvm::append_range(moduleParts,
+                           ArrayRef(split).drop_back(moduleSpec.dots - 1));
+      }
+      llvm::append_range(
+          moduleParts,
+          llvm::map_range(moduleSpec.identifiers,
+                          std::mem_fn(&IdentifierToken::getValue)));
+
+      std::string moduleQualifier;
+      for (StringRef part : moduleParts) {
+        if (moduleQualifier.empty())
+          moduleQualifier = part;
+        else
+          moduleQualifier.append(".").append(part);
+
+        m_options.moduleLoadCallback(moduleQualifier, m_docManager,
+                                     Diag::rangeLoc(moduleSpec.identifiers));
+        // TODO: Ensure modules are not initialized more than once.
+        // TODO: Throw import errors if import failed?
+        create<HIR::InitModuleOp>(moduleQualifier);
+      }
+    }
   }
 
   void visitImpl([[maybe_unused]] const Syntax::FutureStmt& futureStmt) {
