@@ -25,7 +25,7 @@ void CodeGenState::appendToGlobalInit(OpBuilder& builder,
         builder.getUnknownLoc(), "$__GLOBAL_INIT__",
         LLVM::LLVMFunctionType::get(builder.getType<LLVM::LLVMVoidType>(), {}),
         LLVM::Linkage::Internal, true);
-    m_globalInit.addEntryBlock();
+    m_globalInit.addEntryBlock(builder);
   }
   builder.setInsertionPointToEnd(&m_globalInit.back());
   section();
