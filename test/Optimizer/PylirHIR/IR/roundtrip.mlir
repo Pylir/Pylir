@@ -150,3 +150,16 @@ pyHIR.globalFunc @binAssignOp(%0, %1) {
   %19 = binAssignOp %0 __imatmul__ %1
   return %19
 }
+
+pyHIR.init "foo" {
+  %0 = py.constant(#py.dict<{}>)
+  init_return %0
+}
+
+// CHECK-LABEL: pyHIR.globalFunc @initModule(
+pyHIR.globalFunc @initModule() {
+  %0 = py.constant(#py.dict<{}>)
+  // CHECK: initModule @foo
+  initModule @foo
+  return %0
+}

@@ -574,6 +574,51 @@ void pylir::HIR::FuncOp::print(mlir::OpAsmPrinter& p) {
                 (*this)->getAttrDictionary(), getAttributeNames(), getRegion());
 }
 
+//===----------------------------------------------------------------------===//
+// InitCallOp
+//===----------------------------------------------------------------------===//
+
+namespace {
+template <class SymbolOp>
+FailureOr<SymbolOp>
+verifySymbolUse(Operation* op, SymbolRefAttr name,
+                SymbolTableCollection& symbolTable,
+                StringRef kindName = SymbolOp::getOperationName()) {
+  if (auto* symbol = symbolTable.lookupNearestSymbolFrom(op, name)) {
+    auto casted = dyn_cast<SymbolOp>(symbol);
+    if (!casted)
+      return op->emitError("Expected '")
+             << name << "' to be of kind '" << kindName << "', not '"
+             << symbol->getName() << "'";
+
+    return casted;
+  }
+  return op->emitOpError("Failed to find symbol named '") << name << "'";
+}
+} // namespace
+
+LogicalResult
+InitModuleOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  return verifySymbolUse<InitOp>(*this, getModuleAttr(), symbolTable);
+}
+
+LogicalResult
+InitModuleExOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
+  return verifySymbolUse<InitOp>(*this, getModuleAttr(), symbolTable);
+}
+
+LogicalResult InitModuleOp::verify() {
+  if (getModule() == "__main__")
+    return emitOpError("cannot initialize '__main__' module");
+  return success();
+}
+
+LogicalResult InitModuleExOp::verify() {
+  if (getModule() == "__main__")
+    return emitOpError("cannot initialize '__main__' module");
+  return success();
+}
+
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.cpp.inc"
 
 #define GET_OP_CLASSES

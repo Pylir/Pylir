@@ -41,3 +41,12 @@ pyHIR.globalFunc @call_invalid_kind_index(%arg0) {
     : (!py.dynamic, !py.dynamic) -> !py.dynamic
   return %0
 }
+
+// -----
+
+pyHIR.init "__main__" {
+  %0 = py.constant(#py.dict<{}>)
+  // expected-error@below {{cannot initialize '__main__' module}}
+  initModule @__main__
+  init_return %0
+}
