@@ -77,6 +77,9 @@ struct AddableExceptionHandling {
                         mlir::OpTrait::VariadicOperands>())
         return {};
       else if constexpr (ConcreteType::template hasTrait<
+                             mlir::OpTrait::ZeroOperands>())
+        return 0;
+      else if constexpr (ConcreteType::template hasTrait<
                              mlir::OpTrait::OneOperand>())
         return 1;
       else

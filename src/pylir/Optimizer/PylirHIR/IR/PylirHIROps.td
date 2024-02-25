@@ -412,13 +412,13 @@ def PylirHIR_ReturnOp : PylirHIR_Op<"return", [Pure, ReturnLike, Terminator,
 //===----------------------------------------------------------------------===//
 
 def PylirHIR_InitOp : PylirHIR_Op<"init", [NoRegionArguments, IsolatedFromAbove,
-  OpAsmOpInterface]> {
+  OpAsmOpInterface, Symbol]> {
 
-  let arguments = (ins StrAttr:$name);
+  let arguments = (ins StrAttr:$sym_name);
 
   let regions = (region MinSizedRegion<1>:$body);
 
-  let assemblyFormat = "$name attr-dict-with-keyword $body";
+  let assemblyFormat = "$sym_name attr-dict-with-keyword $body";
 
   let description = [{
     This op represents the initializer body of a module `$name`, or in other
@@ -456,6 +456,27 @@ def PylirHIR_InitReturnOp : PylirHIR_Op<"init_return", [HasParent<"InitOp">,
   }];
 
   let assemblyFormat = "$global_dict attr-dict";
+}
+
+def PylirHIR_InitModuleOp : PylirHIR_Op<"initModule",
+  [AddableExceptionHandling<"InitModuleExOp">,
+   DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  let arguments = (ins FlatSymbolRefAttr:$module);
+
+  let description = [{
+    Op used to call an `pyHIR.init` operation by executing its body.
+    `$module` must be a reference to a `pyHIR.init` operation with the given name.
+    As a special case, it is not possible to initialize the `__main__` module.
+  }];
+
+  let assemblyFormat = "$module attr-dict";
+
+  let hasVerifier = 1;
+}
+
+def PylirHIR_InitModuleExOp
+  : CreateExceptionHandlingVariant<PylirHIR_InitModuleOp> {
+  let hasVerifier = 1;
 }
 
 #endif
