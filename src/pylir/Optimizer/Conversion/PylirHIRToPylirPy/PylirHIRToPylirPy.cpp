@@ -534,6 +534,18 @@ struct InitOpConversionPattern : OpRewritePattern<InitOp> {
   }
 };
 
+struct InitModuleOpConversionPattern
+    : OpExRewritePattern<InitModuleOpConversionPattern, HIR::InitModuleOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, TypeRange(), (op.getModule() + ".__init__").str());
+    return success();
+  }
+};
+
 /// Lowering pattern for any Op that is `ReturnLike` to `py.return`.
 /// Returns ALL its operands.
 template <class OpT>
@@ -864,7 +876,8 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
                ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
                CallOpConversionPattern, BinOpConversionPattern,
-               BinAssignOpConversionPattern>(&getContext());
+               BinAssignOpConversionPattern, InitModuleOpConversionPattern>(
+      &getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
