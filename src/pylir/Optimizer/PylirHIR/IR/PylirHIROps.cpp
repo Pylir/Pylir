@@ -14,6 +14,39 @@ using namespace pylir;
 using namespace pylir::HIR;
 
 //===----------------------------------------------------------------------===//
+// SpecialMethodOp
+//===----------------------------------------------------------------------===//
+
+template <class ConcreteType>
+LogicalResult
+SpecialMethodTrait<ConcreteType>::verifyTrait(Operation* operation) {
+  auto op = cast<ConcreteType>(operation);
+  std::size_t numArguments;
+  switch (op.getSpecialMethod()) {
+  case SpecialMethod::GetItem:
+  case SpecialMethod::GetAttr:
+  case SpecialMethod::DelItem: numArguments = 1; break;
+  case SpecialMethod::SetAttr:
+  case SpecialMethod::SetItem: numArguments = 2; break;
+  case SpecialMethod::Neg:
+  case SpecialMethod::Pos:
+  case SpecialMethod::Invert: numArguments = 0; break;
+  default: PYLIR_UNREACHABLE;
+  }
+  if (op.getArguments().size() != numArguments)
+    return op.emitOpError("method '")
+           << stringifyEnum(op.getSpecialMethod()) << "' requires "
+           << numArguments << " argument" << (numArguments == 1 ? "" : "s")
+           << " not " << op.getArguments().size();
+  return success();
+}
+
+namespace pylir::HIR {
+template struct SpecialMethodTrait<SpecialMethodOp>;
+template struct SpecialMethodTrait<SpecialMethodExOp>;
+} // namespace pylir::HIR
+
+//===----------------------------------------------------------------------===//
 // CallOp
 //===----------------------------------------------------------------------===//
 

@@ -50,3 +50,12 @@ pyHIR.init "__main__" {
   initModule @__main__
   init_return %0
 }
+
+// -----
+
+pyHIR.globalFunc @wrong_special_method_args(%arg0) {
+  %0 = py.constant(#py.dict<{}>)
+  // expected-error@below {{method '__getitem__' requires 1 argument not 0}}
+  specialMethod %arg0 __getitem__()
+  init_return %0
+}

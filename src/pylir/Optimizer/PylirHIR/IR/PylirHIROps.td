@@ -23,6 +23,10 @@ include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 class PylirHIR_Op<string mneomic, list<Trait> traits = []>
   : Op<PylirHIR_Dialect, mneomic, traits>;
 
+class PylirHIR_OpTrait<string name> : NativeOpTrait<name> {
+  let cppNamespace = "pylir::HIR";
+}
+
 //===----------------------------------------------------------------------===//
 // Basic Operations
 //===----------------------------------------------------------------------===//
@@ -104,6 +108,46 @@ def PylirHIR_BinAssignOp : PylirHIR_Op<"binAssignOp",
 
 def PylirHIR_BinAssignExOp
   : CreateExceptionHandlingVariant<PylirHIR_BinAssignOp>;
+
+def PylirHIR_SpecialMethodAttr : I32EnumAttr<"SpecialMethod",
+  "Special methods in python", [
+  I32EnumAttrCase<"GetItem", 0, "__getitem__">,
+  I32EnumAttrCase<"SetItem", 1, "__setitem__">,
+  I32EnumAttrCase<"DelItem", 2, "__delitem__">,
+  I32EnumAttrCase<"Neg", 3, "__neg__">,
+  I32EnumAttrCase<"Pos", 4, "__pos__">,
+  I32EnumAttrCase<"Invert", 5, "__invert__">,
+  I32EnumAttrCase<"GetAttr", 6, "__getattr__">,
+  I32EnumAttrCase<"SetAttr", 7, "__setattr__">,
+]> {
+  let cppNamespace = "pylir::HIR";
+}
+
+def PylirHIR_SpecialMethodOp : PylirHIR_Op<"specialMethod",
+  [AddableExceptionHandling<"SpecialMethodExOp", ["Single", "Variadic"]>,
+   PylirHIR_OpTrait<"SpecialMethodTrait">]> {
+  let arguments = (ins PylirHIR_SpecialMethodAttr:$specialMethod,
+                       DynamicType:$object,
+                       Variadic<DynamicType>:$arguments);
+  let results = (outs DynamicType:$result);
+
+  let description = [{
+    Operation representing any special method called by python to implement
+    various operators.
+    Unlike `binOp` or `binAssignOp`, the method lookup procedure of this
+    operation is wholly dependent on the type of `$object` and not any of its
+    arguments.
+    `$arguments` may be zero to two elements depending on the
+    `$specialMethod`.
+  }];
+
+  let assemblyFormat = [{
+    $object $specialMethod `(` ( `)`) : ( `` $arguments^ `)`)? attr-dict
+  }];
+}
+
+def PylirHIR_SpecialMethodExOp
+  : CreateExceptionHandlingVariant<PylirHIR_SpecialMethodOp>;
 
 //===----------------------------------------------------------------------===//
 // Call Operations

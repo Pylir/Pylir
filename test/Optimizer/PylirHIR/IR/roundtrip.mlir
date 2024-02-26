@@ -163,3 +163,26 @@ pyHIR.globalFunc @initModule() {
   initModule @foo
   return %0
 }
+
+// CHECK-LABEL: globalFunc @specialMethod(
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
+pyHIR.globalFunc @specialMethod(%arg0, %arg1, %arg2) {
+  // CHECK: specialMethod %[[ARG0]] __getitem__(%[[ARG1]])
+  specialMethod %arg0 __getitem__(%arg1)
+  // CHECK: specialMethod %[[ARG0]] __setitem__(%[[ARG1]], %[[ARG2]])
+  specialMethod %arg0 __setitem__(%arg1, %arg2)
+  specialMethod %arg0 __delitem__(%arg1)
+  // CHECK: specialMethod %[[ARG0]] __neg__()
+  specialMethod %arg0 __neg__()
+  // CHECK: specialMethod %[[ARG0]] __pos__()
+  specialMethod %arg0 __pos__()
+  // CHECK: specialMethod %[[ARG0]] __invert__()
+  specialMethod %arg0 __invert__()
+  // CHECK: specialMethod %[[ARG0]] __getattr__(%[[ARG1]])
+  specialMethod %arg0 __getattr__(%arg1)
+  // CHECK: specialMethod %[[ARG0]] __setattr__(%[[ARG1]], %[[ARG2]])
+  specialMethod %arg0 __setattr__(%arg1, %arg2)
+  return %arg0
+}

@@ -184,12 +184,21 @@ struct CallArgument {
       kind;
 };
 
+template <class ConcreteType>
+struct SpecialMethodTrait
+    : mlir::OpTrait::TraitBase<ConcreteType, SpecialMethodTrait> {
+  static mlir::LogicalResult verifyTrait(mlir::Operation* operation);
+};
+
 } // namespace pylir::HIR
 
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIROps.h.inc"
 
 namespace pylir::HIR {
+
+extern template struct SpecialMethodTrait<SpecialMethodOp>;
+extern template struct SpecialMethodTrait<SpecialMethodExOp>;
 
 /// Range adaptor allowing easy iteration over the arguments of a call op.
 template <class OpT>
