@@ -40,6 +40,17 @@ def bin_ops(a, b):
     a @ b
 
 
+# CHECK-LABEL: func "__main__.unary_ops"
+# CHECK-SAME: %[[A:[[:alnum:]]+]]
+
+def unary_ops(a):
+    # CHECK: specialMethod %[[A]] __neg__()
+    -a
+    # CHECK: specialMethod %[[A]] __pos__()
+    +a
+    # CHECK: specialMethod %[[A]] __invert__()
+    ~a
+
 # CHECK-LABEL: func "__main__.boolean_ops"
 # CHECK-SAME: %[[A:[[:alnum:]]+]]
 # CHECK-SAME: %[[B:[[:alnum:]]+]]

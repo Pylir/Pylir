@@ -1294,9 +1294,11 @@ private:
     }
   }
 
-  mlir::Value visitImpl(
-      [[maybe_unused]] const Syntax::Subscription& subscription) { // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Subscription& subscription) {
+    Value object = visit(subscription.object);
+    Value index = visit(subscription.index);
+    return create<HIR::SpecialMethodOp>(HIR::SpecialMethod::GetItem, object,
+                                        index);
   }
 
   Value visitImpl(const Syntax::Assignment& assignment) {
@@ -1378,16 +1380,21 @@ private:
   }
 
   Value visitImpl(const Syntax::UnaryOp& unaryOp) {
+    HIR::SpecialMethod specialMethod;
+    Value object = visit(unaryOp.expression);
     switch (unaryOp.operation.getTokenType()) {
-    case TokenType::NotKeyword: {
-      Value value = toI1(visit(unaryOp.expression));
+    case TokenType::NotKeyword:
       return create<Py::BoolFromI1Op>(create<arith::XOrIOp>(
-          value, create<arith::ConstantOp>(m_builder.getBoolAttr(true))));
+          toI1(object),
+          create<arith::ConstantOp>(m_builder.getBoolAttr(true))));
+    case TokenType::Minus: specialMethod = HIR::SpecialMethod::Neg; break;
+    case TokenType::Plus: specialMethod = HIR::SpecialMethod::Pos; break;
+    case TokenType::BitNegate:
+      specialMethod = HIR::SpecialMethod::Invert;
+      break;
+    default: PYLIR_UNREACHABLE;
     }
-    default:
-      // TODO:
-      PYLIR_UNREACHABLE;
-    }
+    return create<HIR::SpecialMethodOp>(specialMethod, object, ValueRange());
   }
 
   mlir::Value
@@ -1599,10 +1606,11 @@ private:
     writeToIdentifier(value, get<std::string>(atom.token.getValue()));
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::Subscription& subscription,
-                 [[maybe_unused]] Value value) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::Subscription& subscription, Value value) {
+    Value object = visit(subscription.object);
+    Value index = visit(subscription.index);
+    create<HIR::SpecialMethodOp>(HIR::SpecialMethod::SetItem, object,
+                                 ValueRange{index, value});
   }
 
   void visitImpl([[maybe_unused]] const Syntax::Slice& slice,
