@@ -255,6 +255,21 @@ struct BinAssignOpConversionPattern
   }
 };
 
+struct SpecialMethodOpConversionPattern
+    : OpExRewritePattern<SpecialMethodOpConversionPattern, SpecialMethodOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    SmallVector<Value> arguments(op.getArguments());
+    arguments.insert(arguments.begin(), op.getObject());
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(),
+        ("pylir" + stringifyEnum(op.getSpecialMethod())).str(), arguments);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
@@ -770,6 +785,51 @@ void buildRevBinOpCompilerBuiltin(PyBuilder& builder,
   builder.create<Py::ReturnOp>(result);
 }
 
+void buildBinOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
+                               TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType(
+                        {builder.getDynamicType(), builder.getDynamicType()},
+                        builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  Value lhs = func.getArgument(0);
+  Value rhs = func.getArgument(1);
+  auto tuple = builder.createMakeTuple({lhs, rhs}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+  builder.create<Py::ReturnOp>(result);
+}
+
+void buildUnaryOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
+                                 TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType({builder.getDynamicType()},
+                                            builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  auto tuple = builder.createMakeTuple({func.getArgument(0)}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+  builder.create<Py::ReturnOp>(result);
+}
+
+void buildTernaryOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
+                                   TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType({builder.getDynamicType(),
+                                             builder.getDynamicType(),
+                                             builder.getDynamicType()},
+                                            builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  auto tuple = builder.createMakeTuple(
+      {func.getArgument(0), func.getArgument(1), func.getArgument(2)}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+  builder.create<Py::ReturnOp>(result);
+}
+
 void buildCallOpCompilerBuiltin(PyBuilder& builder,
                                 llvm::StringRef functionName) {
   auto func = builder.create<Py::FuncOp>(
@@ -860,6 +920,21 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   buildRevBinOpCompilerBuiltin(builder,                                     \
                                COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
                                TypeSlots::name, TypeSlots::revSlotName);
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)                            \
+  if (#slotName != std::string_view{"__getattribute__"})                   \
+    buildBinOpCompilerBuiltin(builder,                                     \
+                              COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                              TypeSlots::name);
+
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName) \
+  buildUnaryOpCompilerBuiltin(                    \
+      builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name);
+
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                            \
+  if (#slotName != std::string_view{"__call__"})                               \
+    buildTernaryOpCompilerBuiltin(builder,                                     \
+                                  COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                                  TypeSlots::name);
 #define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                       \
   buildIOpCompilerBuiltins(                                                  \
       builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name, \
@@ -876,8 +951,8 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
                ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
                CallOpConversionPattern, BinOpConversionPattern,
-               BinAssignOpConversionPattern, InitModuleOpConversionPattern>(
-      &getContext());
+               BinAssignOpConversionPattern, InitModuleOpConversionPattern,
+               SpecialMethodOpConversionPattern>(&getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
