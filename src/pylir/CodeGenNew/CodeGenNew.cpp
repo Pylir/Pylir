@@ -502,13 +502,6 @@ public:
         m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers + "$dict");
     m_globalDictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
 
-    // Initialize builtins from main module.
-    if (m_options.qualifier.empty() && m_options.implicitBuiltinsImport) {
-      m_options.moduleLoadCallback("builtins", m_docManager,
-                                   /*location=*/{0, 1});
-      create<HIR::InitModuleOp>("builtins");
-    }
-
     visit(fileInput.input);
 
     if (m_builder.getInsertionBlock())
