@@ -31,7 +31,7 @@ class CodeGenNew {
   SymbolTable m_symbolTable;
   Diag::DiagnosticsDocManager<>* m_docManager;
   std::string m_qualifiers;
-  Value m_globalDictionary;
+  Py::GlobalValueAttr m_globalDictionary;
   llvm::DenseMap<llvm::StringRef, Py::GlobalValueAttr> m_builtinNamespace;
 
   /// Struct representing one instance of a scope in Python.
@@ -262,9 +262,10 @@ class CodeGenNew {
       }
     }
 
+    Value dictionary = create<Py::ConstantOp>(m_globalDictionary);
     Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
     Value hash = create<Py::StrHashOp>(string);
-    create<Py::DictSetItemOp>(m_globalDictionary, string, hash, value);
+    create<Py::DictSetItemOp>(dictionary, string, hash, value);
   }
 
   /// Reads the identifier given by 'name' and returns its value. Generates code
@@ -303,10 +304,10 @@ class CodeGenNew {
       }
     }
 
+    Value dictionary = create<Py::ConstantOp>(m_globalDictionary);
     Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
     Value hash = create<Py::StrHashOp>(string);
-    Value readValue =
-        create<Py::DictTryGetItemOp>(m_globalDictionary, string, hash);
+    Value readValue = create<Py::DictTryGetItemOp>(dictionary, string, hash);
 
     auto iter = m_builtinNamespace.find(name);
     if (iter != m_builtinNamespace.end()) {
@@ -497,16 +498,14 @@ public:
     init.getBody().push_back(entryBlock);
     m_builder.setInsertionPointToEnd(entryBlock);
 
-    auto dictionary =
+    m_globalDictionary =
         m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers + "$dict");
-    dictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
-
-    m_globalDictionary = create<Py::ConstantOp>(dictionary);
+    m_globalDictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
 
     visit(fileInput.input);
 
     if (m_builder.getInsertionBlock())
-      create<HIR::InitReturnOp>(m_globalDictionary);
+      create<HIR::InitReturnOp>(create<Py::ConstantOp>(m_globalDictionary));
 
     return m_module;
   }

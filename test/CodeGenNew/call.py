@@ -11,7 +11,7 @@ def x(*args, **kwargs):
 
 # CHECK: %[[STR:.*]] = py.constant(#py.str<"x">)
 # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: %[[X:.*]] = py.dict_tryGetItem %[[GLOBALS]][%[[STR]] hash(%[[HASH]])]
+# CHECK: %[[X:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
 # CHECK: %[[SEVEN:.*]] = py.constant(#py.int<7>)
