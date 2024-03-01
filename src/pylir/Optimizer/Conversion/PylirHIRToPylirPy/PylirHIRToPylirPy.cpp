@@ -255,6 +255,45 @@ struct BinAssignOpConversionPattern
   }
 };
 
+struct GetItemOpConversionPattern
+    : OpExRewritePattern<GetItemOpConversionPattern, GetItemOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__getitem__",
+        ValueRange{op.getObject(), op.getIndex()});
+    return success();
+  }
+};
+
+struct SetItemOpConversionPattern
+    : OpExRewritePattern<SetItemOpConversionPattern, SetItemOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__setitem__",
+        ValueRange{op.getObject(), op.getIndex(), op.getValue()});
+    return success();
+  }
+};
+
+struct DelItemOpConversionPattern
+    : OpExRewritePattern<DelItemOpConversionPattern, DelItemOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__delitem__",
+        ValueRange{op.getObject(), op.getIndex()});
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
@@ -849,6 +888,51 @@ void buildIOpCompilerBuiltins(PyBuilder& builder, llvm::StringRef functionName,
                                returnBlock->getArgument(0));
 }
 
+void buildBinOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
+                               TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType(
+                        {builder.getDynamicType(), builder.getDynamicType()},
+                        builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  Value lhs = func.getArgument(0);
+  Value rhs = func.getArgument(1);
+  auto tuple = builder.createMakeTuple({lhs, rhs}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+  builder.create<Py::ReturnOp>(result);
+}
+
+void buildUnaryOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
+                                 TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType({builder.getDynamicType()},
+                                            builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  auto tuple = builder.createMakeTuple({func.getArgument(0)}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+  builder.create<Py::ReturnOp>(result);
+}
+
+void buildTernaryOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
+                                   TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType({builder.getDynamicType(),
+                                             builder.getDynamicType(),
+                                             builder.getDynamicType()},
+                                            builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  auto tuple = builder.createMakeTuple(
+      {func.getArgument(0), func.getArgument(1), func.getArgument(2)}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+  builder.create<Py::ReturnOp>(result);
+}
+
 } // namespace
 
 void ConvertPylirHIRToPylirPy::runOnOperation() {
@@ -860,6 +944,21 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   buildRevBinOpCompilerBuiltin(builder,                                     \
                                COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
                                TypeSlots::name, TypeSlots::revSlotName);
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)                            \
+  if (#slotName != std::string_view{"__getattribute__"})                   \
+    buildBinOpCompilerBuiltin(builder,                                     \
+                              COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                              TypeSlots::name);
+
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName) \
+  buildUnaryOpCompilerBuiltin(                    \
+      builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name);
+
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                            \
+  if (#slotName != std::string_view{"__call__"})                               \
+    buildTernaryOpCompilerBuiltin(builder,                                     \
+                                  COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                                  TypeSlots::name);
 #define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                       \
   buildIOpCompilerBuiltins(                                                  \
       builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name, \
@@ -876,8 +975,9 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
                ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
                CallOpConversionPattern, BinOpConversionPattern,
-               BinAssignOpConversionPattern, InitModuleOpConversionPattern>(
-      &getContext());
+               BinAssignOpConversionPattern, InitModuleOpConversionPattern,
+               GetItemOpConversionPattern, SetItemOpConversionPattern,
+               DelItemOpConversionPattern>(&getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();

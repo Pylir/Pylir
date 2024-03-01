@@ -1294,9 +1294,10 @@ private:
     }
   }
 
-  mlir::Value visitImpl(
-      [[maybe_unused]] const Syntax::Subscription& subscription) { // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Subscription& subscription) {
+    Value object = visit(subscription.object);
+    Value index = visit(subscription.index);
+    return create<HIR::GetItemOp>(object, index);
   }
 
   Value visitImpl(const Syntax::Assignment& assignment) {
@@ -1599,10 +1600,10 @@ private:
     writeToIdentifier(value, get<std::string>(atom.token.getValue()));
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::Subscription& subscription,
-                 [[maybe_unused]] Value value) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::Subscription& subscription, Value value) {
+    Value object = visit(subscription.object);
+    Value index = visit(subscription.index);
+    create<HIR::SetItemOp>(object, index, value);
   }
 
   void visitImpl([[maybe_unused]] const Syntax::Slice& slice,

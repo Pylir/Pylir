@@ -163,3 +163,16 @@ pyHIR.globalFunc @initModule() {
   initModule @foo
   return %0
 }
+
+// CHECK-LABEL: pyHIR.globalFunc @subscription(
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+pyHIR.globalFunc @subscription(%0, %1) {
+  // CHECK: %[[ITEM:.*]] = getItem %[[ARG0]][%[[ARG1]]]
+  %2 = getItem %0[%1]
+  // CHECK: setItem %[[ARG0]][%[[ITEM]]] to %[[ARG1]]
+  setItem %0[%2] to %1
+  // CHECK: delItem %[[ARG1]][%[[ARG0]]]
+  delItem %1[%0]
+  return %2
+}
