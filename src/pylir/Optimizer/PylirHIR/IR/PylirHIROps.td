@@ -106,6 +106,51 @@ def PylirHIR_BinAssignExOp
   : CreateExceptionHandlingVariant<PylirHIR_BinAssignOp>;
 
 //===----------------------------------------------------------------------===//
+// Subscription Operations
+//===----------------------------------------------------------------------===//
+
+def PylirHIR_GetItemOp : PylirHIR_Op<"getItem",
+  [AddableExceptionHandling<"GetItemExOp">]> {
+  let arguments = (ins DynamicType:$object, DynamicType:$index);
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+    $object `[` $index `]` attr-dict
+  }];
+}
+
+def PylirHIR_GetItemExOp
+  : CreateExceptionHandlingVariant<PylirHIR_GetItemOp>;
+
+def PylirHIR_SetItemOp : PylirHIR_Op<"setItem",
+  [AddableExceptionHandling<"SetItemExOp">]> {
+  let arguments = (ins DynamicType:$object,
+                       DynamicType:$index,
+                       DynamicType:$value);
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+    $object `[` $index `]` `to` $value attr-dict
+  }];
+}
+
+def PylirHIR_SetItemExOp
+  : CreateExceptionHandlingVariant<PylirHIR_SetItemOp>;
+
+def PylirHIR_DelItemOp : PylirHIR_Op<"delItem",
+  [AddableExceptionHandling<"DelItemExOp">]> {
+  let arguments = (ins DynamicType:$object, DynamicType:$index);
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+    $object `[` $index `]` attr-dict
+  }];
+}
+
+def PylirHIR_DelItemExOp
+  : CreateExceptionHandlingVariant<PylirHIR_DelItemOp>;
+
+//===----------------------------------------------------------------------===//
 // Call Operations
 //===----------------------------------------------------------------------===//
 
