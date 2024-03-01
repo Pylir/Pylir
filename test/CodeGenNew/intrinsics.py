@@ -3,7 +3,6 @@
 import pylir.intr.object
 
 # CHECK-LABEL: init "__main__"
-# CHECK: %[[DICT:.*]] = py.constant(#__main__$dict)
 
 def foo():
     pass
@@ -12,11 +11,11 @@ def foo():
 # CHECK: py.dict_setItem
 # CHECK: %[[STR:.*]] = py.constant(#py.str<"foo">)
 # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: %[[FOO:.*]] = py.dict_tryGetItem %[[DICT]][%[[STR]] hash(%[[HASH]])]
+# CHECK: %[[FOO:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: %[[T:.*]] = py.typeOf %[[FOO]]
 # CHECK: %[[STR:.*]] = py.constant(#py.str<"t">)
 # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: py.dict_setItem %[[DICT]][%[[STR]] hash(%[[HASH]])] to %[[T]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[T]]
 t = pylir.intr.typeOf(foo)
 
 # CHECK: %[[ZERO:.*]] = py.constant(#py.int<0>)

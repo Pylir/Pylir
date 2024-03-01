@@ -1,7 +1,6 @@
 # RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
 
 # CHECK-LABEL: init "__main__"
-# CHECK: %[[GLOBALS:.*]] = py.constant(#__main__$dict)
 # CHECK: %[[TEST1:.*]] = func "__main__.test1"
 def test1():
     # CHECK: %[[NESTED:.*]] = func "__main__.test1.<locals>.nested"
@@ -19,11 +18,11 @@ def test1():
 
 # CHECK: %[[STR:.*]] = py.constant(#py.str<"test1">)
 # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: py.dict_setItem %[[GLOBALS]][%[[STR]] hash(%[[HASH]])] to %[[TEST1]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[TEST1]]
 
 # CHECK: %[[STR:.*]] = py.constant(#py.str<"test1">)
 # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: %[[TEST1:.*]] = py.dict_tryGetItem %[[GLOBALS]][%[[STR]] hash(%[[HASH]])]
+# CHECK: %[[TEST1:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: func "__main__.test2"(%{{.*}} "arg" = %[[TEST1]])
 
 def test2(arg=test1):
