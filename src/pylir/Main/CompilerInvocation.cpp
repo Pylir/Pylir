@@ -929,7 +929,8 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
   llvm::ThreadPoolTaskGroup taskGroup(*m_threadPool);
   options.moduleLoadCallback =
       [&](llvm::StringRef absoluteModule,
-          Diag::DiagnosticsDocManager<>* diagnostics, Diag::Location location) {
+          Diag::DiagnosticsDocManager<>* diagnostics,
+          Diag::LazyLocation location) {
         std::unique_lock lock{dataStructureMutex};
         auto [iter, inserted] = loaded.try_emplace(absoluteModule, "");
         if (!inserted)

@@ -70,7 +70,7 @@ pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput) {
     // Initialize builtins from main module.
     if (m_qualifiers.empty() && m_options.implicitBuiltinsImport) {
       m_options.moduleLoadCallback("builtins", m_docManager,
-                                   /*location=*/{0, 1});
+                                   /*location=*/std::nullopt);
       m_builder.create<Py::CallOp>(mlir::TypeRange{}, "builtins.__init__");
     }
 

@@ -20,7 +20,7 @@ namespace pylir {
 struct CodeGenOptions {
   std::function<void(llvm::StringRef absoluteModule,
                      Diag::DiagnosticsDocManager<>* diagnostics,
-                     Diag::Location location)>
+                     Diag::LazyLocation location)>
       moduleLoadCallback;
   std::string qualifier;
   bool implicitBuiltinsImport;

@@ -315,6 +315,16 @@ struct LocationProvider<std::optional<T>> {
   }
 };
 
+template <>
+struct LocationProvider<std::nullopt_t> {
+  template <class... Context>
+  static Location getRange(std::nullopt_t, const Context&...) noexcept {
+    return std::nullopt;
+  }
+
+  using non_lazy = void;
+};
+
 template <class T, class Deleter>
 struct LocationProvider<std::unique_ptr<T, Deleter>> {
   template <class... Context>
