@@ -507,6 +507,25 @@ public:
       m_options.moduleLoadCallback("builtins", m_docManager,
                                    /*location=*/std::nullopt);
       create<HIR::InitModuleOp>("builtins");
+      auto builtinNone =
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::None.name);
+      builtinNone.setConstant(true);
+      builtinNone.setInitializer(m_builder.getAttr<Py::ObjectAttr>(
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::NoneType.name)));
+
+      auto builtinNotImplemented =
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::NotImplemented.name);
+      builtinNone.setConstant(true);
+      builtinNone.setInitializer(m_builder.getAttr<Py::ObjectAttr>(
+          m_builder.getAttr<Py::GlobalValueAttr>(
+              Builtins::NotImplementedType.name)));
+
+      OpBuilder::InsertionGuard guard{m_builder};
+      m_builder.setInsertionPointToEnd(m_module.getBody());
+
+      create<Py::ExternalOp>(Builtins::None.name, builtinNone);
+      create<Py::ExternalOp>(Builtins::NotImplemented.name,
+                             builtinNotImplemented);
     }
 
     visit(fileInput.input);

@@ -5,7 +5,7 @@
 # CHECK-SAME: initializer = #py.function<@[[$MAIN_FOO_SYMBOL:[0-9a-zA-Z_.]+]]
 # CHECK-SAME: qual_name = #py.str<"__main__.foo">
 # CHECK-SAME: defaults = #py.tuple<(#py.int<3>)>
-# CHECK-SAME: kw_defaults = #py.dict<{#py.str<"b"> to #py.globalValue<builtins.None>}>
+# CHECK-SAME: kw_defaults = #py.dict<{#py.str<"b"> to #py.globalValue<builtins.None{{.*}}>}>
 
 # CHECK-LABEL: init "__main__"
 # CHECK: %[[FOO:.*]] = py.constant(#[[$MAIN_FOO]])
