@@ -1,6 +1,8 @@
 # RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
 
-# CHECK: #[[$BASE_EXCEPTION:.*]] = #py.globalValue<builtins.BaseException{{(,|>)}}
+# CHECK-DAG: #[[$BASE_EXCEPTION:.*]] = #py.globalValue<builtins.BaseException{{(,|>)}}
+# CHECK-DAG: #[[$NONE:.*]] = #py.globalValue<builtins.None{{(,|>)}}
+# CHECK-DAG: #[[$NOT_IMPLEMENTED:.*]] = #py.globalValue<builtins.NotImplemented{{(,|>)}}
 
 # CHECK: init "__main__"
 # CHECK: initModule @builtins
@@ -18,3 +20,6 @@ def foo(x=BaseException):
     # CHECK: return %[[FIVE]]
     TypeError = 5
     return TypeError
+
+# CHECK: py.external @builtins.None, #[[$NONE]]
+# CHECK: py.external @builtins.NotImplemented, #[[$NOT_IMPLEMENTED]]
