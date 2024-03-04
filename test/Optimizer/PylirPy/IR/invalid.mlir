@@ -73,3 +73,13 @@ py.func @test() -> !py.dynamic {
   %0 = constant(#py.type<instance_slots = <(#py.int<5>)>>)
   return %0 : !py.dynamic
 }
+
+// -----
+
+py.func private @foo() -> !py.dynamic
+
+py.func @test() {
+  // expected-error@below {{call result types '' are not compatible with output types '!py.dynamic' of '@foo'}}
+  call @foo() : () -> ()
+  return
+}
