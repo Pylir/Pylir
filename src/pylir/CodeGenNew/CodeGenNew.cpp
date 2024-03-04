@@ -912,7 +912,8 @@ private:
     SetVector<Attribute> instanceSlots;
     for (Attribute base : bases)
       if (auto interface = dyn_cast<Py::TypeAttrInterface>(base)) {
-        instanceSlots.insert(interface.getInstanceSlots());
+        Py::TupleAttrInterface slots = interface.getInstanceSlots();
+        instanceSlots.insert(slots.begin(), slots.end());
       }
 
     // Slots are the slots of this class due to being an instance of type.
