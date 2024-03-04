@@ -1,8 +1,8 @@
 # RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
 
 # CHECK-DAG: #[[$BASE_EXCEPTION:.*]] = #py.globalValue<builtins.BaseException{{(,|>)}}
-# CHECK-DAG: #[[$NONE:.*]] = #py.globalValue<builtins.None{{(,|>)}}
-# CHECK-DAG: #[[$NOT_IMPLEMENTED:.*]] = #py.globalValue<builtins.NotImplemented{{(,|>)}}
+# CHECK-DAG: #[[$NONE:.*]] = #py.globalValue<builtins.None,
+# CHECK-DAG: #[[$NOT_IMPLEMENTED:.*]] = #py.globalValue<builtins.NotImplemented,
 
 # CHECK: init "__main__"
 # CHECK: initModule @builtins

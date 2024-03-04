@@ -515,8 +515,8 @@ public:
 
       auto builtinNotImplemented =
           m_builder.getAttr<Py::GlobalValueAttr>(Builtins::NotImplemented.name);
-      builtinNone.setConstant(true);
-      builtinNone.setInitializer(m_builder.getAttr<Py::ObjectAttr>(
+      builtinNotImplemented.setConstant(true);
+      builtinNotImplemented.setInitializer(m_builder.getAttr<Py::ObjectAttr>(
           m_builder.getAttr<Py::GlobalValueAttr>(
               Builtins::NotImplementedType.name)));
 
