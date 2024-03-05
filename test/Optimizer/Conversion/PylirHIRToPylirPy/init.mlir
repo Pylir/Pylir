@@ -11,7 +11,7 @@ pyHIR.init "foo" {
 // CHECK-LABEL: py.func @__init__() -> !py.dynamic
 pyHIR.init "__main__" {
   %0 = py.makeDict ()
-  // CHECK: call @foo.__init__()
+  // CHECK: call @foo.__init__() : () -> !py.dynamic
   initModule @foo
   init_return %0
 }

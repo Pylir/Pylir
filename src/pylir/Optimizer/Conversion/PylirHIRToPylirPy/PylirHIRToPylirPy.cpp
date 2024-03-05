@@ -579,8 +579,10 @@ struct InitModuleOpConversionPattern
 
   template <class OpT>
   LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, TypeRange(), (op.getModule() + ".__init__").str());
+    rewriter.create<Py::CallOp>(op.getLoc(),
+                                rewriter.getType<Py::DynamicType>(),
+                                (op.getModule() + ".__init__").str());
+    rewriter.eraseOp(op);
     return success();
   }
 };

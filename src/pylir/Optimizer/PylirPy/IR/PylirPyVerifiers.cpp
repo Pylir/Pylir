@@ -31,18 +31,16 @@ verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
   return op->emitOpError("Failed to find symbol named '") << name << "'";
 }
 
-mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable,
-                               mlir::Operation* call,
-                               mlir::ValueRange callOperands,
-                               mlir::FlatSymbolRefAttr callee) {
-  auto funcOp = symbolTable.lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
-      call, callee);
+LogicalResult verifyCall(SymbolTableCollection& symbolTable, Operation* call,
+                         ValueRange callOperands, FlatSymbolRefAttr callee) {
+  auto funcOp =
+      symbolTable.lookupNearestSymbolFrom<FunctionOpInterface>(call, callee);
   if (!funcOp)
     return call->emitOpError("failed to find function named '")
            << callee << "'";
 
-  auto argumentTypes = funcOp.getArgumentTypes();
-  llvm::SmallVector<mlir::Type> operandTypes;
+  ArrayRef<Type> argumentTypes = funcOp.getArgumentTypes();
+  SmallVector<Type> operandTypes;
   for (auto iter : callOperands)
     operandTypes.push_back(iter.getType());
 
@@ -52,7 +50,15 @@ mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable,
                "call operand types are not compatible with argument types of '")
            << callee << "'";
 
-  return mlir::success();
+  ArrayRef<Type> resultTypes = funcOp.getResultTypes();
+  auto callResults = call->getResultTypes();
+  if (!std::equal(resultTypes.begin(), resultTypes.end(), callResults.begin(),
+                  callResults.end()))
+    return call->emitOpError("call result types '")
+           << callResults << "' are not compatible with output types "
+           << resultTypes << " of '" << callee << "'";
+
+  return success();
 }
 
 } // namespace
