@@ -10,16 +10,15 @@ add_public_tablegen_target(CodeGenIntrIncGen)
 
 add_library(CodeGen
   CodeGen.cpp
-  CompilerBuiltins.cpp
 )
 target_link_libraries(CodeGen
   PUBLIC
   Parser
-  PylirPyDialect
-  
+  PylirHIRDialect
+
   PRIVATE
   PylirTransformsUtils
-  
+
   MLIRArithDialect
   MLIRControlFlowDialect
 )

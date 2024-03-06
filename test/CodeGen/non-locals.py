@@ -1,4 +1,4 @@
-# RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
 # CHECK: func "__main__.foo"
 # CHECK-SAME: %[[ARG0:[[:alnum:]]+]]

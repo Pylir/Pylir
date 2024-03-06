@@ -1,13 +1,10 @@
 # RUN: pylir %s -emit-pylir -o - -S -verify
 
 # expected-error@below {{unknown intrinsic 'pylir.intr.thing.doesnt.exist'}}
-pylir.intr.thing.doesnt.exist
-
-# expected-error@below {{unknown intrinsic 'pylir.intr.thing.doesnt.exist'}}
 pylir.intr.thing.doesnt.exist()
 
-args = ()
-d = {}
+args = 1
+d = 2
 
 # expected-error@+3 {{intrinsics do not support keyword arguments}}
 # expected-error@+2 {{intrinsics do not support iterable unpacking arguments}}
@@ -26,3 +23,4 @@ pylir.intr.int.cmp(args, d, args)
 # expected-error@below {{invalid enum value 'lol' for enum 'IntCmpKind' argument}}
 pylir.intr.int.cmp('lol', d, args)
 # expected-note@above {{valid values are: eq, ne, lt, le, gt, ge}}
+

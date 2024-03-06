@@ -1,4 +1,4 @@
-# RUN: pylir %s -Xnew-codegen -emit-pylir -Xno-builtins -o - -S | FileCheck %s
+# RUN: pylir %s -emit-pylir -Xno-builtins -o - -S | FileCheck %s
 
 # CHECK: #[[$MAIN_SEQ_ITER_INIT:.*]] = #py.globalValue<__main__.SeqIter.__init__,
 # CHECK: #[[$MAIN_SEQ_ITER:.*]] = #py.globalValue<__main__.SeqIter,

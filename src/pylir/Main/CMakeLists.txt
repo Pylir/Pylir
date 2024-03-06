@@ -33,8 +33,9 @@ target_link_libraries(PylirMain
   MLIRPass
   PRIVATE
   CodeGen
-  CodeGenNew
   
+  PylirHIRToPylirPy
+  PylirHIRTransforms
   PylirLinker
   PylirOptimizer
   PylirToLLVMIR

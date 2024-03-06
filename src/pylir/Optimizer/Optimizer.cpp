@@ -14,6 +14,7 @@
 #include <mlir/Transforms/Passes.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
+#include <pylir/Optimizer/PylirHIR/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
@@ -24,11 +25,16 @@ void pylir::registerOptimizationPipelines() {
       "Minimum pass pipeline to fully lower 'py' dialect, up until (exclusive) "
       "conversion to LLVM",
       [](mlir::OpPassManager& pm) {
+        pm.addPass(HIR::createFuncOutliningPass());
+        mlir::OpPassManager* nested = &pm.nestAny();
         // This is supposed to be the minimum pipeline, so shouldn't really
         // contain the canonicalizations, but the dialect conversion framework
         // currently cannot deal with statically known dead code. Running the
         // canonicalizer eliminates any such occurrences.
-        mlir::OpPassManager* nested = &pm.nestAny();
+        nested->addPass(mlir::createCanonicalizerPass());
+        pm.addPass(createConvertPylirHIRToPylirPyPass());
+
+        nested = &pm.nestAny();
         nested->addPass(mlir::createCanonicalizerPass());
         nested->addPass(Py::createExpandPyDialectPass());
         nested->addPass(mlir::createCanonicalizerPass());
@@ -40,6 +46,10 @@ void pylir::registerOptimizationPipelines() {
       "Optimization pipeline used by the compiler with lowering up until "
       "(exclusive) conversion to LLVM",
       [](mlir::OpPassManager& pm) {
+        pm.addPass(HIR::createFuncOutliningPass());
+        pm.nestAny().addPass(mlir::createCanonicalizerPass());
+        pm.addPass(createConvertPylirHIRToPylirPyPass());
+
         mlir::OpPassManager inlinerNested;
 
         mlir::OpPassManager* nested;

@@ -1,172 +1,136 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
-# CHECK-DAG: #[[$BOOL:.*]] = #py.globalValue<builtins.bool,
+# CHECK: #[[$BOOL:.*]] = #py.globalValue<builtins.bool{{,|>}}
 
-# CHECK-LABEL: @"bin_ops$impl[0]"
-# CHECK-SAME: %{{[[:alnum:]]+}}
+# CHECK-LABEL: func "__main__.bin_ops"
 # CHECK-SAME: %[[A:[[:alnum:]]+]]
 # CHECK-SAME: %[[B:[[:alnum:]]+]]
-
 def bin_ops(a, b):
+    # CHECK: binOp %[[A]] __add__ %[[B]]
     a + b
-    # CHECK: call @pylir__add__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __sub__ %[[B]]
     a - b
-    # CHECK: call @pylir__sub__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __or__ %[[B]]
     a | b
-    # CHECK: call @pylir__or__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __xor__ %[[B]]
     a ^ b
-    # CHECK: call @pylir__xor__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __and__ %[[B]]
     a & b
-    # CHECK: call @pylir__and__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __lshift__ %[[B]]
     a << b
-    # CHECK: call @pylir__lshift__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __rshift__ %[[B]]
     a >> b
-    # CHECK: call @pylir__rshift__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __mul__ %[[B]]
     a * b
-    # CHECK: call @pylir__mul__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __div__ %[[B]]
     a / b
-    # CHECK: call @pylir__div__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __floordiv__ %[[B]]
     a // b
-    # CHECK: call @pylir__floordiv__(%[[A]], %[[B]])
 
+    # CHECK: binOp %[[A]] __matmul__ %[[B]]
     a @ b
-    # CHECK: call @pylir__matmul__(%[[A]], %[[B]])
-
-    a in b
-    # CHECK: call @pylir__contains__(%[[B]], %[[A]])
 
 
-# CHECK-LABEL: @"unary_ops$impl[0]"
-# CHECK-SAME: %{{[[:alnum:]]+}}
-# CHECK-SAME: %[[A:[[:alnum:]]+]]
-
-def unary_ops(a):
-    -a
-    # CHECK: call @pylir__neg__(%[[A]])
-    +a
-    # CHECK: call @pylir__pos__(%[[A]])
-    ~a
-    # CHECK: call @pylir__invert__(%[[A]])
-
-
-# CHECK-LABEL: @"boolean_ops$impl[0]"
-# CHECK-SAME: %{{[[:alnum:]]+}}
+# CHECK-LABEL: func "__main__.boolean_ops"
 # CHECK-SAME: %[[A:[[:alnum:]]+]]
 # CHECK-SAME: %[[B:[[:alnum:]]+]]
 def boolean_ops(a, b):
-    global c
-    # Testing with calls on purpose to check in the output that side effects
-    # are correctly sequenced
+    # CHECK: %[[A_CALL:.*]] = call %[[A]]()
+    # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+    # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[A_CALL]])
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
+    # CHECK: cf.cond_br %[[I1]], ^[[BB1:.*]], ^[[BB2:.*]](%[[I1]] : i1)
 
+    # CHECK: ^[[BB1]]:
+    # CHECK: %[[B_CALL:.*]] = call %[[B]]()
+    # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+    # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[B_CALL]])
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
+    # CHECK: cf.br ^[[BB2]](%[[I1]] : i1)
+
+    # CHECK: ^[[BB2]](%[[RES:.*]]: i1 loc({{.*}})):
+    # CHECK: py.bool_fromI1 %[[RES]]
     c = a() and b()
-    # CHECK: %[[TUPLE:.*]] = makeTuple ()
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES:.*]] = call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
-    # CHECK: %[[BOOL:.*]] = constant(#[[$BOOL]])
-    # CHECK: %[[TYPE:.*]] = typeOf %[[RES]]
-    # CHECK: %[[IS_BOOL:.*]] = is %[[TYPE]], %[[BOOL]]
-    # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
-    # CHECK: ^[[CALC_BOOL]]:
-    # CHECK: %[[TUPLE:.*]] = makeTuple (%[[RES]])
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES_AS_BOOL:.*]] = call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
-    # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
-    # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
-    # CHECK: %[[RES_AS_I1:.*]] = bool_toI1 %[[RES_AS_BOOL]]
-    # CHECK: cf.cond_br %[[RES_AS_I1]], ^[[CALCULATE_B_BLOCK:.*]], ^[[DEST:.*]](%[[RES]] : !py.dynamic)
 
-    # CHECK: ^[[CALCULATE_B_BLOCK]]:
-    # CHECK: %[[TUPLE:.*]] = makeTuple ()
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES:.*]] = call @pylir__call__(%[[B]], %[[TUPLE]], %[[DICT]])
-    # CHECK: cf.br ^[[DEST]](%[[RES]] : !py.dynamic)
+    # CHECK: %[[A_CALL:.*]] = call %[[A]]()
+    # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+    # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[A_CALL]])
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
+    # CHECK: cf.cond_br %[[I1]], ^[[BB4:.*]](%[[I1]] : i1), ^[[BB3:[[:alnum:]]+]]
 
-    # CHECK: ^[[DEST]](
-    # CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-    # CHECK: store %[[ARG]] : !py.dynamic into @c
+    # CHECK: ^[[BB3]]:
+    # CHECK: %[[B_CALL:.*]] = call %[[B]]()
+    # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+    # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[B_CALL]])
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
+    # CHECK: cf.br ^[[BB4]](%[[I1]] : i1)
 
+    # CHECK: ^[[BB4]](%[[RES:.*]]: i1 loc({{.*}})):
+    # CHECK: py.bool_fromI1 %[[RES]]
     c = a() or b()
-    # CHECK: %[[TUPLE:.*]] = makeTuple ()
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES:.*]] = call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
-    # CHECK: %[[BOOL:.*]] = constant(#[[$BOOL]])
-    # CHECK: %[[TYPE:.*]] = typeOf %[[RES]]
-    # CHECK: %[[IS_BOOL:.*]] = is %[[TYPE]], %[[BOOL]]
-    # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
-    # CHECK: ^[[CALC_BOOL]]:
-    # CHECK: %[[TUPLE:.*]] = makeTuple (%[[RES]])
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES_AS_BOOL:.*]] = call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
-    # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
-    # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
-    # CHECK: %[[RES_AS_I1:.*]] = bool_toI1 %[[RES_AS_BOOL]]
-    # CHECK: cf.cond_br %[[RES_AS_I1]], ^[[DEST:.*]](%[[RES]] : !py.dynamic), ^[[CALCULATE_B_BLOCK:[[:alnum:]]+]]
 
-    # CHECK: ^[[CALCULATE_B_BLOCK]]:
-    # CHECK: %[[TUPLE:.*]] = makeTuple ()
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES:.*]] = call @pylir__call__(%[[B]], %[[TUPLE]], %[[DICT]])
-    # CHECK: cf.br ^[[DEST]](%[[RES]] : !py.dynamic)
-
-    # CHECK: ^[[DEST]](
-    # CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-    # CHECK: store %[[ARG]] : !py.dynamic into @c
-
-    c = not a
-    # CHECK: %[[BOOL:.*]] = constant(#[[$BOOL]])
-    # CHECK: %[[TYPE:.*]] = typeOf %[[A]]
-    # CHECK: %[[IS_BOOL:.*]] = is %[[TYPE]], %[[BOOL]]
-    # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[A]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
-    # CHECK: ^[[CALC_BOOL]]:
-    # CHECK: %[[TUPLE:.*]] = makeTuple (%[[A]])
-    # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-    # CHECK: %[[RES_AS_BOOL:.*]] = call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
-    # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
-    # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
-    # CHECK: %[[RES_AS_I1:.*]] = bool_toI1 %[[RES_AS_BOOL]]
+    # CHECK: %[[A_CALL:.*]] = call %[[A]]()
+    # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
+    # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[A_CALL]])
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: %[[TRUE:.*]] = arith.constant true
-    # CHECK: %[[INVERTED:.*]] = arith.xori %[[TRUE]], %[[RES_AS_I1]]
-    # CHECK: %[[AS_BOOL:.*]] = bool_fromI1 %[[INVERTED]]
-    # CHECK: store %[[AS_BOOL]] : !py.dynamic into @c
+    # CHECK: %[[NOT:.*]] = arith.xori %[[I1]], %[[TRUE]]
+    # CHECK: py.bool_fromI1 %[[NOT]]
+    c = not a()
 
 
-# CHECK-LABEL: @"aug_assign_ops$impl[0]"
-# CHECK-SAME: %{{[[:alnum:]]+}}
+# CHECK-LABEL: func "__main__.assign_ops"
 # CHECK-SAME: %[[A:[[:alnum:]]+]]
 # CHECK-SAME: %[[B:[[:alnum:]]+]]
-def aug_assign_ops(a, b):
+def assign_ops(a, b):
+    # CHECK: %[[A2:.*]] = binAssignOp %[[A]] __iadd__ %[[B]]
     a += b
-    # CHECK: %[[A_1:.*]] = call @pylir__iadd__(%[[A]], %[[B]])
+
+    # CHECK: %[[A3:.*]] = binAssignOp %[[A2]] __isub__ %[[B]]
     a -= b
-    # CHECK: %[[A_2:.*]] = call @pylir__isub__(%[[A_1]], %[[B]])
-    a *= b
-    # CHECK: %[[A_3:.*]] = call @pylir__imul__(%[[A_2]], %[[B]])
-    a /= b
-    # CHECK: %[[A_4:.*]] = call @pylir__idiv__(%[[A_3]], %[[B]])
-    a //= b
-    # CHECK: %[[A_5:.*]] = call @pylir__ifloordiv__(%[[A_4]], %[[B]])
-    a %= b
-    # CHECK: %[[A_6:.*]] = call @pylir__imod__(%[[A_5]], %[[B]])
-    a @= b
-    # CHECK: %[[A_7:.*]] = call @pylir__imatmul__(%[[A_6]], %[[B]])
-    a &= b
-    # CHECK: %[[A_8:.*]] = call @pylir__iand__(%[[A_7]], %[[B]])
+
+    # CHECK: %[[A4:.*]] = binAssignOp %[[A3]] __ior__ %[[B]]
     a |= b
-    # CHECK: %[[A_9:.*]] = call @pylir__ior__(%[[A_8]], %[[B]])
+
+    # CHECK: %[[A5:.*]] = binAssignOp %[[A4]] __ixor__ %[[B]]
     a ^= b
-    # CHECK: %[[A_10:.*]] = call @pylir__ixor__(%[[A_9]], %[[B]])
-    a >>= b
-    # CHECK: %[[A_11:.*]] = call @pylir__irshift__(%[[A_10]], %[[B]])
+
+    # CHECK: %[[A6:.*]] = binAssignOp %[[A5]] __iand__ %[[B]]
+    a &= b
+
+    # CHECK: %[[A7:.*]] = binAssignOp %[[A6]] __ilshift__ %[[B]]
     a <<= b
-    # CHECK: %[[A_12:.*]] = call @pylir__ilshift__(%[[A_11]], %[[B]])
-    return a
-    # CHECK: return %[[A_12]]
+
+    # CHECK: %[[A8:.*]] = binAssignOp %[[A7]] __irshift__ %[[B]]
+    a >>= b
+
+    # CHECK: %[[A9:.*]] = binAssignOp %[[A8]] __imul__ %[[B]]
+    a *= b
+
+    # CHECK: %[[A10:.*]] = binAssignOp %[[A9]] __idiv__ %[[B]]
+    a /= b
+
+    # CHECK: %[[A11:.*]] = binAssignOp %[[A10]] __ifloordiv__ %[[B]]
+    a //= b
+
+    # CHECK: binAssignOp %[[A11]] __imatmul__ %[[B]]
+    a @= b

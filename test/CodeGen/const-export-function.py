@@ -1,4 +1,4 @@
-# RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
 # CHECK: #[[$MAIN_FOO:.*]] = #py.globalValue<__main__.foo,
 # CHECK-SAME: const

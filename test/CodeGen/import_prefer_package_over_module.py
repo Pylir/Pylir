@@ -1,3 +1,7 @@
+#  // Licensed under the Apache License v2.0 with LLVM Exceptions.
+#  // See https://llvm.org/LICENSE.txt for license information.
+#  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 # RUN: split-file %s %t
 # RUN: pylir %t/main.py -S -emit-pylir -o - | FileCheck %s
 # RUN: pylir %t/main.py -S -emit-pylir -o - -Xsingle-threaded | FileCheck %s
@@ -6,7 +10,7 @@
 
 import foo
 
-# CHECK: call @foo.__init__
+# CHECK: initModule @foo
 
 #--- foo/__init__.py
 
@@ -16,5 +20,5 @@ print("Package")
 
 print("Module")
 
-# CHECK: py.func @foo.__init__
+# CHECK: init "foo"
 # CHECK: constant(#py.str<"Package">)

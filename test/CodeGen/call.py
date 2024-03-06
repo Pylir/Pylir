@@ -1,44 +1,20 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
-# CHECK-LABEL: func @__init__
+# CHECK-LABEL: init "__main__"
+# CHECK: %[[GLOBALS:.*]] = py.constant(#__main__$dict)
 
-global x
+def x(*args, **kwargs):
+    pass
 
-x()
 
-# CHECK: %[[X_LOADED:.*]] = load @x
-# CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[X_LOADED]]
-# CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
+# CHECK: py.dict_setItem
 
-# CHECK: ^[[HAPPY_PATH]]:
-# CHECK-DAG: %[[TUPLE:.*]] = makeTuple ()
-# CHECK-DAG: %[[DICT:.*]] = constant(#py.dict<{}>)
-# CHECK: call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])
-
-x(5, k=3)
-
-# CHECK: %[[X_LOADED:.*]] = load @x
-# CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[X_LOADED]]
-# CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
-
-# CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[FIVE:.*]] = constant(#py.int<5>)
-# CHECK: %[[NAME:.*]] = constant(#py.str<"k">)
-# CHECK: %[[HASH:.*]] = str_hash %[[NAME]]
-# CHECK: %[[THREE:.*]] = constant(#py.int<3>)
-# CHECK: %[[TUPLE:.*]] = makeTuple (%[[FIVE]])
-# CHECK: %[[DICT:.*]] = makeDict (%[[NAME]] hash(%[[HASH]]) : %[[THREE]])
-# CHECK: call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])
-
-x(*(), **{})
-
-# CHECK: %[[X_LOADED:.*]] = load @x
-# CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[X_LOADED]]
-# CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
-
-# CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[TUPLE1:.*]] = makeTuple ()
-# CHECK: %[[DICT1:.*]] = makeDict ()
-# CHECK: %[[TUPLE:.*]] = makeTuple (*%[[TUPLE1]])
-# CHECK: %[[DICT:.*]] = makeDict (**%[[DICT1]])
-# CHECK: call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"x">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: %[[X:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
+# CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
+# CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
+# CHECK: %[[SEVEN:.*]] = py.constant(#py.int<7>)
+# CHECK: %[[EIGHT:.*]] = py.constant(#py.int<8>)
+# CHECK: call %[[X]](%[[FIVE]], "k"=%[[THREE]], *%[[SEVEN]], **%[[EIGHT]])
+x(5, k=3, *7, **8)
