@@ -47,14 +47,18 @@ def boolean_ops(a, b):
     # CHECK: %[[A_CALL:.*]] = call %[[A]]()
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[A_CALL]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[TO_BOOL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.cond_br %[[I1]], ^[[BB1:.*]], ^[[BB2:.*]](%[[I1]] : i1)
 
     # CHECK: ^[[BB1]]:
     # CHECK: %[[B_CALL:.*]] = call %[[B]]()
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[B_CALL]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[TO_BOOL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.br ^[[BB2]](%[[I1]] : i1)
 
     # CHECK: ^[[BB2]](%[[RES:.*]]: i1 loc({{.*}})):
@@ -64,14 +68,18 @@ def boolean_ops(a, b):
     # CHECK: %[[A_CALL:.*]] = call %[[A]]()
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[A_CALL]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[TO_BOOL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.cond_br %[[I1]], ^[[BB4:.*]](%[[I1]] : i1), ^[[BB3:[[:alnum:]]+]]
 
     # CHECK: ^[[BB3]]:
     # CHECK: %[[B_CALL:.*]] = call %[[B]]()
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[B_CALL]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[TO_BOOL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.br ^[[BB4]](%[[I1]] : i1)
 
     # CHECK: ^[[BB4]](%[[RES:.*]]: i1 loc({{.*}})):
@@ -81,7 +89,9 @@ def boolean_ops(a, b):
     # CHECK: %[[A_CALL:.*]] = call %[[A]]()
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[TO_BOOL:.*]] = call %[[BOOL]](%[[A_CALL]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[TO_BOOL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[TO_BOOL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: %[[TRUE:.*]] = arith.constant true
     # CHECK: %[[NOT:.*]] = arith.xori %[[I1]], %[[TRUE]]
     # CHECK: py.bool_fromI1 %[[NOT]]

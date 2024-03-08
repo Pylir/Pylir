@@ -7,7 +7,9 @@
 # CHECK: %[[ZERO:.*]] = py.constant(#py.int<0>)
 # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
 # CHECK: %[[B:.*]] = call %[[BOOL]](%[[ZERO]])
-# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+# CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
 # CHECK: cf.cond_br %[[I1]], ^[[BB1:.*]], ^[[BB2:[[:alnum:]]+]]
 
 # CHECK: ^[[BB1]]:

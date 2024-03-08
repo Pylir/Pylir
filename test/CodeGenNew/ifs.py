@@ -5,8 +5,16 @@
 # CHECK-LABEL: init "__main__"
 
 # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
-# CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
-# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: %[[TYPE_OF:.*]] = py.typeOf %[[VALUE:[[:alnum:]]+]]
+# CHECK: %[[COND:.*]] = py.is %[[TYPE_OF]], %[[BOOL]]
+# CHECK: cf.cond_br %[[COND]], ^[[IS_BOOL_BB:.*]](%[[VALUE]] : !py.dynamic), ^[[IS_NOT_BOOL:[[:alnum:]]+]]
+
+# CHECK: ^[[IS_NOT_BOOL]]:
+# CHECK: %[[B:.*]] = call %[[BOOL]](%[[VALUE]])
+# CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+
+# CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
 # CHECK: cf.cond_br %[[I1]], ^[[BB1:.*]], ^[[BB2:[[:alnum:]]+]]
 if 0:
     # CHECK: ^[[BB1]]:
@@ -20,7 +28,9 @@ if 0:
 # CHECK: ^[[BB3]]:
 # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
 # CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
-# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+# CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
 # CHECK: cf.cond_br %[[I1]], ^[[BB4:.*]], ^[[BB5:[[:alnum:]]+]]
 if 0:
     # CHECK: ^[[BB4]]:
@@ -36,7 +46,9 @@ else:
 # CHECK: ^[[BB6]]:
 # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
 # CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
-# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+# CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
 # CHECK: cf.cond_br %[[I1]], ^[[BB7:.*]], ^[[BB8:[[:alnum:]]+]]
 if 0:
     # CHECK: ^[[BB7]]:
@@ -47,7 +59,9 @@ if 0:
     # CHECK: ^[[BB8]]:
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.cond_br %[[I1]], ^[[BB9:.*]], ^[[BB10:[[:alnum:]]+]]
 elif 1:
     # CHECK: ^[[BB9]]:
@@ -63,7 +77,9 @@ else:
 # CHECK: ^[[BB11]]:
 # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
 # CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
-# CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+# CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+# CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+# CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
 # CHECK: cf.cond_br %[[I1]], ^[[BB12:.*]], ^[[BB13:[[:alnum:]]+]]
 if 0:
     # CHECK: ^[[BB12]]:
@@ -74,7 +90,9 @@ if 0:
     # CHECK: ^[[BB13]]:
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[B:.*]] = call %[[BOOL]](%{{.*}})
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[B]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[B]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.cond_br %[[I1]], ^[[BB14:.*]], ^[[BB15:[[:alnum:]]+]]
 elif 1:
     # CHECK: ^[[BB14]]:
