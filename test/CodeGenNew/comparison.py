@@ -39,7 +39,9 @@ def chaining(a, b, c):
     # CHECK: %[[BIN1:.*]] = binOp %[[CARG0]] __lt__ %[[CARG1]]
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[CALL:.*]] = call %[[BOOL]](%[[BIN1]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[CALL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[CALL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: cf.cond_br %[[I1]], ^[[BB5:.*]], ^[[BB8:.*]](%[[BIN1]] : !py.dynamic)
 
     # CHECK: ^[[BB5]]:
@@ -60,7 +62,9 @@ def invert(a, b):
     # CHECK: %[[B:.*]] = py.bool_fromI1 %[[IS]]
     # CHECK: %[[BOOL:.*]] = py.constant(#[[$BOOL]])
     # CHECK: %[[CALL:.*]] = call %[[BOOL]](%[[B]])
-    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[CALL]]
+    # CHECK: cf.br ^[[IS_BOOL_BB:.*]](%[[CALL]] : !py.dynamic)
+    # CHECK: ^[[IS_BOOL_BB]](%[[BOOL:.*]]: !py.dynamic loc({{.*}})):
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
     # CHECK: %[[TRUE:.*]] = arith.constant true
     # CHECK: %[[INV:.*]] = arith.xori %[[I1]], %[[TRUE]]
     # CHECK: %[[B:.*]] = py.bool_fromI1 %[[INV]]

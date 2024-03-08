@@ -1188,8 +1188,18 @@ private:
   Value toI1(Value value) {
     Value boolRef = create<Py::ConstantOp>(
         m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Bool.name));
-    Value toPyBool = create<HIR::CallOp>(boolRef, value);
-    return create<Py::BoolToI1Op>(toPyBool);
+    Value typeOf = create<Py::TypeOfOp>(value);
+    Value condition = create<Py::IsOp>(typeOf, boolRef);
+    Block* trueBlock = addBlock(value.getType());
+    Block* falseBlock = addBlock();
+    create<cf::CondBranchOp>(condition, trueBlock, value, falseBlock,
+                             ValueRange());
+
+    implementBlock(falseBlock);
+    create<cf::BranchOp>(trueBlock, create<HIR::CallOp>(boolRef, value));
+
+    implementBlock(trueBlock);
+    return create<Py::BoolToI1Op>(trueBlock->getArgument(0));
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Yield& yield) {
