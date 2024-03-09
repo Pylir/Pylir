@@ -899,14 +899,27 @@ private:
     std::string qualifiedName = qualify(classDef.className.getValue());
     AddQualifiers addQualifiers(*this, classDef.className.getValue());
 
-    SmallVector<Attribute> bases;
-    bases.push_back(m_builder.getAttr<Py::GlobalValueAttr>(qualifiedName));
-    if (classDef.inheritance)
-      for (const Syntax::Argument& argument :
-           classDef.inheritance->argumentList)
-        bases.push_back(visit(argument.expression, ConstantExpressionTag{}));
-
     // TODO: bases should be sorted according to MRO algorithm.
+    SetVector<Attribute> bases;
+    bases.insert(m_builder.getAttr<Py::GlobalValueAttr>(qualifiedName));
+    if (classDef.inheritance) {
+      for (const Syntax::Argument& argument :
+           classDef.inheritance->argumentList) {
+        Attribute base = visit(argument.expression, ConstantExpressionTag{});
+        bases.insert(base);
+        if (auto interface = dyn_cast<Py::TypeAttrInterface>(base)) {
+          // TODO: This cast should not be a thing and the type attr interface
+          //  should be adjusted instead.
+          auto transBases =
+              llvm::cast<Py::TupleAttrInterface>(interface.getMroTuple());
+          bases.insert(transBases.begin(), transBases.end());
+        }
+      }
+    } else {
+      // Implicitly inherit from object.
+      bases.insert(
+          m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Object.name));
+    }
 
     // Instance slots are the slots that instances of this class have.
     SetVector<Attribute> instanceSlots;
@@ -968,7 +981,7 @@ private:
     auto attr = m_builder.getAttr<Py::GlobalValueAttr>(qualifiedName);
     attr.setConstant(true);
     attr.setInitializer(m_builder.getAttr<Py::TypeAttr>(
-        m_builder.getAttr<Py::TupleAttr>(bases),
+        m_builder.getAttr<Py::TupleAttr>(bases.getArrayRef()),
         m_builder.getAttr<Py::TupleAttr>(instanceSlots.getArrayRef()),
         m_builder.getAttr<DictionaryAttr>(slots)));
     if (classDef.isExported) {
