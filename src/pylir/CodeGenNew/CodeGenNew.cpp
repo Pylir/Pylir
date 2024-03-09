@@ -1625,9 +1625,11 @@ private:
     return create<Py::ConstantOp>(m_builder.getAttr<Py::UnboundAttr>());
   }
 
-  mlir::Value visitImpl([[maybe_unused]] const Syntax::Lambda& lambda) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::Lambda& lambda) {
+    return visitFunction({}, lambda.parameters, "<lambda>", lambda.scope, [&] {
+      create<HIR::ReturnOp>(visit(lambda.expression));
+      m_builder.clearInsertionPoint();
+    });
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Generator& generator) {
