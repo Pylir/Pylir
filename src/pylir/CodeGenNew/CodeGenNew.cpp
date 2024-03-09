@@ -241,6 +241,19 @@ class CodeGenNew {
 
       // Continue on the happy path.
       implementBlock(happyPath);
+
+      // Converting a terminator without successors into an exception handling
+      // variant creates an unreachable happy path. This is necessary to ensure
+      // transparency from the users perspective in the exception handling case:
+      // The caller used 'create<Terminator>' and expected a terminator
+      // operation to have been created. Without the code below, a new block
+      // is created instead that is NOT terminated, breaking verification.
+      if constexpr (T::template hasTrait<OpTrait::IsTerminator>()) {
+        static_assert(T::template hasTrait<OpTrait::ZeroSuccessors>(),
+                      "cannot yet convert a terminator with successors into an "
+                      "exception handling version");
+        m_builder.create<Py::UnreachableOp>();
+      }
       return doReturn(newOp);
     }
   }
@@ -339,6 +352,10 @@ class CodeGenNew {
   void implementBlock(Block* block) {
     assert(block->getParent() == nullptr &&
            "block must not have been implemented previously");
+    Block* prevInsertionBlock = m_builder.getInsertionBlock();
+    assert(!prevInsertionBlock->empty() &&
+           prevInsertionBlock->back().hasTrait<OpTrait::IsTerminator>() &&
+           "previous block must have been terminated");
     m_builder.getInsertionBlock()->getParent()->push_back(block);
     m_builder.setInsertionPointToStart(block);
   }

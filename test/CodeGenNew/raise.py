@@ -18,3 +18,10 @@
 # CHECK: ^[[BB2]](%[[EXC:.*]]: !py.dynamic loc({{.*}})):
 # CHECK: py.raise %[[EXC]]
 raise TypeError
+
+try:
+    # CHECK: py.raiseEx %{{.*}}
+    # CHECK-NEXT: label ^{{.*}} unwind ^{{.*}}
+    raise NameError
+except NameError:
+    pass
