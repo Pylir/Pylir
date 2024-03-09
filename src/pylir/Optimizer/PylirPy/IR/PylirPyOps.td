@@ -1395,7 +1395,8 @@ def PylirPy_UnreachableOp : PylirPy_Op<"unreachable", [Terminator]> {
   let assemblyFormat = "attr-dict";
 }
 
-def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
+def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator,
+  AddableExceptionHandling<"RaiseExOp">]> {
   let summary = "raise exception";
 
   let arguments = (ins DynamicType:$exception);
@@ -1405,5 +1406,7 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
     $exception attr-dict
   }];
 }
+
+def PylirPy_RaiseExOp : CreateExceptionHandlingVariant<PylirPy_RaiseOp>;
 
 #endif

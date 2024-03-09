@@ -76,7 +76,15 @@ mlir::IRMapping pylir::Py::inlineCall(mlir::CallOpInterface call,
         op->replaceAllUsesWith(newOp);
         mapping.map(sourceOp.getOperation(), newOp);
         mapping.map(sourceOp->getResults(), newOp->getResults());
+        mlir::Location loc = op->getLoc();
         op.erase();
+        // The success block may be empty if 'op' was a terminator without
+        // successors. Create an unreachable op in this case to terminate it.
+        if (successBlock->empty()) {
+          mlir::OpBuilder::InsertionGuard guard{builder};
+          builder.setInsertionPointToEnd(successBlock);
+          builder.create<UnreachableOp>(loc);
+        }
       }
     }
     // While we are iterating over the callable region, it may actually contain
@@ -88,18 +96,6 @@ mlir::IRMapping pylir::Py::inlineCall(mlir::CallOpInterface call,
       continue;
 
     mlir::Operation* sourceTerminator = &sourceBlock.back();
-    if (exceptionHandler && mlir::isa<Py::RaiseOp>(sourceTerminator)) {
-      auto raise = mlir::cast<Py::RaiseOp>(mapping.lookup(sourceTerminator));
-
-      builder.setInsertionPoint(raise);
-      auto ops = llvm::to_vector(exceptionHandler.getUnwindDestOperands());
-      ops.insert(ops.begin(), raise.getException());
-      auto branch = builder.create<mlir::cf::BranchOp>(
-          raise.getLoc(), exceptionHandler.getExceptionPath(), ops);
-      mapping.map(sourceTerminator, branch.getOperation());
-      raise.erase();
-      continue;
-    }
     if (sourceTerminator->hasTrait<mlir::OpTrait::ReturnLike>()) {
       mlir::Operation* terminator = mapping.lookup(sourceTerminator);
 

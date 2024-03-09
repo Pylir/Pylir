@@ -45,9 +45,9 @@ py.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: ^[[SUCCESS]]
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
-// CHECK-NEXT: cf.br ^[[HANDLER:.*]](
-// CHECK-SAME: %[[EX]]
-// CHECK-NEXT: ^[[CONTINUE]]
+// CHECK-NEXT: raiseEx %[[EX]]
+// CHECK-NEXT: unwind ^[[HANDLER:[[:alnum:]]+]]
+// CHECK: ^[[CONTINUE]]:
 // CHECK-NEXT: cf.br ^[[CONTINUE:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]
@@ -109,9 +109,9 @@ py.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: ^[[SUCCESS]]
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
-// CHECK-NEXT: cf.br ^[[HANDLER:.*]](
-// CHECK-SAME: %[[EX]]
-// CHECK-NEXT: ^[[CONTINUE]]
+// CHECK-NEXT: raiseEx %[[EX]]
+// CHECK-NEXT: unwind ^[[HANDLER:.*]]
+// CHECK: ^[[CONTINUE]]:
 // CHECK-NEXT: cf.br ^[[CONTINUE:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]

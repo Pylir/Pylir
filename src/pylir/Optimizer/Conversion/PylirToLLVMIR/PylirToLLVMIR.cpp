@@ -839,6 +839,20 @@ struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<Py::RaiseOp> {
   }
 };
 
+struct RaiseExOpConversion : public ConvertPylirOpToLLVMPattern<Py::RaiseExOp> {
+  using ConvertPylirOpToLLVMPattern<Py::RaiseExOp>::ConvertPylirOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(Py::RaiseExOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    SmallVector<Value> arguments = {adaptor.getException()};
+    llvm::append_range(arguments, adaptor.getUnwindDestOperands());
+    rewriter.replaceOpWithNewOp<LLVM::BrOp>(op, arguments,
+                                            op.getExceptionPath());
+    return mlir::success();
+  }
+};
+
 struct CallOpConversion : public ConvertPylirOpToLLVMPattern<Py::CallOp> {
   using ConvertPylirOpToLLVMPattern<Py::CallOp>::ConvertPylirOpToLLVMPattern;
 
@@ -1705,7 +1719,7 @@ void ConvertPylirToLLVMPass::runOnOperation() {
       ArithmeticSelectOpConversion, TupleContainsOpConversion,
       InitTupleCopyOpConversion, MROLookupOpConversion, TypeSlotsOpConversion,
       InitFloatOpConversion, FloatToF64OpConversion, FuncOpConversion,
-      ReturnOpConversion>(converter, codeGenState);
+      ReturnOpConversion, RaiseExOpConversion>(converter, codeGenState);
   patternSet.insert<GCAllocObjectConstTypeConversion>(converter, codeGenState,
                                                       2);
   if (mlir::failed(mlir::applyFullConversion(module, conversionTarget,
