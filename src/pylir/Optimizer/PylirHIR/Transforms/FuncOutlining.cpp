@@ -137,6 +137,9 @@ void FuncOutlining::runOnOperation() {
             kwDefaults);
 
         globalFunc.getBody().takeBody(funcOp.getBody());
+        // Add argument to entry block acting as the closure parameter.
+        globalFunc.getBody().insertArgument(
+            /*index=*/0u, builder.getType<Py::DynamicType>(), funcOp.getLoc());
         funcOp.replaceAllUsesWith(funcObject);
         funcOp->erase();
 

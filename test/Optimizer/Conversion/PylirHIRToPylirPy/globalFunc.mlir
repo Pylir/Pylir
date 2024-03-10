@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s --convert-pylirHIR-to-pylirPy --split-input-file | FileCheck %s
 
-pyHIR.globalFunc @basic(%arg0, %arg1 "first" has_default, *%arg2, %arg3 only "second" has_default, **%arg4) {
+pyHIR.globalFunc @basic(%closure, %arg0, %arg1 "first" has_default, *%arg2, %arg3 only "second" has_default, **%arg4) {
   return %arg0
 }
 
@@ -80,5 +80,5 @@ pyHIR.globalFunc @basic(%arg0, %arg1 "first" has_default, *%arg2, %arg3 only "se
 // CHECK: ^[[BB12]](%[[ARG3:.*]]: !py.dynamic):
 // CHECK: %[[TWO:.*]] = arith.constant 2
 // CHECK: %[[REST:.*]] = tuple_dropFront %[[TWO]], %[[TUPLE]]
-// CHECK: %[[RET:.*]] = call @basic$impl(%[[ARG0]], %[[ARG1]], %[[REST]], %[[ARG3]], %[[DICT]])
+// CHECK: %[[RET:.*]] = call @basic$impl(%[[CLOSURE]], %[[ARG0]], %[[ARG1]], %[[REST]], %[[ARG3]], %[[DICT]])
 // CHECK: return %[[RET]]

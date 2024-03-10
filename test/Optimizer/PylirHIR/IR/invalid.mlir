@@ -50,3 +50,28 @@ pyHIR.init "__main__" {
   initModule @__main__
   init_return %0
 }
+
+// -----
+
+// expected-error@below {{expected at least one parameter (the closure parameter) to be present}}
+pyHIR.globalFunc @no_closure_param() {
+  %0 = py.constant(#py.int<3>)
+  return %0
+}
+
+
+// -----
+
+// expected-error@below {{closure parameter must be positional-only with no default}}
+pyHIR.globalFunc @wrong_closure_param_1(%closure "text") {
+  %0 = py.constant(#py.int<3>)
+  return %0
+}
+
+// -----
+
+// expected-error@below {{closure parameter must be positional-only with no default}}
+pyHIR.globalFunc @wrong_closure_param_2(%closure has_default) {
+  %0 = py.constant(#py.int<3>)
+  return %0
+}

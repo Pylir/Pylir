@@ -625,7 +625,9 @@ private:
     }
 
     // Initialize the parameters by initializing them with the arguments.
-    for (auto&& [param, arg] : llvm::zip(parameterList, region.getArguments()))
+    for (auto&& [param, arg] :
+         llvm::zip_equal(parameterList,
+                         region.getArguments().take_back(parameterList.size())))
       writeToIdentifier(arg, param.name.getValue());
 
     emitFunctionBody();

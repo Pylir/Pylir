@@ -15,9 +15,9 @@ pyHIR.globalFunc @test(%arg0, *%arg1, %arg2 "keyword", %arg3 { test.name = 0 : i
   return %0
 }
 
-// CHECK-LABEL: pyHIR.globalFunc @res_attr()
+// CHECK-LABEL: pyHIR.globalFunc @res_attr(%{{[[:alnum:]]+}})
 // CHECK-SAME: -> {test.name = 0 : i32}
-pyHIR.globalFunc @res_attr() -> { test.name = 0 : i32 } {
+pyHIR.globalFunc @res_attr(%closure) -> { test.name = 0 : i32 } {
   %0 = func "foo"(%ff0 "rest") {
       return %ff0
   }
@@ -157,7 +157,7 @@ pyHIR.init "foo" {
 }
 
 // CHECK-LABEL: pyHIR.globalFunc @initModule(
-pyHIR.globalFunc @initModule() {
+pyHIR.globalFunc @initModule(%closure) {
   %0 = py.constant(#py.dict<{}>)
   // CHECK: initModule @foo
   initModule @foo

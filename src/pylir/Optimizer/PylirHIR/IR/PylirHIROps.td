@@ -282,6 +282,11 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
     Op representing a function in global scope with no use of non-local
     variables or similar.
     This is meant as a more restrictive and more optimized form of `pyHIR.func`.
+    Unlike `pyHIR.func`, `pyHIR.globalFunc` must have a first parameter which
+    acts as the closure parameter used to implement non-local variables after
+    outlining.
+    It may not have a default parameter nor a keyword with which it can be
+    called.
 
     Syntax:
     ```
@@ -292,6 +297,10 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
   }];
 
   let extraClassDeclaration = [{
+
+    mlir::Value getClosureParameter() {
+      return getBody().getArguments().front();
+    }
 
     //===------------------------------------------------------------------===//
     // FunctionOpInterface implementation
@@ -313,6 +322,11 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 
     static llvm::StringRef getDefaultDialect() {
       return pylir::HIR::PylirHIRDialect::getDialectNamespace();
+    }
+
+    void getAsmBlockArgumentNames(mlir::Region& region,
+                                  mlir::OpAsmSetValueNameFn setNameFn) {
+      setNameFn(getClosureParameter(), "closure");
     }
 
     //===------------------------------------------------------------------===//
