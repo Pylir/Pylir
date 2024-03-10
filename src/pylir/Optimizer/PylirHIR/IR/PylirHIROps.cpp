@@ -255,8 +255,7 @@ void printFunction(OpAsmPrinter& printer, FunctionParameterRange parameters,
                    ArrayRef<StringRef> inherentAttributes, Region& region) {
   printer << '(';
 
-  llvm::interleaveComma(
-      parameters, printer.getStream(),
+  llvm::interleaveComma(parameters, printer.getStream(),
                         [&](const FunctionParameter& functionParameter) {
                           if (functionParameter.isKeywordRest())
                             printer << "**";
@@ -266,19 +265,20 @@ void printFunction(OpAsmPrinter& printer, FunctionParameterRange parameters,
                           printer << functionParameter.getParameter();
 
                           if (functionParameter.getName()) {
-          if (functionParameter.isKeywordOnly())
-            printer << " only";
+                            if (functionParameter.isKeywordOnly())
+                              printer << " only";
 
-          printer << ' ' << functionParameter.getName();
-        }
-        if (functionParameter.getDefaultValue())
-          printer << " = " << functionParameter.getDefaultValue();
-        else if (functionParameter.hasDefault())
-          printer << " has_default";
+                            printer << ' ' << functionParameter.getName();
+                          }
+                          if (functionParameter.getDefaultValue())
+                            printer << " = "
+                                    << functionParameter.getDefaultValue();
+                          else if (functionParameter.hasDefault())
+                            printer << " has_default";
 
-        if (!functionParameter.getAttrs().empty())
-          printer << ' ' << functionParameter.getAttrs();
-      });
+                          if (!functionParameter.getAttrs().empty())
+                            printer << ' ' << functionParameter.getAttrs();
+                        });
 
   printer << ')';
 
@@ -394,8 +394,7 @@ ParseResult parseFunction(OpAsmParser& parser, OperationState& result) {
 
   result.addAttribute(T::getArgAttrsAttrName(result.name),
                       ArrayAttr::get(result.getContext(), argDictAttrs));
-  result.addAttribute(
-      T::getResAttrsAttrName(result.name),
+  result.addAttribute(T::getResAttrsAttrName(result.name),
                       ArrayAttr::get(result.getContext(), resultDictAttrs));
 
   result.addAttribute(T::getFunctionTypeAttrName(result.name),
@@ -410,8 +409,7 @@ ParseResult parseFunction(OpAsmParser& parser, OperationState& result) {
 
   result.addAttribute(T::getParameterNamesAttrName(result.name),
                       ArrayAttr::get(result.getContext(), argNames));
-  result.addAttribute(
-      T::getParameterNameMappingAttrName(result.name),
+  result.addAttribute(T::getParameterNameMappingAttrName(result.name),
                       DenseI32ArrayAttr::get(result.getContext(), argMappings));
   result.addAttribute(
       T::getKeywordOnlyMappingAttrName(result.name),
