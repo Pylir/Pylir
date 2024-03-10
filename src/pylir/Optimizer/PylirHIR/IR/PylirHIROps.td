@@ -273,7 +273,8 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 
   let builders = [
     OpBuilder<(ins "llvm::Twine":$symbolName,
-                   "llvm::ArrayRef<FunctionParameterSpec>":$parameters)>
+                   "llvm::ArrayRef<FunctionParameterSpec>":$parameters,
+                   CArg<"mlir::ArrayAttr", "nullptr">:$resAttrs)>
   ];
 
   let description = [{

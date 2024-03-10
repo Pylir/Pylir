@@ -57,3 +57,18 @@ pyHIR.init "func_collision" {
 
 // CHECK: globalFunc @[[$BASIC1]](
 // CHECK: globalFunc @[[$BASIC2]](
+
+// -----
+
+// CHECK-LABEL: init "arg_res_attrs"
+pyHIR.init "arg_res_attrs" {
+  // CHECK: py.makeFunc @[[$BASIC1:.*]]
+  %0 = func "basic"(%ff0 "rest" { test.name = 0 : i32 }) -> {test.name = 1 : i32} {
+    return %ff0
+  }
+  init_return %0
+}
+
+// CHECK: globalFunc @[[$BASIC1]](
+// CHECK-SAME: "rest" {test.name = 0 : i32}
+// CHECK-SAME: -> {test.name = 1 : i32}

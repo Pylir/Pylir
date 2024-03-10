@@ -127,48 +127,81 @@ public:
   explicit FunctionParameterRange(FunctionInterface function);
 };
 
-/// Struct used to build functions in the pyHIR dialect.
+/// Class used to specify the parameters of a function in the pyHIR dialect.
 class FunctionParameterSpec {
   mlir::StringAttr m_name;
   mlir::Value m_defaultValue;
   bool m_isPosRest = false;
   bool m_isKeywordRest = false;
   bool m_isKeywordOnly = false;
+  mlir::DictionaryAttr m_parameterAttributes;
 
 public:
   struct PosRest {};
   struct KeywordRest {};
 
-  FunctionParameterSpec() = default;
+  /// Creates a parameter spec for a positional-only parameter with potentially
+  /// a default argument.
+  explicit FunctionParameterSpec(mlir::Value maybeDefaultValue = nullptr)
+      : m_defaultValue(maybeDefaultValue) {}
 
+  /// Creates a parameter spec for a named parameter with potentially a default
+  /// argument. The parameter is a keyword-only parameter if 'keywordOnly' is
+  /// true.
   explicit FunctionParameterSpec(mlir::StringAttr name,
-                                 mlir::Value defaultValue,
+                                 mlir::Value maybeDefaultValue,
                                  bool keywordOnly = false)
-      : m_name(name), m_defaultValue(defaultValue),
+      : m_name(name), m_defaultValue(maybeDefaultValue),
         m_isKeywordOnly(keywordOnly) {}
 
+  /// Creates a parameter receiving all leftover positional arguments.
   explicit FunctionParameterSpec(PosRest) : m_isPosRest(true) {}
 
+  /// Creates a parameter receiving all leftover keyword arguments.
   explicit FunctionParameterSpec(KeywordRest) : m_isKeywordRest(true) {}
 
+  /// Creates a parameter spec from an existing function parameter.
+  explicit FunctionParameterSpec(const FunctionParameter& functionParameter);
+
+  /// Returns the name of the parameter or null if it is a positional-only
+  /// parameter.
   mlir::StringAttr getName() const {
     return m_name;
   }
 
+  /// Returns the default value or null if it has no default value.
   mlir::Value getDefaultValue() const {
     return m_defaultValue;
   }
 
+  /// Returns true if this parameter is positional-only.
+  bool isPosOnly() const {
+    return m_name != nullptr;
+  }
+
+  /// Returns true if this parameter receives all leftover positional arguments.
   bool isPosRest() const {
     return m_isPosRest;
   }
 
+  /// Returns true if this parameter receives all leftover keyword arguments.
   bool isKeywordRest() const {
     return m_isKeywordRest;
   }
 
+  /// Returns true if this parameter can only be called as keyword argument.
   bool isKeywordOnly() const {
     return m_isKeywordOnly;
+  }
+
+  /// Returns the attributes of this parameter.
+  mlir::DictionaryAttr getParameterAttributes() const {
+    return m_parameterAttributes;
+  }
+
+  /// Sets the attributes of this parameter.
+  void setParameterAttributes(mlir::DictionaryAttr parameterAttributes) {
+    m_parameterAttributes = parameterAttributes;
   }
 };
 

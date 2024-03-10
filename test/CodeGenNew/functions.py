@@ -15,6 +15,7 @@ def test1():
 def test2(arg, arg2, /):
     def nested():
         pass
+
     pass
 
 
@@ -36,4 +37,11 @@ def test4(*, arg, arg2):
 def test5(arg, arg2, **m):
     pass
 
+
 # CHECK: func "__main__.test5"(%{{.*}} "arg", %{{.*}} "arg2", **%{{.*}})
+
+def test6(arg=3, /):
+    pass
+
+# CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
+# CHECK: func "__main__.test6"(%{{.*}} = %[[THREE]])
