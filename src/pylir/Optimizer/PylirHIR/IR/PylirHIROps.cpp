@@ -11,7 +11,7 @@
 
 using namespace mlir;
 using namespace pylir;
-using namespace pylir::HIR;
+using namespace HIR;
 
 //===----------------------------------------------------------------------===//
 // CallOp
@@ -19,7 +19,7 @@ using namespace pylir::HIR;
 
 /// arg ::= [`*` | `**` | string-attr `=`] value-use
 /// call-arguments ::= <arg> { `,` <arg> }
-ParseResult pylir::HIR::parseCallArguments(
+ParseResult HIR::parseCallArguments(
     OpAsmParser& parser, ArrayAttr& keywords,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand>& arguments,
     DenseI32ArrayAttr& kindInternal) {
@@ -81,9 +81,8 @@ void printCallArguments(OpAsmPrinter& printer, OpT callOp, ArrayAttr,
 }
 } // namespace
 
-void pylir::HIR::CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
-                               Value callable,
-                               ArrayRef<CallArgument> arguments) {
+void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
+                   Value callable, ArrayRef<CallArgument> arguments) {
   SmallVector<std::int32_t> kindInternal;
   SmallVector<Value> argOperands;
   SmallVector<Attribute> keywords;
@@ -115,15 +114,15 @@ void pylir::HIR::CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
       odsBuilder.getDenseI32ArrayAttr(kindInternal);
 }
 
-void pylir::HIR::CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
-                               Value callable, ValueRange posArguments) {
+void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
+                   Value callable, ValueRange posArguments) {
   return build(odsBuilder, odsState, callable,
                llvm::map_to_vector(posArguments, [](Value value) {
                  return CallArgument{value, CallArgument::PositionalTag{}};
                }));
 }
 
-LogicalResult pylir::HIR::CallOp::verify() {
+LogicalResult CallOp::verify() {
   if (getArguments().size() != getKindInternal().size())
     return emitOpError() << getKindInternalAttrName()
                          << " must be the same size as argument operands";
@@ -152,41 +151,41 @@ LogicalResult pylir::HIR::CallOp::verify() {
 // GlobalFuncOp and FuncOp implementation utilities
 //===----------------------------------------------------------------------===//
 
-pylir::HIR::FunctionParameter::FunctionParameter(
-    mlir::Value parameter, mlir::StringAttr optionalName,
-    mlir::DictionaryAttr attrs, mlir::Value optionalDefaultValue,
-    bool isPosRest, bool isKeywordRest, bool isKeywordOnly, bool hasDefault)
+FunctionParameter::FunctionParameter(Value parameter, StringAttr optionalName,
+                                     DictionaryAttr attrs,
+                                     Value optionalDefaultValue, bool isPosRest,
+                                     bool isKeywordRest, bool isKeywordOnly,
+                                     bool hasDefault)
     : m_parameter(parameter), m_name(optionalName), m_attrs(attrs),
       m_defaultValue(optionalDefaultValue), m_isPosRest(isPosRest),
       m_isKeywordRest(isKeywordRest), m_isKeywordOnly(isKeywordOnly),
       m_hasDefault(hasDefault) {}
 
-pylir::HIR::FunctionParameter
-pylir::HIR::FunctionParameterRange::dereference(FunctionInterface function,
-                                                std::ptrdiff_t index) {
-  mlir::ArrayAttr attr = function.getArgAttrsAttr();
+FunctionParameter
+FunctionParameterRange::dereference(FunctionInterface function,
+                                    std::ptrdiff_t index) {
+  ArrayAttr attr = function.getArgAttrsAttr();
   std::optional<std::size_t> position = function.getDefaultValuePosition(index);
-  mlir::ValueRange range = function.getDefaultValues();
+  ValueRange range = function.getDefaultValues();
   return FunctionParameter(
       function->getRegion(0).getArgument(index),
       function.getParameterName(index),
-      attr ? mlir::cast<mlir::DictionaryAttr>(attr[index])
-           : mlir::DictionaryAttr::get(function->getContext()),
+      attr ? cast<DictionaryAttr>(attr[index])
+           : DictionaryAttr::get(function->getContext()),
       position && !range.empty() ? range[*position] : nullptr,
       function.getPosRest() == index, function.getKeywordRest() == index,
       function.isKeywordOnly(index), position.has_value());
 }
 
-pylir::HIR::FunctionParameterRange::FunctionParameterRange(
-    FunctionInterface function)
+FunctionParameterRange::FunctionParameterRange(FunctionInterface function)
     : Base(function, 0, function.getArgumentTypes().size()) {}
 
 namespace {
 
-mlir::LogicalResult
-funcOpsCommonVerifier(mlir::Operation* operation, mlir::TypeRange argumentTypes,
-                      std::optional<std::uint32_t> posRest,
-                      std::optional<std::uint32_t> keywordRest) {
+LogicalResult funcOpsCommonVerifier(Operation* operation,
+                                    TypeRange argumentTypes,
+                                    std::optional<std::uint32_t> posRest,
+                                    std::optional<std::uint32_t> keywordRest) {
   if (posRest >= argumentTypes.size())
     return operation->emitOpError("'pos_rest' index out of range");
 
@@ -197,22 +196,21 @@ funcOpsCommonVerifier(mlir::Operation* operation, mlir::TypeRange argumentTypes,
     return operation->emitOpError(
         "'pos_rest' and 'keyword_rest' cannot apply to the same argument");
 
-  return mlir::success();
+  return success();
 }
 
-void funcOpsCommonBuild(
-    mlir::OpBuilder& builder,
-    llvm::ArrayRef<pylir::HIR::FunctionParameterSpec> parameters,
-    mlir::ArrayAttr& parameterNames,
-    mlir::DenseI32ArrayAttr& parameterNameMapping,
-    mlir::DenseI32ArrayAttr& keywordOnlyMapping, mlir::IntegerAttr& posRest,
-    mlir::IntegerAttr& keywordRest,
-    mlir::DenseI32ArrayAttr& defaultValueMapping,
-    llvm::SmallVectorImpl<mlir::Value>* defaultValues = nullptr) {
-  llvm::SmallVector<mlir::Attribute> parameterNamesStorage;
-  llvm::SmallVector<std::int32_t> parameterNameMappingStorage;
-  llvm::SmallVector<std::int32_t> keywordOnlyMappingStorage;
-  llvm::SmallVector<std::int32_t> defaultValueMappingStorage;
+void funcOpsCommonBuild(OpBuilder& builder,
+                        ArrayRef<FunctionParameterSpec> parameters,
+                        ArrayAttr& parameterNames,
+                        DenseI32ArrayAttr& parameterNameMapping,
+                        DenseI32ArrayAttr& keywordOnlyMapping,
+                        IntegerAttr& posRest, IntegerAttr& keywordRest,
+                        DenseI32ArrayAttr& defaultValueMapping,
+                        SmallVectorImpl<Value>* defaultValues = nullptr) {
+  SmallVector<Attribute> parameterNamesStorage;
+  SmallVector<std::int32_t> parameterNameMappingStorage;
+  SmallVector<std::int32_t> keywordOnlyMappingStorage;
+  SmallVector<std::int32_t> defaultValueMappingStorage;
 
   for (auto&& [index, spec] : llvm::enumerate(parameters)) {
     if (spec.getName()) {
@@ -242,35 +240,32 @@ void funcOpsCommonBuild(
       builder.getDenseI32ArrayAttr(defaultValueMappingStorage);
 }
 
-void createEntryBlock(mlir::Location loc, mlir::Region& region,
+void createEntryBlock(Location loc, Region& region,
                       std::size_t parameterCount) {
-  auto* entryBlock = new mlir::Block;
+  auto* entryBlock = new Block;
   region.push_back(entryBlock);
   entryBlock->addArguments(
-      llvm::SmallVector<mlir::Type>(
-          parameterCount, pylir::Py::DynamicType::get(loc.getContext())),
-      llvm::SmallVector<mlir::Location>(parameterCount, loc));
+      SmallVector<Type>(parameterCount, Py::DynamicType::get(loc.getContext())),
+      SmallVector<Location>(parameterCount, loc));
 }
 
-void printFunction(mlir::OpAsmPrinter& printer,
-                   pylir::HIR::FunctionParameterRange parameters,
-                   llvm::ArrayRef<mlir::DictionaryAttr> resultAttrs,
-                   mlir::DictionaryAttr dictionaryAttr,
-                   llvm::ArrayRef<llvm::StringRef> inherentAttributes,
-                   mlir::Region& region) {
+void printFunction(OpAsmPrinter& printer, FunctionParameterRange parameters,
+                   ArrayRef<DictionaryAttr> resultAttrs,
+                   DictionaryAttr dictionaryAttr,
+                   ArrayRef<StringRef> inherentAttributes, Region& region) {
   printer << '(';
 
   llvm::interleaveComma(
       parameters, printer.getStream(),
-      [&](const pylir::HIR::FunctionParameter& functionParameter) {
-        if (functionParameter.isKeywordRest())
-          printer << "**";
-        else if (functionParameter.isPosRest())
-          printer << "*";
+                        [&](const FunctionParameter& functionParameter) {
+                          if (functionParameter.isKeywordRest())
+                            printer << "**";
+                          else if (functionParameter.isPosRest())
+                            printer << "*";
 
-        printer << functionParameter.getParameter();
+                          printer << functionParameter.getParameter();
 
-        if (functionParameter.getName()) {
+                          if (functionParameter.getName()) {
           if (functionParameter.isKeywordOnly())
             printer << " only";
 
@@ -297,25 +292,22 @@ void printFunction(mlir::OpAsmPrinter& printer,
 }
 
 template <class T>
-mlir::ParseResult parseFunction(mlir::OpAsmParser& parser,
-                                mlir::OperationState& result) {
-  using namespace pylir::HIR;
-
-  llvm::SmallVector<mlir::OpAsmParser::Argument> arguments;
-  llvm::SmallVector<mlir::Value> defaultValues;
-  llvm::SmallVector<std::int32_t> defaultValueMapping;
-  llvm::SmallVector<std::int32_t> keywordOnlyMapping;
-  llvm::SmallVector<mlir::Attribute> argNames;
-  llvm::SmallVector<std::int32_t> argMappings;
+ParseResult parseFunction(OpAsmParser& parser, OperationState& result) {
+  SmallVector<OpAsmParser::Argument> arguments;
+  SmallVector<Value> defaultValues;
+  SmallVector<std::int32_t> defaultValueMapping;
+  SmallVector<std::int32_t> keywordOnlyMapping;
+  SmallVector<Attribute> argNames;
+  SmallVector<std::int32_t> argMappings;
 
   std::optional<std::uint32_t> posRest;
   std::optional<std::uint32_t> keywordRest;
   std::size_t index = 0;
-  mlir::ParseResult parseResult = parser.parseCommaSeparatedList(
-      mlir::AsmParser::Delimiter::Paren, [&]() -> mlir::ParseResult {
+  ParseResult parseResult = parser.parseCommaSeparatedList(
+      AsmParser::Delimiter::Paren, [&]() -> ParseResult {
         llvm::SMLoc loc = parser.getCurrentLocation();
-        if (mlir::succeeded(parser.parseOptionalStar())) {
-          if (mlir::succeeded(parser.parseOptionalStar())) {
+        if (succeeded(parser.parseOptionalStar())) {
+          if (succeeded(parser.parseOptionalStar())) {
             if (keywordRest)
               return parser.emitError(
                   loc, "only one keyword rest parameter allowed");
@@ -330,124 +322,119 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser,
           }
         }
         if (parser.parseOperand(arguments.emplace_back().ssaName, false))
-          return mlir::failure();
+          return failure();
 
-        arguments.back().type =
-            pylir::Py::DynamicType::get(parser.getContext());
+        arguments.back().type = Py::DynamicType::get(parser.getContext());
 
         std::string string;
-        if (mlir::succeeded(parser.parseOptionalKeyword("only"))) {
+        if (succeeded(parser.parseOptionalKeyword("only"))) {
           keywordOnlyMapping.push_back(index);
           if (parser.parseString(&string))
-            return mlir::failure();
+            return failure();
 
-          argNames.push_back(
-              mlir::StringAttr::get(result.getContext(), string));
+          argNames.push_back(StringAttr::get(result.getContext(), string));
           argMappings.push_back(index);
-        } else if (mlir::succeeded(parser.parseOptionalString(&string))) {
-          argNames.push_back(
-              mlir::StringAttr::get(result.getContext(), string));
+        } else if (succeeded(parser.parseOptionalString(&string))) {
+          argNames.push_back(StringAttr::get(result.getContext(), string));
           argMappings.push_back(index);
         }
 
         if constexpr (std::is_same_v<T, FuncOp>) {
-          if (mlir::succeeded(parser.parseOptionalEqual())) {
-            mlir::OpAsmParser::UnresolvedOperand operand;
+          if (succeeded(parser.parseOptionalEqual())) {
+            OpAsmParser::UnresolvedOperand operand;
             if (parser.parseOperand(operand) ||
                 parser.resolveOperand(operand, arguments.back().type,
                                       defaultValues))
-              return mlir::failure();
+              return failure();
 
             defaultValueMapping.push_back(index);
           }
         } else {
-          if (mlir::succeeded(parser.parseOptionalKeyword("has_default")))
+          if (succeeded(parser.parseOptionalKeyword("has_default")))
             defaultValueMapping.push_back(index);
         }
 
-        mlir::NamedAttrList argDict;
-        if (mlir::succeeded(parser.parseOptionalAttrDict(argDict)))
+        NamedAttrList argDict;
+        if (succeeded(parser.parseOptionalAttrDict(argDict)))
           arguments.back().attrs =
-              mlir::DictionaryAttr::get(result.getContext(), argDict);
+              DictionaryAttr::get(result.getContext(), argDict);
 
         index++;
-        return mlir::success();
+        return success();
       });
-  if (mlir::failed(parseResult))
+  if (failed(parseResult))
     return parseResult;
 
-  llvm::SmallVector<mlir::Attribute> resultDictAttrs;
-  if (mlir::succeeded(parser.parseOptionalArrow())) {
-    mlir::DictionaryAttr resultDict;
+  SmallVector<Attribute> resultDictAttrs;
+  if (succeeded(parser.parseOptionalArrow())) {
+    DictionaryAttr resultDict;
     if (parser.parseAttribute(resultDict))
-      return mlir::failure();
+      return failure();
 
     resultDictAttrs.push_back(resultDict);
   } else {
-    resultDictAttrs.push_back(mlir::DictionaryAttr::get(result.getContext()));
+    resultDictAttrs.push_back(DictionaryAttr::get(result.getContext()));
   }
 
-  mlir::NamedAttrList extra;
-  if (mlir::succeeded(parser.parseOptionalAttrDictWithKeyword(extra)))
+  NamedAttrList extra;
+  if (succeeded(parser.parseOptionalAttrDictWithKeyword(extra)))
     result.addAttributes(extra);
 
   auto* region = result.addRegion();
   if (parser.parseRegion(*region, arguments, false))
-    return mlir::failure();
+    return failure();
 
   auto argDictAttrs = llvm::to_vector(llvm::map_range(
-      arguments,
-      [&](const mlir::OpAsmParser::Argument& argument) -> mlir::Attribute {
+      arguments, [&](const OpAsmParser::Argument& argument) -> Attribute {
         if (!argument.attrs) {
-          return mlir::DictionaryAttr::get(result.getContext());
+          return DictionaryAttr::get(result.getContext());
         }
         return argument.attrs;
       }));
 
   result.addAttribute(T::getArgAttrsAttrName(result.name),
-                      mlir::ArrayAttr::get(result.getContext(), argDictAttrs));
+                      ArrayAttr::get(result.getContext(), argDictAttrs));
   result.addAttribute(
       T::getResAttrsAttrName(result.name),
-      mlir::ArrayAttr::get(result.getContext(), resultDictAttrs));
+                      ArrayAttr::get(result.getContext(), resultDictAttrs));
 
   result.addAttribute(T::getFunctionTypeAttrName(result.name),
-                      mlir::TypeAttr::get(mlir::FunctionType::get(
+                      TypeAttr::get(FunctionType::get(
                           result.getContext(),
                           llvm::to_vector(llvm::map_range(
                               arguments,
-                              [](const mlir::OpAsmParser::Argument& argument) {
+                              [](const OpAsmParser::Argument& argument) {
                                 return argument.type;
                               })),
-                          pylir::Py::DynamicType::get(result.getContext()))));
+                          Py::DynamicType::get(result.getContext()))));
 
   result.addAttribute(T::getParameterNamesAttrName(result.name),
-                      mlir::ArrayAttr::get(result.getContext(), argNames));
+                      ArrayAttr::get(result.getContext(), argNames));
   result.addAttribute(
       T::getParameterNameMappingAttrName(result.name),
-      mlir::DenseI32ArrayAttr::get(result.getContext(), argMappings));
+                      DenseI32ArrayAttr::get(result.getContext(), argMappings));
   result.addAttribute(
       T::getKeywordOnlyMappingAttrName(result.name),
-      mlir::DenseI32ArrayAttr::get(result.getContext(), keywordOnlyMapping));
+      DenseI32ArrayAttr::get(result.getContext(), keywordOnlyMapping));
 
   result.addAttribute(
       T::getDefaultValuesMappingAttrName(result.name),
-      mlir::DenseI32ArrayAttr::get(result.getContext(), defaultValueMapping));
+      DenseI32ArrayAttr::get(result.getContext(), defaultValueMapping));
   if constexpr (std::is_same_v<T, FuncOp>)
     result.addOperands(defaultValues);
 
   if (posRest) {
     result.addAttribute(
         T::getPosRestAttrName(result.name),
-        mlir::IntegerAttr::get(mlir::IntegerType::get(result.getContext(), 32),
-                               *posRest));
+        IntegerAttr::get(IntegerType::get(result.getContext(), 32), *posRest));
   }
   if (keywordRest) {
     result.addAttribute(
         T::getKeywordRestAttrName(result.name),
-        mlir::IntegerAttr::get(mlir::IntegerType::get(result.getContext(), 32),
-                               *keywordRest));
+        IntegerAttr::get(IntegerType::get(result.getContext(), 32),
+                         *keywordRest));
   }
-  return mlir::success();
+  return success();
 }
 
 } // namespace
@@ -456,20 +443,20 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser,
 // GlobalFuncOp
 //===----------------------------------------------------------------------===//
 
-mlir::LogicalResult pylir::HIR::GlobalFuncOp::verify() {
+LogicalResult GlobalFuncOp::verify() {
   return funcOpsCommonVerifier(*this, getArgumentTypes(), getPosRest(),
                                getKeywordRest());
 }
 
-void pylir::HIR::GlobalFuncOp::build(
-    ::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-    llvm::Twine symbolName, llvm::ArrayRef<FunctionParameterSpec> parameters) {
-  mlir::ArrayAttr parameterNames;
-  mlir::DenseI32ArrayAttr parameterNameMapping;
-  mlir::DenseI32ArrayAttr keywordOnlyMapping;
-  mlir::DenseI32ArrayAttr defaultVariableMapping;
-  mlir::IntegerAttr posRest;
-  mlir::IntegerAttr keywordRest;
+void GlobalFuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
+                         llvm::Twine symbolName,
+                         ArrayRef<FunctionParameterSpec> parameters) {
+  ArrayAttr parameterNames;
+  DenseI32ArrayAttr parameterNameMapping;
+  DenseI32ArrayAttr keywordOnlyMapping;
+  DenseI32ArrayAttr defaultVariableMapping;
+  IntegerAttr posRest;
+  IntegerAttr keywordRest;
   funcOpsCommonBuild(odsBuilder, parameters, parameterNames,
                      parameterNameMapping, keywordOnlyMapping, posRest,
                      keywordRest, defaultVariableMapping);
@@ -478,27 +465,24 @@ void pylir::HIR::GlobalFuncOp::build(
   build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName),
         defaultVariableMapping,
         odsBuilder.getFunctionType(
-            llvm::SmallVector<mlir::Type>(parameters.size(), dynamicType),
-            dynamicType),
+            SmallVector<Type>(parameters.size(), dynamicType), dynamicType),
         nullptr, nullptr, parameterNames, parameterNameMapping,
         keywordOnlyMapping, posRest, keywordRest);
   createEntryBlock(odsState.location, *odsState.regions.front(),
                    parameters.size());
 }
 
-mlir::ParseResult
-pylir::HIR::GlobalFuncOp::parse(mlir::OpAsmParser& parser,
-                                mlir::OperationState& result) {
-  mlir::StringAttr attr;
+ParseResult GlobalFuncOp::parse(OpAsmParser& parser, OperationState& result) {
+  StringAttr attr;
   if (parser.parseSymbolName(attr))
-    return mlir::failure();
+    return failure();
 
   result.addAttribute(GlobalFuncOp::getSymNameAttrName(result.name), attr);
   return parseFunction<GlobalFuncOp>(parser, result);
 }
 
-void pylir::HIR::GlobalFuncOp::print(mlir::OpAsmPrinter& p) {
-  llvm::SmallVector<mlir::DictionaryAttr> resultAttrs;
+void GlobalFuncOp::print(OpAsmPrinter& p) {
+  SmallVector<DictionaryAttr> resultAttrs;
   getAllResultAttrs(resultAttrs);
 
   p << ' ';
@@ -512,21 +496,21 @@ void pylir::HIR::GlobalFuncOp::print(mlir::OpAsmPrinter& p) {
 // FuncOp
 //===----------------------------------------------------------------------===//
 
-mlir::LogicalResult pylir::HIR::FuncOp::verify() {
+LogicalResult FuncOp::verify() {
   return funcOpsCommonVerifier(*this, getArgumentTypes(), getPosRest(),
                                getKeywordRest());
 }
 
-void pylir::HIR::FuncOp::build(
-    ::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-    llvm::Twine symbolName, llvm::ArrayRef<FunctionParameterSpec> parameters) {
-  mlir::ArrayAttr parameterNames;
-  mlir::DenseI32ArrayAttr parameterNameMapping;
-  mlir::DenseI32ArrayAttr keywordOnlyMapping;
-  mlir::IntegerAttr posRest;
-  mlir::IntegerAttr keywordRest;
-  llvm::SmallVector<mlir::Value> defaultValues;
-  mlir::DenseI32ArrayAttr defaultValueMapping;
+void FuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
+                   llvm::Twine symbolName,
+                   ArrayRef<FunctionParameterSpec> parameters) {
+  ArrayAttr parameterNames;
+  DenseI32ArrayAttr parameterNameMapping;
+  DenseI32ArrayAttr keywordOnlyMapping;
+  IntegerAttr posRest;
+  IntegerAttr keywordRest;
+  SmallVector<Value> defaultValues;
+  DenseI32ArrayAttr defaultValueMapping;
   funcOpsCommonBuild(odsBuilder, parameters, parameterNames,
                      parameterNameMapping, keywordOnlyMapping, posRest,
                      keywordRest, defaultValueMapping, &defaultValues);
@@ -535,40 +519,38 @@ void pylir::HIR::FuncOp::build(
   build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName),
         defaultValues, defaultValueMapping,
         odsBuilder.getFunctionType(
-            llvm::SmallVector<mlir::Type>(parameters.size(), dynamicType),
-            dynamicType),
+            SmallVector<Type>(parameters.size(), dynamicType), dynamicType),
         nullptr, nullptr, parameterNames, parameterNameMapping,
         keywordOnlyMapping, posRest, keywordRest);
   createEntryBlock(odsState.location, *odsState.regions.front(),
                    parameters.size());
 }
 
-mlir::ParseResult pylir::HIR::FuncOp::parse(mlir::OpAsmParser& parser,
-                                            mlir::OperationState& result) {
-  mlir::StringAttr attr;
+ParseResult FuncOp::parse(OpAsmParser& parser, OperationState& result) {
+  StringAttr attr;
   if (parser.parseAttribute(attr))
-    return mlir::failure();
+    return failure();
 
   result.addAttribute(FuncOp::getNameAttrName(result.name), attr);
-  if (mlir::failed(parseFunction<FuncOp>(parser, result)))
-    return mlir::failure();
+  if (failed(parseFunction<FuncOp>(parser, result)))
+    return failure();
 
-  llvm::SmallVector<mlir::Type> resultTypes;
-  if (mlir::failed(inferReturnTypes(
+  SmallVector<Type> resultTypes;
+  if (failed(inferReturnTypes(
           result.getContext(), std::nullopt, result.operands,
-          mlir::DictionaryAttr::get(result.getContext(), result.attributes),
+          DictionaryAttr::get(result.getContext(), result.attributes),
           result.getRawProperties(), result.regions, resultTypes)))
-    return mlir::failure();
+    return failure();
 
   result.addTypes(resultTypes);
-  return mlir::success();
+  return success();
 }
 
-void pylir::HIR::FuncOp::print(mlir::OpAsmPrinter& p) {
+void FuncOp::print(OpAsmPrinter& p) {
   p << ' ' << getNameAttr();
-  llvm::SmallVector<mlir::DictionaryAttr> resAttrs;
+  SmallVector<DictionaryAttr> resAttrs;
   if (auto attr = getResAttrsAttr())
-    resAttrs = llvm::to_vector(attr.getAsRange<mlir::DictionaryAttr>());
+    resAttrs = llvm::to_vector(attr.getAsRange<DictionaryAttr>());
 
   printFunction(p, FunctionParameterRange(*this), resAttrs,
                 (*this)->getAttrDictionary(), getAttributeNames(), getRegion());
