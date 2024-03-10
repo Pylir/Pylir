@@ -180,6 +180,22 @@ FunctionParameterRange::dereference(FunctionInterface function,
 FunctionParameterRange::FunctionParameterRange(FunctionInterface function)
     : Base(function, 0, function.getArgumentTypes().size()) {}
 
+FunctionParameterSpec::FunctionParameterSpec(
+    const FunctionParameter& functionParameter) {
+  if (functionParameter.isPosRest())
+    *this = FunctionParameterSpec(FunctionParameterSpec::PosRest{});
+  else if (functionParameter.isKeywordRest())
+    *this = FunctionParameterSpec(FunctionParameterSpec::KeywordRest{});
+  else if (!functionParameter.isPositionalOnly())
+    *this = FunctionParameterSpec(functionParameter.getName(),
+                                  functionParameter.getDefaultValue(),
+                                  functionParameter.isKeywordOnly());
+  else
+    *this = FunctionParameterSpec(functionParameter.getDefaultValue());
+
+  setParameterAttributes(functionParameter.getAttrs());
+}
+
 namespace {
 
 LogicalResult funcOpsCommonVerifier(Operation* operation,
@@ -201,18 +217,24 @@ LogicalResult funcOpsCommonVerifier(Operation* operation,
 
 void funcOpsCommonBuild(OpBuilder& builder,
                         ArrayRef<FunctionParameterSpec> parameters,
-                        ArrayAttr& parameterNames,
+                        ArrayAttr& parameterNames, ArrayAttr& parameterAttrs,
                         DenseI32ArrayAttr& parameterNameMapping,
                         DenseI32ArrayAttr& keywordOnlyMapping,
                         IntegerAttr& posRest, IntegerAttr& keywordRest,
                         DenseI32ArrayAttr& defaultValueMapping,
                         SmallVectorImpl<Value>* defaultValues = nullptr) {
   SmallVector<Attribute> parameterNamesStorage;
+  SmallVector<Attribute> parameterAttrsStorage;
   SmallVector<std::int32_t> parameterNameMappingStorage;
   SmallVector<std::int32_t> keywordOnlyMappingStorage;
   SmallVector<std::int32_t> defaultValueMappingStorage;
 
   for (auto&& [index, spec] : llvm::enumerate(parameters)) {
+    if (spec.getParameterAttributes())
+      parameterAttrsStorage.push_back(spec.getParameterAttributes());
+    else
+      parameterAttrsStorage.push_back(builder.getDictionaryAttr({}));
+
     if (spec.getName()) {
       parameterNamesStorage.push_back(spec.getName());
       parameterNameMappingStorage.push_back(index);
@@ -238,6 +260,7 @@ void funcOpsCommonBuild(OpBuilder& builder,
   keywordOnlyMapping = builder.getDenseI32ArrayAttr(keywordOnlyMappingStorage);
   defaultValueMapping =
       builder.getDenseI32ArrayAttr(defaultValueMappingStorage);
+  parameterAttrs = builder.getArrayAttr(parameterAttrsStorage);
 }
 
 void createEntryBlock(Location loc, Region& region,
@@ -448,14 +471,16 @@ LogicalResult GlobalFuncOp::verify() {
 
 void GlobalFuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
                          llvm::Twine symbolName,
-                         ArrayRef<FunctionParameterSpec> parameters) {
+                         ArrayRef<FunctionParameterSpec> parameters,
+                         ArrayAttr resAttrs) {
   ArrayAttr parameterNames;
   DenseI32ArrayAttr parameterNameMapping;
   DenseI32ArrayAttr keywordOnlyMapping;
   DenseI32ArrayAttr defaultVariableMapping;
   IntegerAttr posRest;
   IntegerAttr keywordRest;
-  funcOpsCommonBuild(odsBuilder, parameters, parameterNames,
+  ArrayAttr paramAttrs;
+  funcOpsCommonBuild(odsBuilder, parameters, parameterNames, paramAttrs,
                      parameterNameMapping, keywordOnlyMapping, posRest,
                      keywordRest, defaultVariableMapping);
 
@@ -464,8 +489,8 @@ void GlobalFuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
         defaultVariableMapping,
         odsBuilder.getFunctionType(
             SmallVector<Type>(parameters.size(), dynamicType), dynamicType),
-        nullptr, nullptr, parameterNames, parameterNameMapping,
-        keywordOnlyMapping, posRest, keywordRest);
+        /*arg_attrs=*/paramAttrs, /*res_attrs=*/resAttrs, parameterNames,
+        parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
   createEntryBlock(odsState.location, *odsState.regions.front(),
                    parameters.size());
 }
@@ -499,7 +524,7 @@ LogicalResult FuncOp::verify() {
                                getKeywordRest());
 }
 
-void FuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
+void FuncOp::build(OpBuilder& odsBuilder, OperationState& odsState,
                    llvm::Twine symbolName,
                    ArrayRef<FunctionParameterSpec> parameters) {
   ArrayAttr parameterNames;
@@ -509,7 +534,8 @@ void FuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
   IntegerAttr keywordRest;
   SmallVector<Value> defaultValues;
   DenseI32ArrayAttr defaultValueMapping;
-  funcOpsCommonBuild(odsBuilder, parameters, parameterNames,
+  ArrayAttr paramAttrs;
+  funcOpsCommonBuild(odsBuilder, parameters, parameterNames, paramAttrs,
                      parameterNameMapping, keywordOnlyMapping, posRest,
                      keywordRest, defaultValueMapping, &defaultValues);
 
@@ -518,8 +544,8 @@ void FuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
         defaultValues, defaultValueMapping,
         odsBuilder.getFunctionType(
             SmallVector<Type>(parameters.size(), dynamicType), dynamicType),
-        nullptr, nullptr, parameterNames, parameterNameMapping,
-        keywordOnlyMapping, posRest, keywordRest);
+        /*arg_attrs=*/paramAttrs, /*res_attrs=*/nullptr, parameterNames,
+        parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
   createEntryBlock(odsState.location, *odsState.regions.front(),
                    parameters.size());
 }

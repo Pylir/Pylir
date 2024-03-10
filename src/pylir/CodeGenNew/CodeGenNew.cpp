@@ -574,7 +574,9 @@ private:
         specs.emplace_back(m_builder.getStringAttr(iter.name.getValue()),
                            visit(iter.maybeDefault));
         break;
-      case Syntax::Parameter::PosOnly: specs.emplace_back(); break;
+      case Syntax::Parameter::PosOnly:
+        specs.emplace_back(visit(iter.maybeDefault));
+        break;
       case Syntax::Parameter::KeywordOnly:
         specs.emplace_back(m_builder.getStringAttr(iter.name.getValue()),
                            visit(iter.maybeDefault), true);

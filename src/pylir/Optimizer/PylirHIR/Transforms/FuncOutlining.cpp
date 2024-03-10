@@ -44,14 +44,11 @@ void FuncOutlining::runOnOperation() {
       getOperation()->walk<WalkOrder::PostOrder>([&](HIR::FuncOp funcOp) {
         OpBuilder builder(funcOp);
 
+        auto parameters = llvm::to_vector_of<HIR::FunctionParameterSpec>(
+            HIR::FunctionParameterRange(funcOp));
         auto globalFunc = moduleBuilder.create<HIR::GlobalFuncOp>(
-            funcOp.getLoc(), funcOp.getName(),
-            funcOp.getDefaultValuesMappingAttr(), funcOp.getFunctionType(),
-            funcOp.getArgAttrsAttr(), funcOp.getResAttrsAttr(),
-            funcOp.getParameterNamesAttr(),
-            funcOp.getParameterNameMappingAttr(),
-            funcOp.getKeywordOnlyMappingAttr(), funcOp.getPosRestAttr(),
-            funcOp.getKeywordRestAttr());
+            funcOp.getLoc(), funcOp.getName(), parameters,
+            funcOp.getResAttrsAttr());
         // Rename the operation if necessary.
         symbolTable.insert(globalFunc);
 
