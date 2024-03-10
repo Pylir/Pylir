@@ -37,8 +37,8 @@ pyHIR.globalFunc @posDefault(%arg0) {
   return %0
 }
 
-// CHECK: globalFunc @[[$BASIC]](%{{.*}} "rest") {
-// CHECK: globalFunc @[[$POS_DEFAULT_INNER]](%{{.*}} has_default, %{{.*}} only "lol" has_default) {
+// CHECK: globalFunc @[[$BASIC]](%{{[[:alnum:]]+}}, %{{[[:alnum:]]+}} "rest") {
+// CHECK: globalFunc @[[$POS_DEFAULT_INNER]](%{{[[:alnum:]]+}}, %{{[[:alnum:]]+}} has_default, %{{[[:alnum:]]+}} only "lol" has_default) {
 
 // -----
 

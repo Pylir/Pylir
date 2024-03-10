@@ -465,6 +465,16 @@ ParseResult parseFunction(OpAsmParser& parser, OperationState& result) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult GlobalFuncOp::verify() {
+  auto range = FunctionParameterRange(*this);
+  if (range.empty())
+    return emitOpError(
+        "expected at least one parameter (the closure parameter) to "
+        "be present");
+
+  if (!range.front().isPositionalOnly() || range.front().hasDefault())
+    return emitOpError(
+        "closure parameter must be positional-only with no default");
+
   return funcOpsCommonVerifier(*this, getArgumentTypes(), getPosRest(),
                                getKeywordRest());
 }
@@ -473,6 +483,10 @@ void GlobalFuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
                          llvm::Twine symbolName,
                          ArrayRef<FunctionParameterSpec> parameters,
                          ArrayAttr resAttrs) {
+  // Insert implicit closure parameter in the front.
+  SmallVector<FunctionParameterSpec> parametersTemp(parameters);
+  parametersTemp.insert(parametersTemp.begin(), FunctionParameterSpec());
+
   ArrayAttr parameterNames;
   DenseI32ArrayAttr parameterNameMapping;
   DenseI32ArrayAttr keywordOnlyMapping;
@@ -480,7 +494,7 @@ void GlobalFuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
   IntegerAttr posRest;
   IntegerAttr keywordRest;
   ArrayAttr paramAttrs;
-  funcOpsCommonBuild(odsBuilder, parameters, parameterNames, paramAttrs,
+  funcOpsCommonBuild(odsBuilder, parametersTemp, parameterNames, paramAttrs,
                      parameterNameMapping, keywordOnlyMapping, posRest,
                      keywordRest, defaultVariableMapping);
 
@@ -488,11 +502,11 @@ void GlobalFuncOp::build(::OpBuilder& odsBuilder, ::OperationState& odsState,
   build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName),
         defaultVariableMapping,
         odsBuilder.getFunctionType(
-            SmallVector<Type>(parameters.size(), dynamicType), dynamicType),
+            SmallVector<Type>(parametersTemp.size(), dynamicType), dynamicType),
         /*arg_attrs=*/paramAttrs, /*res_attrs=*/resAttrs, parameterNames,
         parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
   createEntryBlock(odsState.location, *odsState.regions.front(),
-                   parameters.size());
+                   parametersTemp.size());
 }
 
 ParseResult GlobalFuncOp::parse(OpAsmParser& parser, OperationState& result) {

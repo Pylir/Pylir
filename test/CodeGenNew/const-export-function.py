@@ -14,7 +14,7 @@
 def foo(a=3, *, b=None):
     return a + b
 
-# CHECK: globalFunc @[[$MAIN_FOO_SYMBOL]](%[[ARG0:.*]] "a" has_default, %[[ARG1:.*]] only "b" has_default) {
+# CHECK: globalFunc @[[$MAIN_FOO_SYMBOL]](%{{[[:alnum:]]+}}, %[[ARG0:.*]] "a" has_default, %[[ARG1:.*]] only "b" has_default) {
 # CHECK: binOp %[[ARG0]] __add__ %[[ARG1]]
 
 # CHECK: py.external @__main__.foo, #[[$MAIN_FOO]]

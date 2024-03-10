@@ -380,9 +380,9 @@ Py::FuncOp buildFunctionCC(OpBuilder& builder, GlobalFuncOp implementation,
   std::size_t positionalDefaultArgsSeen = 0;
   std::optional<std::size_t> positionalRestArgsPos;
   std::optional<std::size_t> kwRestArgsPos;
-  SmallVector<Value> callArguments;
+  SmallVector<Value> callArguments{closure};
   for (HIR::FunctionParameter parameter :
-       HIR::FunctionParameterRange(implementation)) {
+       HIR::FunctionParameterRange(implementation).drop_front()) {
     // There can only be one rest-parameter of each kind. These will be set
     // at the end after all other parameters are converted. The index in the
     // call parameter array with a null-placeholder are set here already.

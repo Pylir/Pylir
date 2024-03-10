@@ -125,6 +125,8 @@ class FunctionParameterRange
 public:
   /// Constructor for any function implementing HIR::FunctionInterface.
   explicit FunctionParameterRange(FunctionInterface function);
+
+  using Base::Base;
 };
 
 /// Class used to specify the parameters of a function in the pyHIR dialect.
