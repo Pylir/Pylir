@@ -234,7 +234,7 @@ jobs:
           sudo apt-get install clang-format-$LLVM_LINT_VERSION
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.9
 
@@ -274,7 +274,7 @@ jobs:
 
     steps:
       - name: Checkout Pylir
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: Pylir
 
@@ -317,7 +317,7 @@ jobs:
         run: cmake --build pylir-build --target docs
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: ${{github.workspace}}/pylir-build/docs/build
 
@@ -346,4 +346,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v2
