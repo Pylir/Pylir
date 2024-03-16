@@ -87,6 +87,12 @@ runs:
         echo "Adding GNU tar to PATH"
         echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"
 
+    - if: ${{ runner.os == 'Linux' && inputs.sanitizers != ''}}
+      name: Workaround ASLR interfering with sanitizers
+      shell: bash
+      # See https://github.com/actions/runner-images/issues/9491.
+      run: sudo sysctl vm.mmap_rnd_bits=28
+
     - name: Calculate ccache key
       id: ccache-key
       shell: pwsh
