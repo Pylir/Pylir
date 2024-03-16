@@ -179,10 +179,13 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(
     Diag::DiagnosticsManager& diagManager) {
   const auto& args = commandLine.getArgs();
 
-  llvm::ThreadPoolStrategy strategy = llvm::hardware_concurrency();
-  if (!args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true))
-    strategy = llvm::hardware_concurrency(1);
-  m_threadPool.emplace(strategy);
+#if LLVM_ENABLE_THREADS
+  if (args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true))
+    m_threadPool = std::make_unique<llvm::StdThreadPool>();
+  else
+#endif
+    m_threadPool = std::make_unique<llvm::SingleThreadExecutor>(
+        llvm::hardware_concurrency(1));
 
   std::optional<llvm::ToolOutputFile> outputFile;
   if (!commandLine.onlyPrint()) {

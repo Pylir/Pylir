@@ -117,13 +117,6 @@ public:
     return m_wrapping.canRecoverFromRewriteFailure();
   }
 
-  void replaceOpWithIf(
-      Operation* op, ValueRange newValues, bool* allUsesReplaced,
-      llvm::unique_function<bool(OpOperand&) const> functor) override {
-    m_wrapping.replaceOpWithIf(op, newValues, allUsesReplaced,
-                               std::move(functor));
-  }
-
   void replaceOp(Operation* op, ValueRange newValues) override {
     m_wrapping.replaceOp(op, newValues);
   }
@@ -143,10 +136,6 @@ public:
   void inlineBlockBefore(Block* source, Block* dest, Block::iterator before,
                          ValueRange argValues) override {
     m_wrapping.inlineBlockBefore(source, dest, before, argValues);
-  }
-
-  Block* splitBlock(Block* block, Block::iterator before) override {
-    return m_wrapping.splitBlock(block, before);
   }
 
   void startOpModification(Operation* op) override {
