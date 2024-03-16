@@ -33,7 +33,7 @@ namespace pylir {
 struct CodeGenOptions;
 
 class CompilerInvocation {
-  std::optional<llvm::ThreadPool> m_threadPool;
+  std::unique_ptr<llvm::ThreadPoolInterface> m_threadPool;
   std::optional<mlir::MLIRContext> m_mlirContext;
   std::unique_ptr<llvm::LLVMContext> m_llvmContext;
   std::list<Diag::Document> m_documents;
