@@ -5,6 +5,7 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/BuiltinOps.h>
 
+#include <llvm/ADT/MapVector.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.hpp>
@@ -52,28 +53,52 @@ void FuncOutlining::runOnOperation() {
         // Rename the operation if necessary.
         symbolTable.insert(globalFunc);
 
+        // Temporary value serving as placeholder for the closure parameter.
+        Value tempClosure =
+            builder
+                .create<UnrealizedConversionCastOp>(
+                    funcOp.getLoc(), builder.getType<Py::DynamicType>(),
+                    ValueRange())
+                .getResult(0);
+
         // Check for any values that were captured. Captured values are defined
         // as any values defined outside the 'func' op that are used by an
         // operation within the body of the 'func' op.
+
+        // TODO: This should be a SetVector, but SetVector doesn't give us an
+        //       iterator to the inserted element.
+        llvm::MapVector<Value, std::monostate> captured;
         WalkResult result = funcOp.getBody().walk([&](Operation* operation) {
-          for (Value value : operation->getOperands()) {
-            Region* currentRegion = value.getParentRegion();
-            while (currentRegion != funcOp.getRegion())
+          for (OpOperand& value : operation->getOpOperands()) {
+            Region* currentRegion = value.get().getParentRegion();
+            while (currentRegion && currentRegion != &funcOp.getRegion())
               currentRegion = currentRegion->getParentRegion();
             if (currentRegion)
               continue;
 
-            operation->emitError("Capturing of values not yet implemented");
-            return WalkResult::interrupt();
+            auto* iter = captured.insert({value.get(), std::monostate{}}).first;
+            std::size_t index = iter - captured.begin();
+
+            OpBuilder::InsertionGuard guard{builder};
+            builder.setInsertionPoint(operation);
+            Value replacement = builder.create<Py::FunctionGetClosureArgOp>(
+                operation->getLoc(), tempClosure, index,
+                builder.getTypeArrayAttr(
+                    llvm::map_to_vector(llvm::make_first_range(llvm::make_range(
+                                            captured.begin(), std::next(iter))),
+                                        std::mem_fn(&Value::getType))));
+            value.set(replacement);
           }
           return WalkResult::advance();
         });
         if (result.wasInterrupted())
           return WalkResult::interrupt();
 
-        // TODO: Handle captured values.
+        // TODO: The order of fields in the closure could be optimized to
+        //  minimize padding and therefore object size.
         Value funcObject = builder.create<Py::MakeFuncOp>(
-            funcOp.getLoc(), FlatSymbolRefAttr::get(globalFunc), ValueRange());
+            funcOp.getLoc(), FlatSymbolRefAttr::get(globalFunc),
+            llvm::to_vector(llvm::make_first_range(captured)));
 
         builder.create<Py::SetSlotOp>(
             funcOp.getLoc(), funcObject,
@@ -140,6 +165,9 @@ void FuncOutlining::runOnOperation() {
         // Add argument to entry block acting as the closure parameter.
         globalFunc.getBody().insertArgument(
             /*index=*/0u, builder.getType<Py::DynamicType>(), funcOp.getLoc());
+        tempClosure.replaceAllUsesWith(globalFunc.getClosureParameter());
+        tempClosure.getDefiningOp()->erase();
+
         funcOp.replaceAllUsesWith(funcObject);
         funcOp->erase();
 
