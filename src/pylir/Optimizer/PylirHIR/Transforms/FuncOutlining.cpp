@@ -73,7 +73,7 @@ void FuncOutlining::runOnOperation() {
 
         // TODO: Handle captured values.
         Value funcObject = builder.create<Py::MakeFuncOp>(
-            funcOp.getLoc(), FlatSymbolRefAttr::get(globalFunc));
+            funcOp.getLoc(), FlatSymbolRefAttr::get(globalFunc), ValueRange());
 
         builder.create<Py::SetSlotOp>(
             funcOp.getLoc(), funcObject,

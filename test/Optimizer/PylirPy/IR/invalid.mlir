@@ -83,3 +83,11 @@ py.func @test() {
   call @foo() : () -> ()
   return
 }
+
+// -----
+
+py.func @func_get_closure(%arg0 : !py.dynamic) -> i32 {
+  // expected-error@below {{index '2' out of bounds}}
+  %0 = "py.function_closureArg"(%arg0) <{ index = 2 : i32, closure_types = [i32, i64]}> : (!py.dynamic) -> i32
+  return %0 : i32
+}

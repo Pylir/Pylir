@@ -509,6 +509,22 @@ void pylir::Py::FunctionInvokeOp::setCalleeFromCallable(
 }
 
 //===----------------------------------------------------------------------===//
+// FunctionGetClosureArgOp implementations
+//===----------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::FunctionGetClosureArgOp::inferReturnTypes(
+    mlir::MLIRContext*, std::optional<mlir::Location>, Adaptor adaptor,
+    llvm::SmallVectorImpl<mlir::Type>& inferredReturnTypes) {
+  if (adaptor.getIndex() >= adaptor.getClosureTypes().size())
+    return mlir::failure();
+
+  inferredReturnTypes.push_back(
+      llvm::cast<mlir::TypeAttr>(adaptor.getClosureTypes()[adaptor.getIndex()])
+          .getValue());
+  return mlir::success();
+}
+
+//===----------------------------------------------------------------------===//
 // UnpackOp implementations
 //===----------------------------------------------------------------------===//
 
