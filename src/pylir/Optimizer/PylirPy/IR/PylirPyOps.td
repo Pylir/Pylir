@@ -727,14 +727,44 @@ def PylirPy_FunctionInvokeOp
 def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [AlwaysBound,
   KnownType<"Function">, DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   DeclareOpInterfaceMethods<SROAAllocOpInterface>]> {
-  let arguments = (ins FlatSymbolRefAttr:$function);
+  let arguments = (ins FlatSymbolRefAttr:$function,
+                       Variadic<AnyType>:$closure_args);
+
+  let description = [{
+    Creates a new instance of a python function that refers to `function`.
+    `closure_args` are extra operands that are stored as part of the function
+    object and can only be read using `py.function_closureArg`, where the index
+    refers to the position within `closure_args`.
+  }];
 
   let results = (outs
     Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
   let assemblyFormat = [{
-    $function attr-dict
+    $function (`[` $closure_args^ `:` type($closure_args) `]`)? attr-dict
   }];
+}
+
+def PylirPy_FunctionGetClosureArgOp : PylirPy_Op<"function_closureArg",
+  [NoMemoryEffect, InferTypeOpAdaptor]> {
+  let arguments = (ins DynamicType:$function,
+                       I32Attr:$index,
+                       TypeArrayAttr:$closure_types);
+
+  let results = (outs AnyType:$result);
+
+  let description = [{
+    Returns the closure argument at the given index within `function`.
+    `function` must have been created with closure arguments whose types match
+    `closure_types` or whose type of closure arguments match up until and
+    including `index`.
+  }];
+
+  let assemblyFormat = [{
+    $function `[` $index `]` `:` $closure_types attr-dict
+  }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

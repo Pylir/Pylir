@@ -139,8 +139,20 @@ LogicalResult Py::TypeAttr::verifyStructure(Operation* op,
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(
     ::mlir::SymbolTableCollection& symbolTable) {
-  return verifySymbolUse<mlir::FunctionOpInterface>(
-      *this, getFunctionAttr(), symbolTable, "FunctionOpInterface");
+  if (!symbolTable.lookupNearestSymbolFrom(*this, getFunctionAttr()))
+    return emitOpError("Failed to find symbol named '")
+           << getFunctionAttr() << "'";
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// FunctionGetClosureArgOp verification
+//===----------------------------------------------------------------------===//
+
+LogicalResult FunctionGetClosureArgOp::verify() {
+  if (getIndex() >= getClosureTypes().size())
+    return emitOpError("index '") << getIndex() << "' out of bounds";
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

@@ -408,7 +408,7 @@ public:
   }
 
   Py::MakeFuncOp createMakeFunc(mlir::FlatSymbolRefAttr function) {
-    return create<Py::MakeFuncOp>(function);
+    return create<Py::MakeFuncOp>(function, mlir::ValueRange());
   }
 
   Py::MakeObjectOp createMakeObject(mlir::Value typeObject) {

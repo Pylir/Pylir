@@ -80,7 +80,7 @@ def : Pat<(PylirPy_IntToStrOp $integer),
 
 defvar FunctionRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.function">;
 
-def : Pat<(PylirPy_MakeFuncOp $symbol),
+def : Pat<(PylirPy_MakeFuncOp $symbol, $closure_args),
   (PylirMem_InitFuncOp GCWithSlots<FunctionRef>.result, $symbol)>;
 
 defvar BoolRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.bool">;
