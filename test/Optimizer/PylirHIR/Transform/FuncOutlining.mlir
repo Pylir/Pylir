@@ -72,3 +72,21 @@ pyHIR.init "arg_res_attrs" {
 // CHECK: globalFunc @[[$BASIC1]](
 // CHECK-SAME: "rest" {test.name = 0 : i32}
 // CHECK-SAME: -> {test.name = 1 : i32}
+
+// -----
+
+// CHECK-LABEL: init "non_locals"
+pyHIR.init "non_locals" {
+  // CHECK: %[[LIST:.*]] = py.makeList ()
+  %0 = py.makeList ()
+  // CHECK: py.makeFunc @[[$BASIC1:[[:alnum:]]+]][%[[LIST]] : !py.dynamic]
+  %1 = func "basic"() {
+    return %0
+  }
+  init_return %1
+}
+
+// CHECK: globalFunc @[[$BASIC1]](
+// CHECK-SAME: %[[CLOSURE:[[:alnum:]]+]]
+// CHECK: %[[ARG:.*]] = py.function_closureArg %[[CLOSURE]][0] : [!py.dynamic]
+// CHECK: return %[[ARG]]
