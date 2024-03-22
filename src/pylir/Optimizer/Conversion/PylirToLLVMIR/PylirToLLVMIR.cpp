@@ -1110,6 +1110,53 @@ struct StackAllocObjectOpConversion
   }
 };
 
+struct GCAllocFunctionOpConversion
+    : public ConvertPylirOpToLLVMPattern<Mem::GCAllocFunctionOp> {
+  using ConvertPylirOpToLLVMPattern<
+      Mem::GCAllocFunctionOp>::ConvertPylirOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(Mem::GCAllocFunctionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    SmallVector<Type> types;
+    if (failed(typeConverter.convertTypes(
+            llvm::to_vector(adaptor.getClosureArgsTypes()
+                                .getAsValueRange<mlir::TypeAttr>()),
+            types)))
+      return failure();
+
+    LLVM::LLVMStructType type = typeConverter.getPyFunctionType(
+        std::initializer_list<int>{
+#define FUNCTION_SLOT(...) 0,
+#include <pylir/Interfaces/Slots.def>
+        }
+            .size(),
+        types);
+    auto pointerType = rewriter.getType<LLVM::LLVMPointerType>();
+    Value null = rewriter.create<LLVM::ZeroOp>(op.getLoc(), pointerType);
+    Value typeSize = rewriter.create<LLVM::GEPOp>(
+        op.getLoc(), pointerType, type, null, ArrayRef<LLVM::GEPArg>{1});
+    typeSize = rewriter.create<LLVM::PtrToIntOp>(op.getLoc(), getIndexType(),
+                                                 typeSize);
+
+    Value memory = codeGenState.createRuntimeCall(
+        op.getLoc(), rewriter, CodeGenState::Runtime::pylir_gc_alloc,
+        {typeSize});
+    Value zeroI8 = rewriter.create<LLVM::ConstantOp>(
+        op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
+    rewriter.create<LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, typeSize,
+                                    /*isVolatile=*/false);
+    pyObjectModel(rewriter, memory)
+        .typePtr(op.getLoc())
+        .store(op.getLoc(),
+               codeGenState.getConstant(op.getLoc(), rewriter,
+                                        rewriter.getType<Py::GlobalValueAttr>(
+                                            Builtins::Function.name)));
+    rewriter.replaceOp(op, memory);
+    return mlir::success();
+  }
+};
+
 struct InitObjectOpConversion
     : public ConvertPylirOpToLLVMPattern<Mem::InitObjectOp> {
   using ConvertPylirOpToLLVMPattern<
@@ -1719,7 +1766,8 @@ void ConvertPylirToLLVMPass::runOnOperation() {
       ArithmeticSelectOpConversion, TupleContainsOpConversion,
       InitTupleCopyOpConversion, MROLookupOpConversion, TypeSlotsOpConversion,
       InitFloatOpConversion, FloatToF64OpConversion, FuncOpConversion,
-      ReturnOpConversion, RaiseExOpConversion>(converter, codeGenState);
+      ReturnOpConversion, RaiseExOpConversion, GCAllocFunctionOpConversion>(
+      converter, codeGenState);
   patternSet.insert<GCAllocObjectConstTypeConversion>(converter, codeGenState,
                                                       2);
   if (mlir::failed(mlir::applyFullConversion(module, conversionTarget,

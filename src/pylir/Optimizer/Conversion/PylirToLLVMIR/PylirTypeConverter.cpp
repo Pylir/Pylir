@@ -14,6 +14,8 @@
 #include "X86_64.hpp"
 
 using namespace mlir;
+using namespace mlir::LLVM;
+using namespace pylir;
 using namespace pylir::Py;
 
 pylir::PylirTypeConverter::PylirTypeConverter(mlir::MLIRContext* context,
@@ -109,10 +111,31 @@ mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyObjectType(
 }
 
 mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFunctionType(
-    std::optional<unsigned int> slotSize) {
-  return lazyInitStructType(
-      &getContext(), "PyFunction", slotSize,
-      {m_objectPtrType, mlir::LLVM::LLVMPointerType::get(&getContext())});
+    std::optional<unsigned int> slotSize, TypeRange closureArgsTypes) {
+  assert((slotSize || closureArgsTypes.empty()) &&
+         "slot size must be present if specifying closure arguments");
+
+  std::string name = "PyFunction";
+
+  llvm::raw_string_ostream ss(name);
+  if (!closureArgsTypes.empty()) {
+    ss << '[';
+    llvm::interleaveComma(closureArgsTypes, ss);
+    ss << ']';
+  }
+  ss << slotSizeNameSuffix(slotSize);
+  auto type = LLVMStructType::getIdentified(&getContext(), name);
+  if (type.isInitialized())
+    return type;
+
+  SmallVector<Type> body{m_objectPtrType,
+                         mlir::LLVM::LLVMPointerType::get(&getContext())};
+  body.push_back(getSlotEpilogue(&getContext(), slotSize.value_or(0)));
+  llvm::append_range(body, closureArgsTypes);
+  [[maybe_unused]] LogicalResult result =
+      type.setBody(body, /*isPacked=*/false);
+  PYLIR_ASSERT(succeeded(result));
+  return type;
 }
 
 mlir::LLVM::LLVMStructType

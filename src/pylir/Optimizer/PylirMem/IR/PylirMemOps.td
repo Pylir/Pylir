@@ -48,6 +48,25 @@ def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject",
   let assemblyFormat = "$type_object`[` $trailing_items `]` attr-dict";
 }
 
+def PylirMem_GCAllocFunctionOp : PylirMem_Op<"gcAllocFunction"> {
+  let arguments = (ins TypeArrayAttr:$closure_args_types);
+  let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
+
+  let description = [{
+    Allocates a function object with enough space for `closure_args_types` as
+    closure arguments. This operation must be used over `gcAllocObject` if space
+    must be allocated for `closure_args_types`.
+    It is otherwise identical to `gcAllocObject`.
+
+    The function object allocated is tracked by the garbage collector and
+    guaranteed to be life as long as it is reachable.
+  }];
+
+  let assemblyFormat = [{
+    $closure_args_types attr-dict
+  }];
+}
+
 /// Object layouts known to the compiler with a static size. May be replaced
 /// with some kind of type descriptors if we ever introduce custom object
 /// layouts as an optimization.

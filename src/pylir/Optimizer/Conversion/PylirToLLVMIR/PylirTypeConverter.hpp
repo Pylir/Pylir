@@ -40,9 +40,10 @@ public:
   getPyObjectType(std::optional<unsigned> slotSize = {});
 
   /// Returns the LLVM representation for 'function', optionally with the given
-  /// slot count.
+  /// slot count and closure argument types.
   mlir::LLVM::LLVMStructType
-  getPyFunctionType(std::optional<unsigned> slotSize = {});
+  getPyFunctionType(std::optional<unsigned> slotSize = {},
+                    mlir::TypeRange closureArgsTypes = {});
 
   /// Returns the LLVM representation for a 'tuple', optionally of the given
   /// length.
