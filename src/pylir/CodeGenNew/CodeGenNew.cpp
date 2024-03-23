@@ -39,7 +39,7 @@ class CodeGenNew {
   /// a function. The 'ssaBuilder' is used for reading and writing to any local
   /// variable.
   struct Scope {
-    using Identifier = std::variant<SSABuilder::DefinitionsMap>;
+    using Identifier = std::variant<SSABuilder::DefinitionsMap, Value>;
     llvm::DenseMap<llvm::StringRef, Identifier> identifiers;
     SSABuilder ssaBuilder;
 
@@ -270,7 +270,10 @@ class CodeGenNew {
             [&](SSABuilder::DefinitionsMap& map) {
               map[m_builder.getInsertionBlock()] = value;
             },
-            [](auto) { llvm_unreachable("not yet implemented"); });
+            [&](Value cell) {
+              create<Py::SetSlotOp>(cell, create<arith::ConstantIndexOp>(0),
+                                    value);
+            });
         return;
       }
     }
@@ -311,7 +314,10 @@ class CodeGenNew {
                   m_builder.getLoc(), m_builder.getType<Py::DynamicType>(), map,
                   m_builder.getInsertionBlock());
             },
-            [](auto) -> Value { llvm_unreachable("not yet implemented"); });
+            [&](Value cell) -> Value {
+              return create<Py::GetSlotOp>(cell,
+                                           create<arith::ConstantIndexOp>(0));
+            });
         throwExceptionIfUnbound(result, Builtins::UnboundLocalError);
         return result;
       }
@@ -618,8 +624,19 @@ private:
         m_functionScope->identifiers[identifier.getValue()] =
             SSABuilder::DefinitionsMap{};
         break;
-      case Syntax::Scope::Cell:
-      case Syntax::Scope::NonLocal: llvm_unreachable("not-yet-implemented");
+      case Syntax::Scope::Cell: {
+        Value cellType = create<Py::ConstantOp>(
+            m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Cell.name));
+        m_functionScope->identifiers[identifier.getValue()] =
+            create<HIR::CallOp>(cellType);
+        break;
+      }
+      case Syntax::Scope::NonLocal:
+        // Python language semantics guarantee that non-locals always refer to
+        // cells.
+        m_functionScope->identifiers[identifier.getValue()] =
+            pylir::get<Value>(functionScopeReset.getValueAfterReset()
+                                  ->identifiers[identifier.getValue()]);
       default: break;
       }
     }
