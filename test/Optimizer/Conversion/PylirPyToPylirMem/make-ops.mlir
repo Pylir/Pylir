@@ -74,21 +74,19 @@ py.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> !p
 
 // -----
 
-// CHECK: #[[$FUNCTION_TYPE:.*]] = #py.globalValue<builtins.function{{,|>}}
-
 py.func private @test(!py.dynamic,!py.dynamic,!py.dynamic) -> !py.dynamic
 
-py.func @make_function() -> !py.dynamic {
-    %0 = makeFunc @test
+py.func @make_function(%arg0 : i32, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = makeFunc @test [%arg0, %arg1 : i32, !py.dynamic]
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_function
-// CHECK-NEXT: %[[FUNCTION:.*]] = constant(#[[$FUNCTION_TYPE]])
-// CHECK-NEXT: %[[SLOTS:.*]] = type_slots %[[FUNCTION]]
-// CHECK-NEXT: %[[LEN:.*]] = tuple_len %[[SLOTS]]
-// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[FUNCTION]][%[[LEN]]]
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocFunction [i32, !py.dynamic]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initFunc %[[MEM]] to @test
+// CHECK-SAME: [%[[ARG0]], %[[ARG1]] : i32, !py.dynamic]
 // CHECK-NEXT: return %[[RESULT]]
 
 // -----
