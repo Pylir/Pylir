@@ -42,6 +42,15 @@ public:
     m_valueAfter = std::move(rhs.m_valueAfter);
     return *this;
   }
+
+  /// Returns a reference to the value that will be assigned at destruction.
+  T& getValueAfterReset() {
+    return m_valueAfter;
+  }
+
+  const T& getValueAfterReset() const {
+    return m_valueAfter;
+  }
 };
 
 template <class... Args>
