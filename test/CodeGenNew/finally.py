@@ -123,3 +123,18 @@ def foo6():
             x = 5
     finally:
         x = 3
+
+
+# CHECK-LABEL: func "__main__.foo7"
+def foo7():
+    try:
+        # CHECK-LABEL: func "__main__.foo7.<locals>.bar"
+        # CHECK-SAME: %[[X:[[:alnum:]]+]]
+        def bar(x):
+            # CHECK: call %[[X]]()
+            x()
+            # CHECK-NEXT: %[[ONE:.*]] = py.constant(#py.int<1>)
+            # CHECK-NEXT: return %[[ONE]]
+            return 1
+    finally:
+        return 0
