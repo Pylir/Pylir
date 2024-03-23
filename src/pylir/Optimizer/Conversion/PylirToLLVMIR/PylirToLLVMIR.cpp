@@ -70,6 +70,22 @@ protected:
   // Model instantiations.
   //===--------------------------------------------------------------------===//
 
+  PyFunctionModel pyFunctionModel(OpBuilder& builder, Value value,
+                                  TypeRange closureArgsTypes = {}) const {
+    // TODO: Right now we straight up rely on the slot size here matching with
+    //  whatever is input in the IR. In the future slots should just be removed
+    //  from functions.
+    return {builder, value,
+            typeConverter.getPyFunctionType(
+                std::initializer_list<int>{
+#define FUNCTION_SLOT(...) 0,
+#include <pylir/Interfaces/Slots.def>
+                }
+                    .size(),
+                closureArgsTypes),
+            codeGenState};
+  }
+
 #define DEFINE_MODEL_INST(type, name)                            \
   type name(mlir::OpBuilder& builder, mlir::Value value) const { \
     return {builder, value, codeGenState};                       \
@@ -82,7 +98,6 @@ protected:
   DEFINE_MODEL_INST(PyDictModel, pyDictModel);
   DEFINE_MODEL_INST(PyIntModel, pyIntModel);
   DEFINE_MODEL_INST(PyFloatModel, pyFloatModel);
-  DEFINE_MODEL_INST(PyFunctionModel, pyFunctionModel);
   DEFINE_MODEL_INST(PyStringModel, pyStringModel);
   DEFINE_MODEL_INST(PyTypeModel, pyTypeModel);
 
@@ -893,6 +908,29 @@ struct FunctionCallOpConversion
   }
 };
 
+struct FunctionGetClosureArgOpConversion
+    : public ConvertPylirOpToLLVMPattern<Py::FunctionGetClosureArgOp> {
+  using ConvertPylirOpToLLVMPattern<
+      Py::FunctionGetClosureArgOp>::ConvertPylirOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(Py::FunctionGetClosureArgOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    SmallVector<Type> convertedTypes;
+    if (failed(typeConverter.convertTypes(
+            llvm::to_vector(
+                adaptor.getClosureTypes().getAsValueRange<mlir::TypeAttr>()),
+            convertedTypes)))
+      return failure();
+
+    rewriter.replaceOp(
+        op, pyFunctionModel(rewriter, adaptor.getFunction(), convertedTypes)
+                .closureArgument(op.getLoc(), adaptor.getIndex())
+                .load(op.getLoc()));
+    return success();
+  }
+};
+
 template <class T>
 struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T> {
   using ConvertPylirOpToLLVMPattern<T>::ConvertPylirOpToLLVMPattern;
@@ -1490,16 +1528,20 @@ struct InitFuncOpConversion
   using ConvertPylirOpToLLVMPattern<
       Mem::InitFuncOp>::ConvertPylirOpToLLVMPattern;
 
-  mlir::LogicalResult
+  LogicalResult
   matchAndRewrite(Mem::InitFuncOp op, OpAdaptor adaptor,
-                  mlir::ConversionPatternRewriter& rewriter) const override {
-    auto address = rewriter.create<mlir::LLVM::AddressOfOp>(
-        op.getLoc(), rewriter.getType<mlir::LLVM::LLVMPointerType>(),
+                  ConversionPatternRewriter& rewriter) const override {
+    Value address = rewriter.create<LLVM::AddressOfOp>(
+        op.getLoc(), rewriter.getType<LLVM::LLVMPointerType>(),
         adaptor.getInitializer());
 
-    pyFunctionModel(rewriter, adaptor.getMemory())
-        .funcPtr(op.getLoc())
-        .store(op.getLoc(), address);
+    PyFunctionModel model = pyFunctionModel(
+        rewriter, adaptor.getMemory(), adaptor.getClosureArgs().getTypes());
+
+    model.funcPtr(op.getLoc()).store(op.getLoc(), address);
+    for (auto [index, value] : llvm::enumerate(adaptor.getClosureArgs()))
+      model.closureArgument(op.getLoc(), index).store(op.getLoc(), value);
+
     rewriter.replaceOp(op, adaptor.getMemory());
     return mlir::success();
   }
@@ -1766,8 +1808,8 @@ void ConvertPylirToLLVMPass::runOnOperation() {
       ArithmeticSelectOpConversion, TupleContainsOpConversion,
       InitTupleCopyOpConversion, MROLookupOpConversion, TypeSlotsOpConversion,
       InitFloatOpConversion, FloatToF64OpConversion, FuncOpConversion,
-      ReturnOpConversion, RaiseExOpConversion, GCAllocFunctionOpConversion>(
-      converter, codeGenState);
+      ReturnOpConversion, RaiseExOpConversion, GCAllocFunctionOpConversion,
+      FunctionGetClosureArgOpConversion>(converter, codeGenState);
   patternSet.insert<GCAllocObjectConstTypeConversion>(converter, codeGenState,
                                                       2);
   if (mlir::failed(mlir::applyFullConversion(module, conversionTarget,

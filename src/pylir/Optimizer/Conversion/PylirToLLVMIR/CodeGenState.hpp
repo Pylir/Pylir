@@ -572,14 +572,21 @@ struct PyFloatModel : PyObjectModelBase<PyFloatModel> {
 struct PyFunctionModel : PyObjectModelBase<PyFunctionModel> {
   using PyObjectModelBase::PyObjectModelBase;
 
-  static auto getElementType(PylirTypeConverter& typeConverter) {
-    return typeConverter.getPyFunctionType();
-  }
-
   /// Returns a model for the internal function pointer, using the universal
   /// calling convention.
   auto funcPtr(mlir::Location loc) const {
     return field<Scalar<TbaaAccessType::FunctionPointer>>(loc, 1);
+  }
+
+  /// Returns a model for accessing the slots of the function.
+  auto slotsArray(mlir::Location loc) const {
+    return field<Array<Pointer<PyObjectModel, TbaaAccessType::TupleElements>>>(
+        loc, 2);
+  }
+
+  /// Returns a model for accessing the closure argument with the given index.
+  auto closureArgument(mlir::Location loc, unsigned index) const {
+    return field<Scalar<>>(loc, 3 + index);
   }
 };
 
