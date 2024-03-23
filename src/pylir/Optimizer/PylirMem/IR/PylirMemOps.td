@@ -251,10 +251,13 @@ def PylirMem_InitStrFromIntOp : PylirMem_Op<"initStrFromInt",  [AlwaysBound,
 
 def PylirMem_InitFuncOp : PylirMem_Op<"initFunc", [AlwaysBound, NoCaptures]> {
   let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory,
-    FlatSymbolRefAttr:$initializer);
+    FlatSymbolRefAttr:$initializer, Variadic<AnyType>:$closure_args);
   let results = (outs DynamicType:$result);
 
-  let assemblyFormat = "$memory `to` $initializer attr-dict";
+  let assemblyFormat = [{
+    $memory `to` $initializer
+      (`[` $closure_args^ `:` type($closure_args) `]`)? attr-dict
+  }];
 }
 
 def PylirMem_InitObjectOp : PylirMem_Op<"initObject", [AlwaysBound,

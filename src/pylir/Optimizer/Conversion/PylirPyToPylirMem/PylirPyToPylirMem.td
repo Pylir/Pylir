@@ -81,7 +81,10 @@ def : Pat<(PylirPy_IntToStrOp $integer),
 defvar FunctionRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.function">;
 
 def : Pat<(PylirPy_MakeFuncOp $symbol, $closure_args),
-  (PylirMem_InitFuncOp GCWithSlots<FunctionRef>.result, $symbol)>;
+  (PylirMem_InitFuncOp (PylirMem_GCAllocFunctionOp (NativeCodeCall<[{
+    $_builder.getTypeArrayAttr($0.getTypes())
+  }]> $closure_args)), $symbol,
+    $closure_args)>;
 
 defvar BoolRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.bool">;
 
