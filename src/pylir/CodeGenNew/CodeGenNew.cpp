@@ -1700,10 +1700,31 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  mlir::Value
-  visitImpl([[maybe_unused]] const Syntax::DictDisplay& dictDisplay) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::DictDisplay& dictDisplay) {
+    return match(
+        dictDisplay.variant,
+        [&](ArrayRef<Syntax::DictDisplay::KeyDatum> list) -> Value {
+          SmallVector<Py::DictArg> result;
+          for (const Syntax::DictDisplay::KeyDatum& iter : list) {
+            Value key = visit(iter.key);
+            Value value = visit(iter.maybeValue);
+            if (!value) {
+              result.emplace_back(Py::MappingExpansion{key});
+              continue;
+            }
+
+            Value hashRef = create<Py::ConstantOp>(
+                m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Hash.name));
+            Value hash = create<HIR::CallOp>(hashRef, key);
+            result.emplace_back(
+                Py::DictEntry{key, create<Py::IntToIndexOp>(hash), value});
+          }
+          return create<Py::MakeDictOp>(result);
+        },
+        [&](const Syntax::DictDisplay::DictComprehension&) -> Value {
+          // TODO:
+          PYLIR_UNREACHABLE;
+        });
   }
 
   //===--------------------------------------------------------------------===//
