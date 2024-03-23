@@ -18,7 +18,6 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 #include <pylir/Support/Macros.hpp>
-#include <pylir/Support/ValueReset.hpp>
 
 namespace {
 using namespace pylir;
@@ -124,17 +123,17 @@ class CodeGenNew {
   std::vector<FinallyCode> m_finallyStack;
 
   /// RAII class setting and resetting the currently active exception handler.
-  class EnterTry : public RAIIBaseClass<EnterTry> {
+  class ChangeEHHandler : public RAIIBaseClass<ChangeEHHandler> {
     Block* m_previousHandler;
 
   public:
-    EnterTry(CodeGenNew& codeGen, Block* newExceptionHandler)
+    ChangeEHHandler(CodeGenNew& codeGen, Block* newExceptionHandler)
         : RAIIBaseClass(codeGen),
           m_previousHandler(codeGen.m_exceptionHandler) {
       codeGen.m_exceptionHandler = newExceptionHandler;
     }
 
-    ~EnterTry() {
+    ~ChangeEHHandler() {
       m_codeGen.m_exceptionHandler = m_previousHandler;
     }
   };
@@ -169,6 +168,38 @@ class CodeGenNew {
 
     ~AddQualifiers() {
       m_codeGen.m_qualifiers = std::move(m_previous);
+    }
+  };
+
+  /// RAII class used to change all state associated with changing the current
+  /// function.
+  class ChangeFunction : public RAIIBaseClass<ChangeFunction> {
+    AddQualifiers m_addQualifiers;
+    ChangeEHHandler m_changeExceptionHandler;
+    std::optional<Scope> m_previousScope;
+    std::vector<FinallyCode> m_finallyStack;
+    OpBuilder::InsertionGuard m_guard;
+
+  public:
+    ChangeFunction(CodeGenNew& codeGen, StringRef funcName, Block* entryBlock)
+        : RAIIBaseClass(codeGen),
+          m_addQualifiers(codeGen, funcName, "<locals>"),
+          m_changeExceptionHandler(codeGen, nullptr),
+          m_previousScope(std::move(codeGen.m_functionScope)),
+          m_finallyStack(std::move(codeGen.m_finallyStack)),
+          m_guard(codeGen.m_builder) {
+      m_codeGen.m_functionScope.emplace(m_codeGen.m_builder);
+      m_codeGen.m_builder.setInsertionPointToStart(entryBlock);
+    }
+
+    ~ChangeFunction() {
+      m_codeGen.m_functionScope = std::move(m_previousScope);
+      m_codeGen.m_finallyStack = std::move(m_finallyStack);
+    }
+
+    /// Returns the function scope prior to the function change.
+    std::optional<Scope>& getPreviousScope() {
+      return m_previousScope;
     }
   };
 
@@ -607,13 +638,7 @@ private:
                         ArrayRef<Syntax::Parameter> parameterList,
                         const Syntax::Scope& scope,
                         function_ref<void()> emitFunctionBody, Region& region) {
-    AddQualifiers resetQualifier(*this, funcName, "<locals>");
-
-    ValueReset functionScopeReset(std::move(m_functionScope));
-    m_functionScope.emplace(m_builder);
-
-    mlir::OpBuilder::InsertionGuard guard{m_builder};
-    m_builder.setInsertionPointToEnd(&region.front());
+    ChangeFunction changeFunction(*this, funcName, &region.front());
 
     // First, initialize all locals and non-locals in the function scope.
     // This makes it known to all subsequent reads and writes that the
@@ -635,7 +660,7 @@ private:
         // Python language semantics guarantee that non-locals always refer to
         // cells.
         m_functionScope->identifiers[identifier.getValue()] =
-            pylir::get<Value>(functionScopeReset.getValueAfterReset()
+            pylir::get<Value>(changeFunction.getPreviousScope()
                                   ->identifiers[identifier.getValue()]);
       default: break;
       }
@@ -818,7 +843,7 @@ private:
     std::optional<MarkOpenBlock> openBlock(std::in_place, *this, condition);
     Value nextValue;
     {
-      EnterTry catchException(*this, stopIterationHandler);
+      ChangeEHHandler catchException(*this, stopIterationHandler);
       Value next = create<Py::ConstantOp>(
           m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Next.name));
       nextValue = create<HIR::CallOp>(next, iterator);
@@ -874,7 +899,7 @@ private:
     Block* thenBlock = addBlock();
     Block* exceptionHandler = addBlock(m_builder.getType<Py::DynamicType>());
     {
-      EnterTry enterTry(*this, exceptionHandler);
+      ChangeEHHandler enterTry(*this, exceptionHandler);
       visit(tryStmt.suite);
 
       create<cf::BranchOp>(elseBlock);
