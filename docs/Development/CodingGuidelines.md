@@ -54,7 +54,7 @@ the diff created by git.
 ### Link Library List
 
 A link library list should be formatted the same as described in
-[](source-file-list).
+[](#source-file-list).
 Additionally, linked targets must be grouped first by the
 [scope keyword](https://cmake.org/cmake/help/latest/command/target_link_libraries.html#libraries-for-a-target-and-or-its-dependents)
 in order of `INTERFACE`, `PUBLIC` and `PRIVATE`.
@@ -98,7 +98,7 @@ target_link_libraries(PylirMain
 ### Dependency list
 
 If the list of dependencies in `add_depdencies` is likely to grow, it should be
-formatted the same way as sources described in [](source-file-list).
+formatted the same way as sources described in [](#source-file-list).
 This is most notably the case for any CMake targets depending on code generation
 performed by TableGen.
 

@@ -1,4 +1,4 @@
-sphinx==5.3.*
-furo==2022.9.*
-myst-parser==0.18.*
-docutils>=0.17
+sphinx==7.2.*
+furo==2024.1.*
+myst-parser==2.0.*
+myst-parser[linkify]==2.0.*

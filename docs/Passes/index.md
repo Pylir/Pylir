@@ -2,7 +2,7 @@
 
 Passes listed here are custom passes implemented within Pylir.
 Make sure to also checkout passes implemented in upstream
-MLIR: <https://mlir.llvm.org/docs/Passes/>
+MLIR: https://mlir.llvm.org/docs/Passes/
 
 There are two kinds of passes:
 
