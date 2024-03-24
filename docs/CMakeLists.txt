@@ -5,8 +5,6 @@
 # Create phony target used to collect build dependencies.
 add_custom_target(pylir-doc)
 
-find_program(SPHINX_EXECUTABLE NAMES sphinx-build REQUIRED)
-
 set(PYLIR_PREPROCESS_MLIR_MD "${CMAKE_CURRENT_SOURCE_DIR}/preprocess_mlir_md.py"
   PARENT_SCOPE)
 
@@ -27,7 +25,7 @@ set_target_properties(create-build-dir
 add_dependencies(create-build-dir pylir-doc)
 
 add_custom_target(docs
-  ${SPHINX_EXECUTABLE} -b html . ../build -W --keep-going -n
+  ${Python3_EXECUTABLE} -m sphinx.cmd.build -b html . ../build -W --keep-going -n
   COMMENT "Building Sphinx docs"
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source)
 set_target_properties(docs

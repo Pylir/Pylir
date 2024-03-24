@@ -24,7 +24,7 @@ import sys
 # -- Project information -----------------------------------------------------
 
 project = 'Pylir'
-copyright = '2022, Pylir Contributors'
+copyright = '2024, Pylir Contributors'
 author = 'Pylir Contributors'
 
 # -- General configuration ---------------------------------------------------
@@ -36,13 +36,22 @@ sys.path.append(os.path.abspath('./_ext'))
 # ones.
 extensions = [
     'myst_parser',
-    'globinclude'
+    'globinclude',
 ]
 
-myst_enable_extensions = ['dollarmath']
+myst_enable_extensions = [
+    'dollarmath',
+    'amsmath',
+    'colon_fence',
+    'smartquotes',
+    'replacements',
+    'linkify',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+
+myst_heading_anchors = 3
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
