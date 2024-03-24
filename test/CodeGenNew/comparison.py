@@ -28,6 +28,9 @@ def binary_ops(a, b):
     # CHECK: py.bool_fromI1 %[[IS]]
     a is b
 
+    # CHECK: contains %[[ARG0]] in %[[ARG1]]
+    a in b
+
 
 # CHECK-LABEL: func "__main__.chaining"
 # CHECK-SAME: %[[ARG0:[[:alnum:]]+]]

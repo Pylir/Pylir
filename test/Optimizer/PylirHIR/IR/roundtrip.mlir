@@ -1,4 +1,5 @@
 // RUN: pylir-opt %s | pylir-opt | FileCheck %s
+// RUN: pylir-opt --verify-roundtrip
 
 // CHECK-LABEL: pyHIR.globalFunc @test(
 // CHECK-SAME: %{{[[:alnum:]]+}},
@@ -175,4 +176,13 @@ pyHIR.globalFunc @subscription(%0, %1) {
   // CHECK: delItem %[[ARG1]][%[[ARG0]]]
   delItem %1[%0]
   return %2
+}
+
+// CHECK-LABEL: pyHIR.globalFunc @contains(
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+pyHIR.globalFunc @contains(%container, %item) {
+  // CHECK: contains %[[ARG1]] in %[[ARG0]]
+  %0 = contains %item in %container
+  return %0
 }

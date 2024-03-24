@@ -1321,7 +1321,8 @@ private:
       }
 
       struct IsTag {};
-      std::variant<HIR::BinaryOperation, IsTag> binaryOperation;
+      struct InTag {};
+      std::variant<HIR::BinaryOperation, IsTag, InTag> binaryOperation;
       switch (op.firstToken.getTokenType()) {
       case TokenType::LessThan:
         binaryOperation = HIR::BinaryOperation::Lt;
@@ -1340,10 +1341,7 @@ private:
         binaryOperation = HIR::BinaryOperation::Ne;
         break;
       case TokenType::IsKeyword: binaryOperation = IsTag{}; break;
-      case TokenType::InKeyword:
-        // TODO:
-        PYLIR_UNREACHABLE;
-        break;
+      case TokenType::InKeyword: binaryOperation = InTag{}; break;
       default: PYLIR_UNREACHABLE;
       }
 
@@ -1356,6 +1354,9 @@ private:
           },
           [&](IsTag) -> Value {
             return create<Py::BoolFromI1Op>(create<Py::IsOp>(current, other));
+          },
+          [&](InTag) -> Value {
+            return create<HIR::ContainsOp>(other, current);
           });
       if (invert) {
         Value i1 = toI1(boolean);

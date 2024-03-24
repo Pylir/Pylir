@@ -105,6 +105,42 @@ def PylirHIR_BinAssignOp : PylirHIR_Op<"binAssignOp",
 def PylirHIR_BinAssignExOp
   : CreateExceptionHandlingVariant<PylirHIR_BinAssignOp>;
 
+def PylirHIR_ContainsOp : PylirHIR_Op<"contains",
+  [AddableExceptionHandling<"ContainsExOp">]> {
+  let arguments = (ins DynamicType:$container, DynamicType:$item);
+  let results = (outs DynamicType:$result);
+
+  let description = [{
+    Performs a membership check whether `item` is within `container`.
+
+    This is performed in the following steps:
+    * If the type of `container` implements `__contains__`, calls the method
+      with `item`.
+      Returns true if it returns a truthy value.
+    * Otherwise, if the type of `container` implements `__iter__`, it iterates
+      over `container` and checks whether for any element `z`,
+      `z is item or z == item` is true.
+      Any exceptions raised in the process are propagated as is.
+
+    :::{admonition} TODO
+    :class: note
+
+    * Describe the behaviour of types implementing `__getitem__` in detail.
+    * Implement correctly in lowering: Currently only performs `__contains__`
+      check.
+    :::
+
+    Reference: https://docs.python.org/3.9/reference/expressions.html#membership-test-operations
+  }];
+
+  let assemblyFormat = [{
+    $item `in` $container attr-dict
+  }];
+}
+
+def PylirHIR_ContainsExOp
+  : CreateExceptionHandlingVariant<PylirHIR_ContainsOp>;
+
 //===----------------------------------------------------------------------===//
 // Subscription Operations
 //===----------------------------------------------------------------------===//
