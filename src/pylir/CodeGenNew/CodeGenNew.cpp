@@ -1754,23 +1754,29 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void
-  visitImpl([[maybe_unused]] llvm::ArrayRef<Syntax::StarredItem> starredItems,
-            [[maybe_unused]] Value value) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(ArrayRef<Syntax::StarredItem> starredItems, Value value) {
+    const auto* iter =
+        llvm::find_if(starredItems, [](const Syntax::StarredItem& item) {
+          return item.maybeStar;
+        });
+    std::optional<std::size_t> index;
+    if (iter != starredItems.end())
+      index = iter - starredItems.begin();
+
+    Operation* op = create<Py::UnpackOp>(/*count=*/starredItems.size(),
+                                         /*restIndex=*/index, value);
+    for (auto&& [item, subValue] :
+         llvm::zip_equal(starredItems, op->getResults()))
+      visit(item.expression, subValue);
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::TupleConstruct& tupleConstruct,
-                 [[maybe_unused]] Value value) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::TupleConstruct& tupleConstruct, Value value) {
+    visit(tupleConstruct.items, value);
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::ListDisplay& listDisplay,
-                 [[maybe_unused]] Value value) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::ListDisplay& listDisplay, Value value) {
+    visit(pylir::get<std::vector<Syntax::StarredItem>>(listDisplay.variant),
+          value);
   }
 
   /// Overload for any construct that is a possible alternative for 'Target' in
