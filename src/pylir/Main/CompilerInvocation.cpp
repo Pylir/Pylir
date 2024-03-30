@@ -57,6 +57,7 @@
 
 #include "DiagnosticMessages.hpp"
 
+using namespace mlir;
 using namespace pylir::cli;
 
 namespace {
@@ -371,24 +372,25 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
     if (type == FileType::MLIR) {
       ensureMLIRContext();
       m_mlirContext->allowUnregisteredDialects(false);
-      auto content = readWholeFile(inputFile, commandLine);
-      if (mlir::failed(content))
-        return mlir::failure();
+      FailureOr<std::string> content = readWholeFile(inputFile, commandLine);
+      if (failed(content))
+        return failure();
 
-      // verifyAfterParse is disabled as the verifiers rely on 'RefAttr' being
-      // linked, which may only happen after 'pylir-finalize-ref-attrs' pass has
-      // run.
-      auto config =
-          mlir::ParserConfig(&*m_mlirContext, /*verifyAfterParse=*/false);
+      auto config = ParserConfig(&*m_mlirContext, /*verifyAfterParse=*/true);
       if (auto buffer = llvm::MemoryBufferRef(*content, inputFile->getValue());
-          mlir::isBytecode(buffer)) {
-        auto body = std::make_unique<mlir::Block>();
-        if (mlir::failed(mlir::readBytecodeFile(buffer, body.get(), config)))
-          return mlir::failure();
+          isBytecode(buffer)) {
+        std::unique_ptr<Block> body = std::make_unique<mlir::Block>();
+        if (failed(readBytecodeFile(buffer, body.get(), config)))
+          return failure();
 
         mlirModule = buildModuleIfNecessary(std::move(body), &*m_mlirContext);
       } else {
-        mlirModule = mlir::parseSourceString<mlir::ModuleOp>(*content, config);
+        mlirModule = parseSourceString<ModuleOp>(*content, config,
+                                                 inputFile->getValue());
+        // Call above should have emitted an error message through the context's
+        // diagnostic handler in the error case.
+        if (!mlirModule)
+          return failure();
       }
     }
     mlir::PassManager manager(&*m_mlirContext);
