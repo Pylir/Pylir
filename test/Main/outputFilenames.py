@@ -8,14 +8,6 @@
 # RUN: pylir outputFilenames.mlir -c -emit-pylir
 # RUN: ls outputFilenames.mlirbc
 
-# RUN: rm outputFilenames.mlir
-# RUN: pylir outputFilenames.mlirbc -S -emit-mlir
-# RUN: ls outputFilenames.mlir
-
-# RUN: rm outputFilenames.mlirbc
-# RUN: pylir outputFilenames.mlir -c -emit-mlir
-# RUN: ls outputFilenames.mlirbc
-
 # RUN: pylir outputFilenames.mlirbc -c -emit-llvm
 # RUN: ls outputFilenames.bc
 

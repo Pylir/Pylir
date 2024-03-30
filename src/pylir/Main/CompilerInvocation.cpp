@@ -322,8 +322,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
   const auto& args = commandLine.getArgs();
 
   auto shouldOutput = [&args](pylir::cli::ID id) {
-    auto* outputFormatArg =
-        args.getLastArg(OPT_emit_llvm, OPT_emit_mlir, OPT_emit_pylir);
+    auto* outputFormatArg = args.getLastArg(OPT_emit_llvm, OPT_emit_pylir);
     return outputFormatArg && outputFormatArg->getOption().getID() == id;
   };
 
@@ -435,7 +434,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
               manager)))
         return mlir::failure();
 
-    if (shouldOutput(OPT_emit_mlir) || shouldOutput(OPT_emit_pylir)) {
+    if (shouldOutput(OPT_emit_pylir)) {
       if (mlir::failed(manager.run(*mlirModule)))
         return mlir::failure();
 
@@ -684,7 +683,7 @@ std::string formDefaultOutputName(const llvm::opt::InputArgList& args,
     inputFilename.resize(inputFilename.size() - extension.size());
 
   std::string defaultName;
-  if (args.hasArg(OPT_emit_mlir, OPT_emit_pylir)) {
+  if (args.hasArg(OPT_emit_pylir)) {
     if (action == pylir::CompilerInvocation::ObjectFile)
       defaultName = inputFilename + ".mlirbc";
     else

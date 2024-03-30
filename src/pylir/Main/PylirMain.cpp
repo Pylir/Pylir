@@ -114,12 +114,10 @@ int pylir::main(int argc, char** argv) {
           .addHighlight(syntaxOnly, Diag::flags::secondaryColour);
     };
 
-    if (auto* lastIR =
-            args.getLastArg(OPT_emit_llvm, OPT_emit_mlir, OPT_emit_pylir)) {
+    if (auto* lastIR = args.getLastArg(OPT_emit_llvm, OPT_emit_pylir)) {
       std::string_view name;
       switch (lastIR->getOption().getID()) {
       case OPT_emit_llvm: name = "LLVM IR"; break;
-      case OPT_emit_mlir: name = "MLIR IR"; break;
       case OPT_emit_pylir: name = "Pylir IR"; break;
       }
       diagActionWithIR(lastIR, name);
@@ -133,13 +131,13 @@ int pylir::main(int argc, char** argv) {
     action = arg->getOption().getID() == OPT_S
                  ? pylir::CompilerInvocation::Assembly
                  : pylir::CompilerInvocation::ObjectFile;
-  } else if (args.hasArg(OPT_emit_llvm, OPT_emit_pylir, OPT_emit_mlir)) {
+  } else if (args.hasArg(OPT_emit_llvm, OPT_emit_pylir)) {
     action = pylir::CompilerInvocation::Assembly;
   }
 
   if (auto* opt = args.getLastArg(OPT_O);
       opt && opt->getValue() == std::string_view{"4"} &&
-      !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm) &&
+      !args.hasArg(OPT_emit_pylir, OPT_emit_llvm) &&
       (action == pylir::CompilerInvocation::Assembly ||
        action == pylir::CompilerInvocation::ObjectFile) &&
       !args.hasArg(OPT_flto, OPT_fno_lto)) {
@@ -153,7 +151,7 @@ int pylir::main(int argc, char** argv) {
 
   if (auto* opt = args.getLastArg(OPT_flto, OPT_fno_lto);
       opt && opt->getOption().matches(OPT_flto) &&
-      !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm) &&
+      !args.hasArg(OPT_emit_pylir, OPT_emit_llvm) &&
       (action == pylir::CompilerInvocation::Assembly ||
        action == pylir::CompilerInvocation::ObjectFile)) {
     commandLine
