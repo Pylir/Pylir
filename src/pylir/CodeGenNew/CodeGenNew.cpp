@@ -1504,10 +1504,10 @@ private:
     }
   }
 
-  mlir::Value
-  visitImpl([[maybe_unused]] const Syntax::AttributeRef& attributeRef) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  Value visitImpl(const Syntax::AttributeRef& attributeRef) {
+    Value object = visit(attributeRef.object);
+    return create<HIR::GetAttributeOp>(object,
+                                       attributeRef.identifier.getValue());
   }
 
   mlir::Value visitImpl([[maybe_unused]] const Syntax::Slice& slice) {
@@ -1748,10 +1748,9 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::AttributeRef& attributeRef,
-                 [[maybe_unused]] Value value) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::AttributeRef& attributeRef, Value value) {
+    create<HIR::SetAttrOp>(visit(attributeRef.object),
+                           attributeRef.identifier.getValue(), value);
   }
 
   void visitImpl(ArrayRef<Syntax::StarredItem> starredItems, Value value) {
