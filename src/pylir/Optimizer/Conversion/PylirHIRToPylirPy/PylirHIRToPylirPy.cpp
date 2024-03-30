@@ -296,6 +296,39 @@ struct DelItemOpConversionPattern
   }
 };
 
+struct GetAttributeOpConversionPattern
+    : OpExRewritePattern<GetAttributeOpConversionPattern, GetAttributeOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__getattribute__",
+        ValueRange{op.getObject(),
+                   rewriter.create<Py::ConstantOp>(
+                       op.getLoc(),
+                       rewriter.getAttr<Py::StrAttr>(op.getAttribute()))});
+    return success();
+  }
+};
+
+struct SetAttrOpConversionPattern
+    : OpExRewritePattern<SetAttrOpConversionPattern, SetAttrOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__setattr__",
+        ValueRange{
+            op.getObject(),
+            rewriter.create<Py::ConstantOp>(
+                op.getLoc(), rewriter.getAttr<Py::StrAttr>(op.getAttribute())),
+            op.getValue()});
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
@@ -937,6 +970,45 @@ void buildTernaryOpCompilerBuiltin(PyBuilder& builder, StringRef functionName,
   builder.create<Py::ReturnOp>(result);
 }
 
+void buildGetAttributeOpCompilerBuiltin(PyBuilder& builder,
+                                        StringRef functionName,
+                                        TypeSlots method) {
+  auto func = builder.create<Py::FuncOp>(
+      functionName, builder.getFunctionType(
+                        {builder.getDynamicType(), builder.getDynamicType()},
+                        builder.getDynamicType()));
+  OpBuilder::InsertionGuard guard{builder};
+  builder.setInsertionPointToStart(func.addEntryBlock());
+  Value lhs = func.getArgument(0);
+  Value rhs = func.getArgument(1);
+
+  auto tuple = builder.createMakeTuple({lhs, rhs}, nullptr);
+  auto dict = builder.createMakeDict();
+  auto* attrError = new Block;
+  attrError->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+  auto result = buildSpecialMethodCall(builder, method, tuple, dict, attrError);
+  builder.create<Py::ReturnOp>(result);
+
+  // If __getattribute__ raises an AttributeError we have to automatically call
+  // __getattr__.
+  implementBlock(builder, attrError);
+  auto exception = attrError->getArgument(0);
+  auto ref = builder.createAttributeErrorRef();
+  auto exceptionType = builder.createTypeOf(exception);
+  auto isAttributeError = builder.createIs(exceptionType, ref);
+  auto* reraiseBlock = new Block;
+  auto* getattrBlock = new Block;
+  builder.create<cf::CondBranchOp>(isAttributeError, getattrBlock,
+                                   reraiseBlock);
+
+  implementBlock(builder, reraiseBlock);
+  builder.createRaise(exception);
+
+  implementBlock(builder, getattrBlock);
+  result = builder.createPylirGetAttrIntrinsic(lhs, rhs);
+  builder.create<Py::ReturnOp>(result);
+}
+
 } // namespace
 
 void ConvertPylirHIRToPylirPy::runOnOperation() {
@@ -970,6 +1042,9 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
           *symbolizeBinaryAssignment(#slotName)));
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
+  buildGetAttributeOpCompilerBuiltin(builder, "pylir__getattribute__",
+                                     TypeSlots::GetAttribute);
+
   ConversionTarget target(getContext());
   target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
@@ -981,7 +1056,8 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
                CallOpConversionPattern, BinOpConversionPattern,
                BinAssignOpConversionPattern, InitModuleOpConversionPattern,
                GetItemOpConversionPattern, SetItemOpConversionPattern,
-               DelItemOpConversionPattern, ContainsOpConversionPattern>(
+               DelItemOpConversionPattern, ContainsOpConversionPattern,
+               GetAttributeOpConversionPattern, SetAttrOpConversionPattern>(
       &getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))

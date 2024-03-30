@@ -187,6 +187,39 @@ def PylirHIR_DelItemExOp
   : CreateExceptionHandlingVariant<PylirHIR_DelItemOp>;
 
 //===----------------------------------------------------------------------===//
+// Attribute Operations
+//===----------------------------------------------------------------------===//
+
+def PylirHIR_GetAttributeOp : PylirHIR_Op<"getAttribute",
+  [AddableExceptionHandling<"GetAttributeExOp">]> {
+  let arguments = (ins DynamicType:$object, StrAttr:$attribute);
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+    $attribute `of` $object attr-dict
+  }];
+}
+
+def PylirHIR_GetAttributeExOp
+  : CreateExceptionHandlingVariant<PylirHIR_GetAttributeOp>;
+
+def PylirHIR_SetAttrOp : PylirHIR_Op<"setAttr",
+  [AddableExceptionHandling<"SetAttrExOp">]> {
+  let arguments = (ins DynamicType:$object,
+                       StrAttr:$attribute,
+                       DynamicType:$value);
+
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+     $attribute `of` $object `to` $value attr-dict
+  }];
+}
+
+def PylirHIR_SetAttrExOp
+  : CreateExceptionHandlingVariant<PylirHIR_SetAttrOp>;
+
+//===----------------------------------------------------------------------===//
 // Call Operations
 //===----------------------------------------------------------------------===//
 
