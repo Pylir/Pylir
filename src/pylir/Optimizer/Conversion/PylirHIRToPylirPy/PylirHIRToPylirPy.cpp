@@ -244,6 +244,19 @@ struct BinAssignOpConversionPattern
   }
 };
 
+struct ContainsOpConversionPattern
+    : OpExRewritePattern<ContainsOpConversionPattern, ContainsOp> {
+  using Base::Base;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    rewriter.replaceOpWithNewOp<Py::CallOp>(
+        op, op.getType(), "pylir__contains__",
+        ValueRange{op.getContainer(), op.getItem()});
+    return success();
+  }
+};
+
 struct GetItemOpConversionPattern
     : OpExRewritePattern<GetItemOpConversionPattern, GetItemOp> {
   using Base::Base;
@@ -968,7 +981,8 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
                CallOpConversionPattern, BinOpConversionPattern,
                BinAssignOpConversionPattern, InitModuleOpConversionPattern,
                GetItemOpConversionPattern, SetItemOpConversionPattern,
-               DelItemOpConversionPattern>(&getContext());
+               DelItemOpConversionPattern, ContainsOpConversionPattern>(
+      &getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
