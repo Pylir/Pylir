@@ -34,7 +34,6 @@ def grp_actions : OptionGroup<"Actions">, HelpText<"Action options">;
 
 def c : F<"c", "Emit object file instead of final executable">, Group<grp_actions>;
 def emit_llvm : F<"emit-llvm", "Emit LLVM IR">, Group<grp_actions>;
-def emit_mlir : F<"emit-mlir", "Emit MLIR IR">, Group<grp_actions>;
 def emit_pylir : F<"emit-pylir", "Emit Pylir IR">, Group<grp_actions>;
 def dump_ast : F<"dump-ast", "Dump AST for input file to stdout">, Group<grp_actions>;
 def S : F<"S", "Emit textual assembly file">, Group<grp_actions>;

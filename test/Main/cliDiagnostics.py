@@ -2,10 +2,6 @@
 # RUN: --check-prefix=SYNTAX_ONLY_LLVM
 # SYNTAX_ONLY_LLVM: LLVM IR won't be emitted when only checking syntax
 
-# RUN: pylir -emit-mlir -fsyntax-only %s 2>&1 | FileCheck %s \
-# RUN: --check-prefix=SYNTAX_ONLY_MLIR
-# SYNTAX_ONLY_MLIR: MLIR IR won't be emitted when only checking syntax
-
 # RUN: pylir -emit-pylir -fsyntax-only %s 2>&1 | FileCheck %s \
 # RUN: --check-prefix=SYNTAX_ONLY_PYLIR
 # SYNTAX_ONLY_PYLIR: Pylir IR won't be emitted when only checking syntax
