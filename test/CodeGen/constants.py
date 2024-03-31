@@ -1,6 +1,6 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK: #[[NONE:.*]] = #py.globalValue<builtins.None,
+# CHECK: #[[NONE:.*]] = #py.globalValue<builtins.None{{(,|>)}}
 
 5
 # CHECK: constant(#py.int<5>)

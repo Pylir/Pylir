@@ -1,4 +1,4 @@
-# RUN: pylir %s -Xnew-codegen -emit-pylir -o - -c -S | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
 # CHECK: #[[$IS_INSTANCE:.*]] = #py.globalValue<builtins.isinstance{{>|,}}
 # CHECK: #[[$TYPE:.*]] = #py.globalValue<builtins.type{{>|,}}

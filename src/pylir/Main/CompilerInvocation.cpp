@@ -43,12 +43,12 @@
 #include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
-#include <pylir/CodeGenNew/CodeGenNew.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
 #include <pylir/Optimizer/Linker/Linker.hpp>
 #include <pylir/Optimizer/Optimizer.hpp>
+#include <pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
@@ -654,6 +654,7 @@ void pylir::CompilerInvocation::ensureMLIRContext() {
 
   mlir::DialectRegistry registry;
   registry.insert<pylir::Py::PylirPyDialect>();
+  registry.insert<pylir::HIR::PylirHIRDialect>();
   registry.insert<pylir::Mem::PylirMemDialect>();
   registry.insert<mlir::arith::ArithDialect>();
   registry.insert<mlir::LLVM::LLVMDialect>();
@@ -926,10 +927,6 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
   // Protects 'm_fileInputs' and 'm_documents'.
   std::mutex sourceDSMutex;
 
-  auto codeGenBackend = pylir::codegen;
-  if (args.hasArg(OPT_Xnew_codegen))
-    codeGenBackend = pylir::codegenNew;
-
   llvm::ThreadPoolTaskGroup taskGroup(*m_threadPool);
   options.moduleLoadCallback =
       [&](llvm::StringRef absoluteModule,
@@ -1014,7 +1011,7 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
 
           CodeGenOptions copyOption = options;
           copyOption.qualifier = std::move(absoluteModule);
-          mlir::OwningOpRef<mlir::ModuleOp> res = codeGenBackend(
+          mlir::OwningOpRef<mlir::ModuleOp> res = pylir::codegenModule(
               &*m_mlirContext, fileInput, docManager, copyOption);
           if (docManager.errorsOccurred())
             return nullptr;
@@ -1032,13 +1029,14 @@ pylir::CompilerInvocation::codegenPythonToMLIR(
   {
     std::unique_lock lock{dataStructureMutex};
 
+    options.qualifier = "__main__";
     futures.emplace_back(
         m_threadPool->async(taskGroup,
                             [&]() -> mlir::ModuleOp {
                               mlir::OwningOpRef<mlir::ModuleOp> mainModule =
-                                  codeGenBackend(
-                                      &*m_mlirContext, m_fileInputs.front(),
-                                      mainModuleDiagManager, options);
+                                  codegenModule(&*m_mlirContext,
+                                                m_fileInputs.front(),
+                                                mainModuleDiagManager, options);
                               if (mainModuleDiagManager.errorsOccurred())
                                 return nullptr;
 

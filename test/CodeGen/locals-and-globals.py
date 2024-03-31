@@ -1,4 +1,4 @@
-# RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
 # CHECK-LABEL: init "__main__"
 # CHECK: %[[TEST1:.*]] = func "__main__.test1"

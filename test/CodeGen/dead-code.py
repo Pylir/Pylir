@@ -1,10 +1,17 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK: #[[NONE_ATTR:.*]] = #py.globalValue<builtins.None,
+# CHECK: #[[$NONE:.*]] = #py.globalValue<builtins.None{{(,|>)}}
+
+# CHECK-LABEL: func "__main__.foo"
 def foo():
+    # CHECK: %[[CONSTANT:.*]] = py.constant(#[[$NONE]])
+    # CHECK: return %[[CONSTANT]]
+
+    # CHECK-NEXT: ^{{[[:alnum:]]+}}:
+    # CHECK: %[[ONE:.*]] = py.constant(#py.int<1>)
+    # CHECK: %[[TWO:.*]] = py.constant(#py.int<2>)
+    # CHECK: %[[OP:.*]] = binOp %[[ONE]] __add__ %[[TWO]]
+    # CHECK: %[[CONSTANT:.*]] = py.constant(#[[$NONE]])
+    # CHECK: return %[[CONSTANT]]
     return
     1 + 2
-
-# CHECK: func private @"foo$impl[0]"
-# CHECK: %[[NONE:.*]] = constant(#[[NONE_ATTR]])
-# CHECK-NEXT: return %[[NONE]]

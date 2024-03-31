@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_subdirectory(CodeGen)
-add_subdirectory(CodeGenNew)
 add_subdirectory(Diagnostics)
 add_subdirectory(Lexer)
 add_subdirectory(LLVM)

@@ -1,48 +1,71 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK-DAG: #[[$ITER:.*]] = #py.globalValue<builtins.iter,
-# CHECK-DAG: #[[$NEXT:.*]] = #py.globalValue<builtins.next,
-# CHECK-DAG: #[[$PRINT:.*]] = #py.globalValue<builtins.print,
-# CHECK-DAG: #[[$STOP:.*]] = #py.globalValue<builtins.StopIteration,
+# CHECK-DAG: #[[$ITER:.*]] = #py.globalValue<builtins.iter{{>|,}}
+# CHECK-DAG: #[[$NEXT:.*]] = #py.globalValue<builtins.next{{>|,}}
+# CHECK-DAG: #[[$ISINSTANCE:.*]] = #py.globalValue<builtins.isinstance{{>|,}}
+# CHECK-DAG: #[[$STOPITERATION:.*]] = #py.globalValue<builtins.StopIteration{{>|,}}
 
-for i in (3, 5, 7):
-    print(i)
+# CHECK-LABEL: func "__main__.test"
+# CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+def test(iter):
+    # CHECK: %[[ITER:.*]] = py.constant(#[[$ITER]])
+    # CHECK: %[[ITERATOR:.*]] = call %[[ITER]](%[[ARG0]])
+    # CHECK: cf.br ^[[CONDITION:[[:alnum:]]+]]
+    # CHECK: ^[[CONDITION]]:
+    # CHECK: %[[NEXT:.*]] = py.constant(#[[$NEXT]])
+    # CHECK: %[[I:.*]] = callEx %[[NEXT]](%[[ITERATOR]])
+    # CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[CATCH:[[:alnum:]]+]]
+    # CHECK: ^[[CONTINUE]]:
+    # CHECK: cf.br ^[[BODY:[[:alnum:]]+]]
+    for i in iter:
+        # CHECK: ^[[BODY]]:
+        # CHECK: call %{{.*}}(%[[I]])
+        # CHECK: cf.br ^[[CONDITION]]
+        print(i)
+    # CHECK: ^[[CATCH]](%[[EXC:.*]]: !py.dynamic {{.*}}):
+    # CHECK-DAG: %[[ISINSTANCE:.*]] = py.constant(#[[$ISINSTANCE]])
+    # CHECK-DAG: %[[STOPITERATION:.*]] = py.constant(#[[$STOPITERATION]])
+    # CHECK: %[[BOOL:.*]] = call %[[ISINSTANCE]](%[[EXC]], %[[STOPITERATION]])
+    # CHECK: %[[I1:.*]] = py.bool_toI1 %[[BOOL]]
+    # CHECK: cf.cond_br %[[I1]], ^[[ELSE:.*]], ^[[RERAISE:[[:alnum:]]+]]
+    # CHECK: ^[[RERAISE]]:
+    # CHECK: raise %[[EXC]]
+    else:
+        # CHECK: ^[[ELSE]]:
+        # CHECK: call %{{.*}}()
+        # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
+        print()
+    # CHECK: ^[[THEN]]:
+    # CHECK: return
 
-# CHECK: %[[THREE:.*]] = constant(#py.int<3>)
-# CHECK: %[[FIVE:.*]] = constant(#py.int<5>)
-# CHECK: %[[SEVEN:.*]] = constant(#py.int<7>)
-# CHECK: %[[TUPLE:.*]] = makeTuple (%[[THREE]], %[[FIVE]], %[[SEVEN]])
-# CHECK: %[[ITER_F:.*]] = constant(#[[$ITER]])
-# CHECK: %[[ARGS:.*]] = makeTuple (%[[TUPLE]])
-# CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-# CHECK: %[[ITER:.*]] = call @pylir__call__(%[[ITER_F]], %[[ARGS]], %[[DICT]])
-# CHECK: cf.br ^[[COND:[[:alnum:]]+]]
 
-# CHECK: ^[[COND]]:
-# CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
-# CHECK: %[[ARGS:.*]] = makeTuple (%[[ITER]])
-# CHECK: %[[ITEM:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[ARGS]], %[[DICT]])
-# CHECK-NEXT: label ^[[ASSIGN:.*]] unwind ^[[EXIT:[[:alnum:]]+]]
+# CHECK-LABEL: func "__main__.break_for"
+def break_for(iter):
+    # CHECK: %[[I:.*]] = callEx %{{[[:alnum:]]+}}(%{{[[:alnum:]]+}})
+    # CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[CATCH:[[:alnum:]]+]]
+    # CHECK: ^[[CONTINUE]]:
+    # CHECK: cf.br ^[[BODY:[[:alnum:]]+]]
+    for i in iter:
+        # CHECK: ^[[BODY]]:
+        # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
+        break
+    # CHECK: ^[[CATCH]](%[[EXC:.*]]: !py.dynamic {{.*}}):
+    # CHECK: cf.cond_br %{{[[:alnum:]]+}}, ^[[ELSE:.*]], ^{{[[:alnum:]]+}}
+    # CHECK: ^[[ELSE]]:
+    # CHECK: cf.br ^[[THEN]]
+    # CHECK: ^[[THEN]]:
+    # CHECK: return
 
-# CHECK: ^[[ASSIGN]]:
-# CHECK: store %[[ITEM]] : !py.dynamic into @i$handle
-# CHECK: cf.br ^[[BODY:[[:alnum:]]+]]
 
-# CHECK: ^[[BODY]]:
-# CHECK: %[[PRINT:.*]] = constant(#[[$PRINT]])
-# CHECK: %[[ITEM:.*]] = load @i$handle
-# CHECK: %[[ARGS:.*]] = makeTuple (%[[ITEM]])
-# CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
-# CHECK: call @pylir__call__(%[[PRINT]], %[[ARGS]], %[[DICT]])
-# CHECK: cf.br ^[[COND]]
-
-# CHECK: ^[[EXIT]](%[[EXC:.*]]: !py.dynamic loc({{.*}})):
-# CHECK: %[[STOP_ITER:.*]] = constant(#[[$STOP]])
-# CHECK: %[[EXC_TYPE:.*]] = typeOf %[[EXC]]
-# CHECK: %[[IS:.*]] = is %[[STOP_ITER]], %[[EXC_TYPE]]
-# CHECK: cf.cond_br %[[IS]], ^[[END:.*]], ^[[RERAISE:[[:alnum:]]+]]
-
-# CHECK: ^[[RERAISE]]:
-# CHECK: raise %[[EXC]]
-
-# CHECK: ^[[END]]:
+# CHECK-LABEL: func "__main__.continue_for"
+def continue_for(iter):
+    # CHECK: cf.br ^[[CONDITION:[[:alnum:]]+]]
+    # CHECK: ^[[CONDITION]]:
+    # CHECK: %[[I:.*]] = callEx %{{[[:alnum:]]+}}(%{{[[:alnum:]]+}})
+    # CHECK-NEXT: label ^[[CONTINUE:[[:alnum:]]+]]
+    # CHECK: ^[[CONTINUE]]:
+    # CHECK: cf.br ^[[BODY:[[:alnum:]]+]]
+    for i in iter:
+        # CHECK: ^[[BODY]]:
+        # CHECK: cf.br ^[[CONDITION]]
+        continue

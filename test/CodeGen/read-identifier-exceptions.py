@@ -1,4 +1,4 @@
-# RUN: pylir %s -Xnew-codegen -emit-pylir -o - -S | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
 # CHECK-DAG: #[[$NAME_ERROR:.*]] = #py.globalValue<builtins.NameError{{>|,}}
 # CHECK-DAG: #[[$UNBOUND_LOCAL_ERROR:.*]] = #py.globalValue<builtins.UnboundLocalError{{>|,}}
