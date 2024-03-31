@@ -1579,7 +1579,7 @@ private:
         return create<Py::ConstantOp>(m_builder.getAttr<Py::UnboundAttr>());
       }
 
-      return callIntrinsic(std::move(*intr), *args, call);
+      return callIntrinsic(*intr, *args, call);
     }
 
     Value callable = visit(call.expression);

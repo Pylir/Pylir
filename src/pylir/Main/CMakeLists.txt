@@ -34,8 +34,6 @@ target_link_libraries(PylirMain
   PRIVATE
   CodeGen
   
-  PylirHIRToPylirPy
-  PylirHIRTransforms
   PylirLinker
   PylirOptimizer
   PylirToLLVMIR

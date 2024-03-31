@@ -17,6 +17,8 @@ add_library(PylirOptimizer
 )
 target_link_libraries(PylirOptimizer
   PRIVATE
+  PylirHIRToPylirPy
+  PylirHIRTransforms
   PylirMemTransforms
   PylirPyToPylirMem
   PylirPyTransforms
