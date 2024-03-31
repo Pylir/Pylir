@@ -26,8 +26,14 @@ pyHIR.globalFunc @basic(%closure, %arg0, %arg1 "first" has_default, *%arg2, %arg
 // CHECK: %[[VALUE:.*]] = tuple_getItem %[[TUPLE]][%[[ZERO]]]
 // CHECK: cf.br ^[[BB2]](%[[VALUE]] : !py.dynamic)
 
-// %arg1 code:
 // CHECK: ^[[BB2]](%[[ARG0:.*]]: !py.dynamic):
+// CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[ARG0]]
+// CHECK: %[[TRUE:.*]] = arith.constant true
+// CHECK: %[[BOUND:.*]] = arith.xori %[[IS_UNBOUND]], %[[TRUE]]
+// TODO: This should throw a type error.
+// CHECK: cf.assert %[[BOUND]]
+
+// %arg1 code:
 // CHECK: %[[ONE:.*]] = arith.constant 1
 // CHECK: %[[LT:.*]] = arith.cmpi ult, %[[ONE]], %[[ARG_LEN]]
 // CHECK: cf.cond_br %[[LT]], ^[[BB3:.*]], ^[[BB4:.*]](%[[UNBOUND]] : !py.dynamic)
@@ -56,8 +62,14 @@ pyHIR.globalFunc @basic(%closure, %arg0, %arg1 "first" has_default, *%arg2, %arg
 // CHECK: %[[DEFAULT:.*]] = tuple_getItem %[[DEFAULT_TUPLE]][%[[ZERO]]]
 // CHECK: cf.br ^[[BB8]](%[[DEFAULT]] : !py.dynamic)
 
-// %arg3 code:
 // CHECK: ^[[BB8]](%[[ARG1:.*]]: !py.dynamic):
+// CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[ARG1]]
+// CHECK: %[[TRUE:.*]] = arith.constant true
+// CHECK: %[[BOUND:.*]] = arith.xori %[[IS_UNBOUND]], %[[TRUE]]
+// TODO: This should throw a type error.
+// CHECK: cf.assert %[[BOUND]]
+
+// %arg3 code:
 // CHECK: %[[KW:.*]] = constant(#py.str<"second">)
 // CHECK: %[[HASH:.*]] = str_hash %[[KW]]
 // CHECK: %[[LOOKUP:.*]] = dict_tryGetItem %[[DICT]][%[[KW]] hash(%[[HASH]])]
