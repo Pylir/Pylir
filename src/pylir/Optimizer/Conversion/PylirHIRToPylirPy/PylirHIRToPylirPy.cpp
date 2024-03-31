@@ -499,8 +499,12 @@ Py::FuncOp buildFunctionCC(OpBuilder& builder, GlobalFuncOp implementation,
     Value notFound = builder.create<Py::IsUnboundValueOp>(loc, currentArg);
     if (!parameter.hasDefault()) {
       // TODO: This should raise a 'TypeError'.
-      builder.create<cf::AssertOp>(loc, notFound,
-                                   "failed to find argument for parameter");
+      builder.create<cf::AssertOp>(
+          loc,
+          builder.create<arith::XOrIOp>(loc, notFound,
+                                        builder.create<arith::ConstantOp>(
+                                            loc, builder.getBoolAttr(true))),
+          "failed to find argument for parameter");
       continue;
     }
 
@@ -530,8 +534,12 @@ Py::FuncOp buildFunctionCC(OpBuilder& builder, GlobalFuncOp implementation,
     currentArg = afterDefault->getArgument(0);
     notFound = builder.create<Py::IsUnboundValueOp>(loc, currentArg);
     // TODO: This should raise a 'TypeError'.
-    builder.create<cf::AssertOp>(loc, notFound,
-                                 "failed to find argument for parameter");
+    builder.create<cf::AssertOp>(
+        loc,
+        builder.create<arith::XOrIOp>(
+            loc, notFound,
+            builder.create<arith::ConstantOp>(loc, builder.getBoolAttr(true))),
+        "failed to find argument for parameter");
   }
 
   if (positionalRestArgsPos) {
