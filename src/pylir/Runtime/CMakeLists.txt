@@ -82,7 +82,7 @@ list(FILTER gc_sources EXCLUDE REGEX "src/heap/base/asm/.*\.cc")
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64")
   list(APPEND gc_sources "${oilpan_SOURCE_DIR}/src/heap/base/asm/x64/push_registers_asm.cc")
 endif ()
-add_library(PylirOilpan EXCLUDE_FROM_ALL ${gc_sources})
+add_library(PylirOilpan OBJECT EXCLUDE_FROM_ALL ${gc_sources})
 target_include_directories(PylirOilpan PUBLIC "${oilpan_SOURCE_DIR}")
 target_compile_definitions(PylirOilpan PRIVATE CPPGC_IS_STANDALONE CPPGC_CAGED_HEAP CPPGC_YOUNG_GENERATION)
 
