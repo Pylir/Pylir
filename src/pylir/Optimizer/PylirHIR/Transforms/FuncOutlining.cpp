@@ -69,25 +69,36 @@ void FuncOutlining::runOnOperation() {
         //       iterator to the inserted element.
         llvm::MapVector<Value, std::monostate> captured;
         WalkResult result = funcOp.getBody().walk([&](Operation* operation) {
-          for (OpOperand& value : operation->getOpOperands()) {
-            Region* currentRegion = value.get().getParentRegion();
+          for (OpOperand& opOperand : operation->getOpOperands()) {
+            Value value = opOperand.get();
+            Region* currentRegion = value.getParentRegion();
             while (currentRegion && currentRegion != &funcOp.getRegion())
               currentRegion = currentRegion->getParentRegion();
             if (currentRegion)
               continue;
 
-            auto* iter = captured.insert({value.get(), std::monostate{}}).first;
-            std::size_t index = iter - captured.begin();
-
             OpBuilder::InsertionGuard guard{builder};
             builder.setInsertionPoint(operation);
-            Value replacement = builder.create<Py::FunctionGetClosureArgOp>(
-                operation->getLoc(), tempClosure, index,
-                builder.getTypeArrayAttr(
-                    llvm::map_to_vector(llvm::make_first_range(llvm::make_range(
-                                            captured.begin(), std::next(iter))),
-                                        std::mem_fn(&Value::getType))));
-            value.set(replacement);
+            Value replacement;
+            // Avoid capturing constant operations. Rather materialize these
+            // constants within the 'globalFunc' operation as well.
+            if (matchPattern(value, m_Constant())) {
+              // 'm_Constant' asserts that value is an 'OpResult' of an
+              // operation containing one result.
+              replacement =
+                  builder.insert(value.getDefiningOp()->clone())->getResult(0);
+            } else {
+              auto* iter = captured.insert({value, std::monostate{}}).first;
+              std::size_t index = iter - captured.begin();
+
+              replacement = builder.create<Py::FunctionGetClosureArgOp>(
+                  operation->getLoc(), tempClosure, index,
+                  builder.getTypeArrayAttr(llvm::map_to_vector(
+                      llvm::make_first_range(
+                          llvm::make_range(captured.begin(), std::next(iter))),
+                      std::mem_fn(&Value::getType))));
+            }
+            opOperand.set(replacement);
           }
           return WalkResult::advance();
         });
