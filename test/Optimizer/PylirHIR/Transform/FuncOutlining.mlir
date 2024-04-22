@@ -90,3 +90,22 @@ pyHIR.init "non_locals" {
 // CHECK-SAME: %[[CLOSURE:[[:alnum:]]+]]
 // CHECK: %[[ARG:.*]] = py.function_closureArg %[[CLOSURE]][0] : [!py.dynamic]
 // CHECK: return %[[ARG]]
+
+// -----
+
+
+// CHECK-LABEL: init "constants"
+pyHIR.init "constants" {
+  %0 = py.constant (#py.str<"text">)
+  // CHECK: py.makeFunc @[[BASIC1:[[:alnum:]]+]]
+  // CHECK-NOT: [
+  // CHECK: {{$}}
+  %1 = func "basic"() {
+    return %0
+  }
+  init_return %1
+}
+
+// CHECK: globalFunc @[[BASIC1]](
+// CHECK-NEXT: %[[ARG:.*]] = py.constant(#py.str
+// CHECK-NEXT: return %[[ARG]]
