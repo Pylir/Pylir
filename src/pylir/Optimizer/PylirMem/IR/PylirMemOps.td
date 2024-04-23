@@ -6,8 +6,9 @@
 #define PYLIR_OPS_TABLEGEN
 
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
-include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.td"
 include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.td"
+include "pylir/Optimizer/PylirMem/IR/PylirMemEnums.td"
+include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
@@ -17,7 +18,6 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
-include "mlir/IR/EnumAttr.td"
 
 defvar ObjectAttr = PylirPy_ObjectAttr;
 defvar MemoryType = PylirMem_MemoryType;
@@ -65,25 +65,6 @@ def PylirMem_GCAllocFunctionOp : PylirMem_Op<"gcAllocFunction"> {
   let assemblyFormat = [{
     $closure_args_types attr-dict
   }];
-}
-
-/// Object layouts known to the compiler with a static size. May be replaced
-/// with some kind of type descriptors if we ever introduce custom object
-/// layouts as an optimization.
-def PylirMem_LayoutTypeAttr : I32EnumAttr<"LayoutType",
-  "Enum of types with known object layouts", [
-  I32EnumAttrCase<"Object", 0, "object">,
-  I32EnumAttrCase<"Type", 1, "type">,
-  I32EnumAttrCase<"Float", 2, "float">,
-  I32EnumAttrCase<"Function", 3, "function">,
-  I32EnumAttrCase<"Tuple", 4, "tuple">,
-  I32EnumAttrCase<"List", 5, "list">,
-  I32EnumAttrCase<"String", 6, "string">,
-  I32EnumAttrCase<"Dict", 7, "dict">,
-  I32EnumAttrCase<"Int", 8, "int">,
-  I32EnumAttrCase<"BaseException", 9>,
-]> {
-  let cppNamespace = "pylir::Mem";
 }
 
 def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject", [
