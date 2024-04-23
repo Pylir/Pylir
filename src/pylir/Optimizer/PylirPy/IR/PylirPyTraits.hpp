@@ -33,6 +33,19 @@ class AlwaysBound : public mlir::OpTrait::TraitBase<ConcreteType, AlwaysBound> {
   }
 };
 
+/// Trait used to mark the entry blockarguments of all regions of an op as
+/// always being bound.
+template <class ConcreteType>
+class EntryArgsBound
+    : public mlir::OpTrait::TraitBase<ConcreteType, EntryArgsBound> {
+  static mlir::LogicalResult verifyTrait(mlir::Operation*) {
+    static_assert(
+        !ConcreteType::template hasTrait<mlir::OpTrait::ZeroRegions>(),
+        "'EntryArgsBound' trait is ony applicable to ops with regions");
+    return mlir::success();
+  }
+};
+
 template <class ConcreteType>
 class ReturnsImmutable
     : public mlir::OpTrait::TraitBase<ConcreteType, ReturnsImmutable> {

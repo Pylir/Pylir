@@ -282,7 +282,7 @@ def PylirHIR_FunctionType : Type<
 
 def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
   [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface,
-    PylirHIR_FunctionInterface]> {
+    PylirHIR_FunctionInterface, EntryArgsBound]> {
 
   let arguments = (ins StrAttr:$sym_name,
              DenseI32ArrayAttr:$default_values_mapping,
@@ -390,7 +390,7 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 }
 
 def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface,
-  PylirHIR_FunctionInterface]> {
+  PylirHIR_FunctionInterface, EntryArgsBound]> {
 
   let arguments = (ins StrAttr:$name, Variadic<DynamicType>:$default_values,
              DenseI32ArrayAttr:$default_values_mapping,
