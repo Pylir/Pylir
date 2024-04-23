@@ -31,7 +31,7 @@ pyHIR.init "__main__" {
   %0 = func "foo"(%ff0 "rest") {
       return %ff0
   }
-  init_return %0
+  init_return
 }
 
 // CHECK-LABEL: pyHIR.globalFunc @call(
@@ -154,7 +154,7 @@ pyHIR.globalFunc @binAssignOp(%0, %1) {
 
 pyHIR.init "foo" {
   %0 = py.constant(#py.dict<{}>)
-  init_return %0
+  init_return
 }
 
 // CHECK-LABEL: pyHIR.globalFunc @initModule(

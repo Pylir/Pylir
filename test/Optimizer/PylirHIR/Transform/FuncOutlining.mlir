@@ -11,11 +11,12 @@ pyHIR.init "__main__" {
   // CHECK: %[[NONE2:.*]] = py.constant(#[[$NONE]])
   // CHECK: py.setSlot %[[FUNC]][%{{.*}}] to %[[NONE1]]
   // CHECK: py.setSlot %[[FUNC]][%{{.*}}] to %[[NONE2]]
-  // CHECK: init_return %[[FUNC]]
+  // CHECK: test.use(%[[FUNC]])
   %0 = func "basic"(%ff0 "rest") {
     return %ff0
   }
-  init_return %0
+  test.use(%0) : !py.dynamic
+  init_return
 }
 
 // CHECK-LABEL: globalFunc @posDefault
@@ -52,7 +53,7 @@ pyHIR.init "func_collision" {
   %1 = func "basic"(%ff0 "rest") {
     return %ff0
   }
-  init_return %0
+  init_return
 }
 
 // CHECK: globalFunc @[[$BASIC1]](
@@ -66,7 +67,7 @@ pyHIR.init "arg_res_attrs" {
   %0 = func "basic"(%ff0 "rest" { test.name = 0 : i32 }) -> {test.name = 1 : i32} {
     return %ff0
   }
-  init_return %0
+  init_return
 }
 
 // CHECK: globalFunc @[[$BASIC1]](
@@ -83,7 +84,7 @@ pyHIR.init "non_locals" {
   %1 = func "basic"() {
     return %0
   }
-  init_return %1
+  init_return
 }
 
 // CHECK: globalFunc @[[$BASIC1]](
@@ -103,7 +104,7 @@ pyHIR.init "constants" {
   %1 = func "basic"() {
     return %0
   }
-  init_return %1
+  init_return
 }
 
 // CHECK: globalFunc @[[BASIC1]](

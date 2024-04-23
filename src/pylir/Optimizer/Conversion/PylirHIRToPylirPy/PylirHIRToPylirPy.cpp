@@ -596,7 +596,7 @@ struct InitOpConversionPattern : OpRewritePattern<InitOp> {
   LogicalResult matchAndRewrite(InitOp op,
                                 PatternRewriter& rewriter) const override {
     std::string functionName = "__init__";
-    // The main init is treate specially as it is the entry point of the whole
+    // The main init is treated specially as it is the entry point of the whole
     // python program by default. It is callable with an `__init__` as that is a
     // valid C identifier.
     if (!op.isMainModule())
@@ -604,8 +604,8 @@ struct InitOpConversionPattern : OpRewritePattern<InitOp> {
 
     auto funcOp = rewriter.create<Py::FuncOp>(
         op->getLoc(), functionName,
-        rewriter.getFunctionType(/*inputs=*/{},
-                                 rewriter.getType<DynamicType>()));
+        rewriter.getFunctionType(/*inputs=*/{}, /*outputs=*/{}));
+
     // The region can be inlined directly without creating a suitable entry
     // block for the function as the function body does not need any block
     // arguments.
@@ -622,8 +622,7 @@ struct InitModuleOpConversionPattern
 
   template <class OpT>
   LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.create<Py::CallOp>(op.getLoc(),
-                                rewriter.getType<Py::DynamicType>(),
+    rewriter.create<Py::CallOp>(op.getLoc(), ValueRange(),
                                 (op.getModule() + ".__init__").str());
     rewriter.eraseOp(op);
     return success();

@@ -510,10 +510,6 @@ def PylirHIR_InitOp : PylirHIR_Op<"init", [NoRegionArguments, IsolatedFromAbove,
   let description = [{
     This op represents the initializer body of a module `$name`, or in other
     words, the global scope of a python source file.
-    The region may only be exited by an instruction throwing an exception or via
-    `pyHIR.init_return`.
-    In the latter case, a dictionary must be returned which in python are the
-    global variables of the module and the namespace of the module.
   }];
 
   let extraClassDeclaration = [{
@@ -534,15 +530,13 @@ def PylirHIR_InitOp : PylirHIR_Op<"init", [NoRegionArguments, IsolatedFromAbove,
 
 def PylirHIR_InitReturnOp : PylirHIR_Op<"init_return", [HasParent<"InitOp">,
   Terminator, ReturnLike, Pure]> {
-  let arguments = (ins DynamicType:$global_dict);
+  let arguments = (ins);
 
   let description = [{
     Op used to terminate a `pyHIR.init` body.
-    `$global_dict` are the global variables of the module and the namespace of
-    the module and MUST be a dictionary.
   }];
 
-  let assemblyFormat = "$global_dict attr-dict";
+  let assemblyFormat = "attr-dict";
 }
 
 def PylirHIR_InitModuleOp : PylirHIR_Op<"initModule",

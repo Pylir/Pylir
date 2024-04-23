@@ -48,7 +48,7 @@ pyHIR.init "__main__" {
   %0 = py.constant(#py.dict<{}>)
   // expected-error@below {{cannot initialize '__main__' module}}
   initModule @__main__
-  init_return %0
+  init_return
 }
 
 // -----

@@ -583,9 +583,7 @@ public:
 
     visit(fileInput.input);
 
-    if (m_builder.getInsertionBlock())
-      create<HIR::InitReturnOp>(create<Py::ConstantOp>(m_globalDictionary));
-
+    create<HIR::InitReturnOp>();
     return m_module;
   }
 
