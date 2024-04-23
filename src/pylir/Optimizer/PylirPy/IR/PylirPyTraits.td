@@ -26,6 +26,10 @@ class PylirPyParamOpTrait<string name, string param>
 /// If such an operation returns an unbound result, it is undefined behaviour.
 def AlwaysBound : PylirPyOpTrait<"AlwaysBound">;
 
+/// Trait used to mark the entry blockarguments of all regions of an op as
+/// always being bound.
+def EntryArgsBound : PylirPyOpTrait<"EntryArgsBound">;
+
 /// Signifies that the results of the operation returns a new immutable object.
 /// It therefore has distinct object identity from every other object marked
 /// 'ReturnsImmutable' or a 'MemAlloc' result.

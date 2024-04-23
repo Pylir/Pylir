@@ -28,10 +28,20 @@ std::optional<bool> pylir::Py::isUnbound(mlir::Value value) {
   if (mlir::matchPattern(value, mlir::m_Constant(&constant)))
     return constant.isa<Py::UnboundAttr>();
 
-  if (auto blockArg = value.dyn_cast<mlir::BlockArgument>()) {
-    if (mlir::isa_and_nonnull<mlir::FunctionOpInterface>(
-            blockArg.getOwner()->getParentOp()) &&
-        blockArg.getOwner()->isEntryBlock())
+  // The region's entry args of an Op marked 'EntryArgsBound' are known to be
+  // bound.
+  if (auto blockArg = dyn_cast<BlockArgument>(value)) {
+    Block* owner = blockArg.getOwner();
+    // TODO: This should be removed but is currently needed due to the dialect
+    //       conversion infrastructure calling 'fold' for legalization despite
+    //       not replacing the 'BlockArgument' after signature conversion.
+    //       We are therefore seeing the block argument of the unliked block
+    //       before conversion.
+    if (!owner->getParent())
+      return std::nullopt;
+
+    if (owner->isEntryBlock() &&
+        owner->getParentOp()->hasTrait<EntryArgsBound>())
       return false;
 
     return std::nullopt;

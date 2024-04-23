@@ -1312,7 +1312,7 @@ def PylirPy_InvokeOp
 
 def PylirPy_FuncOp : PylirPy_Op<"func", [FunctionOpInterface, IsolatedFromAbove,
   OpAsmOpInterface, AutomaticAllocationScope, CallableOpInterface,
-  VerifyAttributesOpTrait]> {
+  EntryArgsBound, VerifyAttributesOpTrait]> {
   let arguments = (ins StrAttr:$sym_name,
            TypeAttrOf<FunctionType>:$function_type,
            OptionalAttr<StrAttr>:$sym_visibility,
