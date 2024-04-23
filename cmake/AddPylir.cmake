@@ -57,8 +57,11 @@ function(add_pylir_dialect dialect dialect_namespace)
     -dialect="${dialect_namespace}")
   mlir_tablegen(${dialect}Dialect.cpp.inc -gen-dialect-defs
     -dialect="${dialect_namespace}")
-  mlir_tablegen(${dialect}Enums.h.inc -gen-enum-decls)
-  mlir_tablegen(${dialect}Enums.cpp.inc -gen-enum-defs)
+  if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/${dialect}Enums.td)
+    set(LLVM_TARGET_DEFINITIONS ${dialect}Enums.td)
+    mlir_tablegen(${dialect}Enums.h.inc -gen-enum-decls)
+    mlir_tablegen(${dialect}Enums.cpp.inc -gen-enum-defs)
+  endif ()
   add_public_tablegen_target(${dialect}IncGen)
   
   if (NOT ARG_NO_DOC)

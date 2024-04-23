@@ -5,10 +5,11 @@
 #ifndef PYLIR_PY_OPS_TABLEGEN
 #define PYLIR_PY_OPS_TABLEGEN
 
-include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
-include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyEnums.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/CopyObjectInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/OnlyReadsValueInterface.td"
@@ -18,7 +19,6 @@ include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
-include "mlir/IR/EnumAttr.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
@@ -973,20 +973,6 @@ def PylirPy_IntToIndexOp : PylirPy_Op<"int_toIndex", [NoMemoryEffect,
   }];
 
   let hasFolder = 1;
-}
-
-def PylirPy_IntCmpEq : I64EnumAttrCase<"eq", 0>;
-def PylirPy_IntCmpNe : I64EnumAttrCase<"ne", 1>;
-def PylirPy_IntCmpLt : I64EnumAttrCase<"lt", 2>;
-def PylirPy_IntCmpLe : I64EnumAttrCase<"le", 3>;
-def PylirPy_IntCmpGt : I64EnumAttrCase<"gt", 4>;
-def PylirPy_IntCmpGe : I64EnumAttrCase<"ge", 5>;
-
-def PylirPy_IntCmpKindAttr : I64EnumAttr<"IntCmpKind", "", [
-  PylirPy_IntCmpEq, PylirPy_IntCmpNe, PylirPy_IntCmpLt, PylirPy_IntCmpLe,
-  PylirPy_IntCmpGt, PylirPy_IntCmpGe
-]> {
-  let cppNamespace = "::pylir::Py";
 }
 
 def PylirPy_IntCmpOp : PylirPy_Op<"int_cmp", [NoMemoryEffect, NoCaptures]> {
