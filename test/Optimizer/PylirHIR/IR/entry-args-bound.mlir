@@ -22,5 +22,6 @@ pyHIR.init "__main__" {
     %1 = py.bool_fromI1 %0
     return %1
   }
-  init_return %f
+  test.use(%f) : !py.dynamic
+  init_return
 }
