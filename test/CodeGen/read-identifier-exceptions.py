@@ -18,11 +18,7 @@ def foo(a):
     return a
 
 
-# CHECK: dict_setItem
-
-# CHECK: %[[STR:.*]] = py.constant(#py.str<"foo">)
-# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: %[[FOO:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
+# CHECK: %[[FOO:.*]] = module_getAttr #{{.*}}["foo"]
 # CHECK: %[[UNBOUND:.*]] = py.isUnboundValue %[[FOO]]
 # CHECK: cf.cond_br %[[UNBOUND]], ^[[BB1:.*]], ^[[BB2:[[:alnum:]]+]]
 

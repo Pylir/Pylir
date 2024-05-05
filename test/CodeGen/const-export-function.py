@@ -9,7 +9,7 @@
 
 # CHECK-LABEL: init "__main__"
 # CHECK: %[[FOO:.*]] = py.constant(#[[$MAIN_FOO]])
-# CHECK: py.dict_setItem %{{.*}}[{{.*}}] to %[[FOO]]
+# CHECK: module_setAttr #{{.*}}["foo"] to %[[FOO]]
 @pylir.intr.const_export
 def foo(a=3, *, b=None):
     return a + b

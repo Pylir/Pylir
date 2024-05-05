@@ -30,7 +30,7 @@ class CodeGen {
   SymbolTable m_symbolTable;
   Diag::DiagnosticsDocManager<>* m_docManager;
   std::string m_qualifiers;
-  Py::GlobalValueAttr m_globalDictionary;
+  Py::GlobalValueAttr m_thisModuleObject;
   llvm::DenseMap<llvm::StringRef, Py::GlobalValueAttr> m_builtinNamespace;
 
   /// Struct representing one instance of a scope in Python.
@@ -309,10 +309,7 @@ class CodeGen {
       }
     }
 
-    Value dictionary = create<Py::ConstantOp>(m_globalDictionary);
-    Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
-    Value hash = create<Py::StrHashOp>(string);
-    create<Py::DictSetItemOp>(dictionary, string, hash, value);
+    create<HIR::ModuleSetAttrOp>(m_thisModuleObject, name, value);
   }
 
   /// Reads the identifier given by 'name' and returns its value. Generates code
@@ -354,11 +351,7 @@ class CodeGen {
       }
     }
 
-    Value dictionary = create<Py::ConstantOp>(m_globalDictionary);
-    Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
-    Value hash = create<Py::StrHashOp>(string);
-    Value readValue = create<Py::DictTryGetItemOp>(dictionary, string, hash);
-
+    Value readValue = create<HIR::ModuleGetAttrOp>(m_thisModuleObject, name);
     auto iter = m_builtinNamespace.find(name);
     if (iter != m_builtinNamespace.end()) {
       Value alternative = create<Py::ConstantOp>(iter->second);
@@ -551,9 +544,16 @@ public:
     init.getBody().push_back(entryBlock);
     m_builder.setInsertionPointToEnd(entryBlock);
 
-    m_globalDictionary =
+    m_thisModuleObject = m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers);
+
+    // TODO:
+    auto globalDictionary =
         m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers + "$dict");
-    m_globalDictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
+    globalDictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
+    m_thisModuleObject.setInitializer(m_builder.getAttr<Py::ObjectAttr>(
+        m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Module.name),
+        m_builder.getDictionaryAttr(
+            {{m_builder.getStringAttr("__dict__"), globalDictionary}})));
 
     // Initialize builtins from main module.
     if (m_options.qualifier == "__main__" && m_options.implicitBuiltinsImport) {

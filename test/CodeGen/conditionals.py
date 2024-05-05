@@ -21,5 +21,5 @@
 # CHECK: cf.br ^[[BB3]](%[[THREE]] : !py.dynamic)
 
 # CHECK: ^[[BB3]](%[[VALUE:[[:alnum:]]+]]: !py.dynamic loc({{.*}}):
-# CHECK: py.dict_setItem %{{.*}}[%{{.*}}] to %[[VALUE]]
+# CHECK: module_setAttr #{{.*}}["x"] to %[[VALUE]]
 x = 5 if 0 else 3
