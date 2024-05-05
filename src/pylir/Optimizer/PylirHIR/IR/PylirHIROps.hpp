@@ -16,6 +16,7 @@
 
 #include <llvm/ADT/iterator.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTraits.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.hpp>
