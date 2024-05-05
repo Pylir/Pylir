@@ -1097,12 +1097,13 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   target.addIllegalDialect<HIR::PylirHIRDialect>();
 
   RewritePatternSet patterns(&getContext());
-  patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
-               ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
-               CallOpConversionPattern, BinOpConversionPattern,
-               BinAssignOpConversionPattern, InitModuleOpConversionPattern,
-               GetItemOpConversionPattern, SetItemOpConversionPattern,
-               DelItemOpConversionPattern, ContainsOpConversionPattern,
+  patterns
+      .add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
+           ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
+           CallOpConversionPattern, BinOpConversionPattern,
+           BinAssignOpConversionPattern, InitModuleOpConversionPattern,
+           GetItemOpConversionPattern, SetItemOpConversionPattern,
+           DelItemOpConversionPattern, ContainsOpConversionPattern,
            GetAttributeOpConversionPattern, SetAttrOpConversionPattern,
            ModuleGetAttrOpConversionPattern, ModuleSetAttrOpConversionPattern>(
           &getContext());
