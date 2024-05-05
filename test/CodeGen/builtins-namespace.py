@@ -7,10 +7,7 @@
 # CHECK: init "__main__"
 # CHECK: initModule @builtins
 
-# CHECK: %[[GLOBALS:.*]] = py.constant(#__main__$dict)
-# CHECK: %[[STR:.*]] = py.constant(#py.str<"BaseException">)
-# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
-# CHECK: %[[ITEM:.*]] = py.dict_tryGetItem %[[GLOBALS]][%[[STR]] hash(%[[HASH]])]
+# CHECK: %[[ITEM:.*]] = module_getAttr #{{.*}}["BaseException"]
 # CHECK: %[[BUILTIN:.*]] = py.constant(#[[$BASE_EXCEPTION]])
 # CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[ITEM]]
 # CHECK: %[[SELECT:.*]] = arith.select %[[IS_UNBOUND:.*]], %[[BUILTIN]], %[[ITEM]]

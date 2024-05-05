@@ -357,6 +357,10 @@ class function:
 
 
 @pylir.intr.const_export
+class module:
+    __slots__ = "__dict__"
+
+@pylir.intr.const_export
 class cell:
     __slots__ = "cell_contents"
 
