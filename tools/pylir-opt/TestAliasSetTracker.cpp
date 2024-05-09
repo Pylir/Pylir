@@ -30,7 +30,7 @@ protected:
       iter.walk([&](mlir::Operation* op) {
         if (op == &op->getBlock()->front()) {
           for (auto& iter2 : op->getBlock()->getArguments()) {
-            if (!iter2.getType().isa<pylir::Py::DynamicType>())
+            if (!mlir::isa<pylir::Py::DynamicType>(iter2.getType()))
               continue;
             tracker.insert(iter2);
           }
@@ -39,7 +39,7 @@ protected:
           return;
 
         for (auto res : op->getResults()) {
-          if (!res.getType().isa<pylir::Py::DynamicType>())
+          if (!mlir::isa<pylir::Py::DynamicType>(res.getType()))
             continue;
           tracker.insert(res);
         }

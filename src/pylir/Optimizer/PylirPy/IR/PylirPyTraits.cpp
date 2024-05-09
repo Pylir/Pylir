@@ -26,7 +26,7 @@ mlir::Operation* pylir::Py::details::cloneWithExceptionHandlingImpl(
     if (iter.getName() == attrSizedSegmentName) {
       llvm::SmallVector<std::int32_t> sizes;
       for (auto integer :
-           iter.getValue().cast<mlir::DenseI32ArrayAttr>().asArrayRef())
+           mlir::cast<mlir::DenseI32ArrayAttr>(iter.getValue()).asArrayRef())
         sizes.push_back(integer);
 
       sizes.push_back(0);

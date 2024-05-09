@@ -355,6 +355,9 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner) {
         }
       }
 
+      if (!m_parentDef)
+        return;
+
       // add any non locals from nested functions except if they are local to
       // this function aka the referred to local
       for (const auto& [id, kind] : scope.identifiers) {

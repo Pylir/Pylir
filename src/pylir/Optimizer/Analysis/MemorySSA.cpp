@@ -319,7 +319,7 @@ mlir::Value getLastClobber(pylir::MemSSA::MemoryUseOp use,
               if (!ptr)
                 return true;
 
-              if (auto val = ptr.dyn_cast<mlir::Value>())
+              if (auto val = mlir::dyn_cast<mlir::Value>(ptr))
                 return aliasAnalysis.getModRef(memDef.getInstruction(), val)
                     .isMod();
 

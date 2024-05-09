@@ -33,9 +33,8 @@ mlir::Value callOrInvoke(
     auto* happyPath = new mlir::Block;
     mlir::Block* exceptionPath;
     mlir::ValueRange unwindOperands;
-    if (auto interface =
-            exceptionHandler
-                .dyn_cast<pylir::Py::ExceptionHandlingInterface>()) {
+    if (auto interface = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(
+            exceptionHandler)) {
       exceptionPath = interface.getExceptionPath();
       unwindOperands = static_cast<mlir::OperandRange>(
           interface.getUnwindDestOperandsMutable());

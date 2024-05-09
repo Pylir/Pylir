@@ -361,7 +361,7 @@ deduceCallableFromCall(mlir::CallOpInterface call,
   // calls we can only check whether the indirect callee is an actual constant
   // or possibly even the callable op itself!
   mlir::CallInterfaceCallable callee = call.getCallableForCallee();
-  auto ref = callee.dyn_cast<mlir::SymbolRefAttr>();
+  auto ref = dyn_cast<mlir::SymbolRefAttr>(callee);
   if (!ref)
     mlir::matchPattern(callee.get<mlir::Value>(), mlir::m_Constant(&ref));
 
@@ -428,7 +428,7 @@ std::optional<GradeResult> gradeFromKnownConstants(
           // TODO: All of this is in need of an interface function or something
           // not as hardcoded.
           if (auto constant = knownConstants.lookup(
-                  call.getCallableForCallee().dyn_cast<mlir::Value>())) {
+                  dyn_cast<mlir::Value>(call.getCallableForCallee()))) {
             if (auto func = dyn_cast<FunctionAttrInterface>(constant)) {
               callable =
                   collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(

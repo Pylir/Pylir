@@ -176,8 +176,8 @@ bool emitIntrinsics(const llvm::RecordKeeper& records,
     os << "::llvm::SmallVector<::mlir::NamedAttribute> attributes;\n";
     std::string argOffset = "0";
     for (const auto& iter : llvm::enumerate(op.getArgs())) {
-      if (auto* type =
-              iter.value().dyn_cast<mlir::tblgen::NamedTypeConstraint*>()) {
+      if (auto* type = mlir::dyn_cast<mlir::tblgen::NamedTypeConstraint*>(
+              iter.value())) {
         if (!type->isVariadic()) {
           os << llvm::formatv(
               "operands.push_back({0});\n",

@@ -143,8 +143,8 @@ protected:
       bool failed = false;
       changed = false;
       init->walk([&](mlir::CallOpInterface callOpInterface) {
-        auto ref = callOpInterface.getCallableForCallee()
-                       .dyn_cast<mlir::SymbolRefAttr>();
+        auto ref = mlir::dyn_cast<mlir::SymbolRefAttr>(
+            callOpInterface.getCallableForCallee());
         if (!ref) {
           return mlir::WalkResult::advance();
         }

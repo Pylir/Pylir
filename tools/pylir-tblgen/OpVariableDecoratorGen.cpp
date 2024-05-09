@@ -151,7 +151,7 @@ collectExtendableInterfaceMethods(const mlir::tblgen::Operator& op) {
         continue;
 
       auto* namedCons =
-          op.getArg(i).dyn_cast<mlir::tblgen::NamedTypeConstraint*>();
+          mlir::dyn_cast<mlir::tblgen::NamedTypeConstraint*>(op.getArg(i));
       if (!namedCons) {
         llvm::PrintError(
             &dec.getDef(),
