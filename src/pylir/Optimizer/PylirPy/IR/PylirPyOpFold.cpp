@@ -38,8 +38,8 @@ struct TupleExpansionRemover : mlir::OpRewritePattern<T> {
 
           if (auto constant = mlir::dyn_cast<pylir::Py::ConstantOp>(definingOp))
             // TODO: StringAttr
-            return constant.getConstant()
-                .template isa<pylir::Py::ListAttr, TupleAttrInterface>();
+            return mlir::isa<pylir::Py::ListAttr, TupleAttrInterface>(
+                constant.getConstant());
 
           return mlir::isa<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(
               definingOp);
@@ -143,7 +143,7 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context,
                             mlir::Attribute objectOp, mlir::Attribute slot) {
   using namespace pylir::Py;
 
-  auto intAttr = slot.dyn_cast_or_null<mlir::IntegerAttr>();
+  auto intAttr = dyn_cast_or_null<mlir::IntegerAttr>(slot);
   if (!intAttr)
     return nullptr;
 
@@ -364,7 +364,7 @@ mlir::LogicalResult pylir::Py::GetSlotOp::foldUsage(
 mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(FoldAdaptor adaptor) {
   if (adaptor.getValue())
     return mlir::BoolAttr::get(getContext(),
-                               adaptor.getValue().isa<Py::UnboundAttr>());
+                               isa<Py::UnboundAttr>(adaptor.getValue()));
 
   if (auto unboundRes = isUnbound(getValue()))
     return mlir::BoolAttr::get(getContext(), *unboundRes);
@@ -549,7 +549,7 @@ mlir::OpFoldResult pylir::Py::MakeDictExOp::fold(FoldAdaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(FoldAdaptor adaptor) {
-  auto indexAttr = adaptor.getIndex().dyn_cast_or_null<mlir::IntegerAttr>();
+  auto indexAttr = dyn_cast_or_null<mlir::IntegerAttr>(adaptor.getIndex());
   if (!indexAttr)
     return nullptr;
 
@@ -604,7 +604,7 @@ mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(FoldAdaptor adaptor) {
   if (constant && constant.empty())
     return Py::TupleAttr::get(getContext());
 
-  auto index = adaptor.getCount().dyn_cast_or_null<mlir::IntegerAttr>();
+  auto index = dyn_cast_or_null<mlir::IntegerAttr>(adaptor.getCount());
   if (!index || !constant)
     return nullptr;
 
@@ -620,7 +620,7 @@ mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(FoldAdaptor adaptor) {
-  auto type = adaptor.getTypeObject().dyn_cast_or_null<GlobalValueAttr>();
+  auto type = dyn_cast_or_null<GlobalValueAttr>(adaptor.getTypeObject());
   // Forwarding it is safe in the case that the types of the input tuple as well
   // as the resulting tuple are identical and that the type is fully immutable.
   // In the future this may be computed, but for the time being, the
@@ -848,7 +848,7 @@ mlir::OpFoldResult pylir::Py::TypeSlotsOp::fold(FoldAdaptor adaptor) {
 mlir::OpFoldResult pylir::Py::StrConcatOp::fold(FoldAdaptor adaptor) {
   std::string res;
   for (const auto& iter : adaptor.getStrings()) {
-    auto str = iter.dyn_cast_or_null<StrAttr>();
+    auto str = dyn_cast_or_null<StrAttr>(iter);
     if (!str)
       return nullptr;
 
@@ -865,7 +865,7 @@ mlir::OpFoldResult pylir::Py::IntFromSignedOp::fold(FoldAdaptor adaptor) {
   if (auto op = getInput().getDefiningOp<IntToIndexOp>())
     return op.getInput();
 
-  auto integer = adaptor.getInput().dyn_cast_or_null<mlir::IntegerAttr>();
+  auto integer = dyn_cast_or_null<mlir::IntegerAttr>(adaptor.getInput());
   if (!integer)
     return nullptr;
 
@@ -878,7 +878,7 @@ mlir::OpFoldResult pylir::Py::IntFromSignedOp::fold(FoldAdaptor adaptor) {
 //===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::IntFromUnsignedOp::fold(FoldAdaptor adaptor) {
-  auto integer = adaptor.getInput().dyn_cast_or_null<mlir::IntegerAttr>();
+  auto integer = dyn_cast_or_null<mlir::IntegerAttr>(adaptor.getInput());
   if (!integer)
     return nullptr;
 
@@ -897,7 +897,7 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(FoldAdaptor adaptor) {
   if (auto op = getInput().getDefiningOp<IntFromUnsignedOp>())
     return op.getInput();
 
-  auto integer = adaptor.getInput().dyn_cast_or_null<IntAttrInterface>();
+  auto integer = dyn_cast_or_null<IntAttrInterface>(adaptor.getInput());
   if (!integer)
     return nullptr;
 
@@ -927,8 +927,8 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(FoldAdaptor adaptor) {
 //===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::IntCmpOp::fold(FoldAdaptor adaptor) {
-  auto lhs = adaptor.getLhs().dyn_cast_or_null<IntAttrInterface>();
-  auto rhs = adaptor.getRhs().dyn_cast_or_null<IntAttrInterface>();
+  auto lhs = dyn_cast_or_null<IntAttrInterface>(adaptor.getLhs());
+  auto rhs = dyn_cast_or_null<IntAttrInterface>(adaptor.getRhs());
   if (!lhs || !rhs)
     return nullptr;
 
@@ -949,7 +949,7 @@ mlir::OpFoldResult pylir::Py::IntCmpOp::fold(FoldAdaptor adaptor) {
 //===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::IntToStrOp::fold(FoldAdaptor adaptor) {
-  auto integer = adaptor.getInput().dyn_cast_or_null<IntAttrInterface>();
+  auto integer = dyn_cast_or_null<IntAttrInterface>(adaptor.getInput());
   if (!integer)
     return nullptr;
 
@@ -964,7 +964,7 @@ mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(FoldAdaptor adaptor) {
   if (auto op = getInput().getDefiningOp<Py::BoolFromI1Op>())
     return op.getInput();
 
-  auto boolean = adaptor.getInput().dyn_cast_or_null<Py::BoolAttr>();
+  auto boolean = dyn_cast_or_null<Py::BoolAttr>(adaptor.getInput());
   if (!boolean)
     return nullptr;
 
@@ -979,7 +979,7 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(FoldAdaptor adaptor) {
   if (auto op = getInput().getDefiningOp<Py::BoolToI1Op>())
     return op.getInput();
 
-  auto boolean = adaptor.getInput().dyn_cast_or_null<mlir::BoolAttr>();
+  auto boolean = dyn_cast_or_null<mlir::BoolAttr>(adaptor.getInput());
   if (!boolean)
     return nullptr;
 
@@ -998,7 +998,7 @@ mlir::OpFoldResult pylir::Py::MROLookupOp::fold(FoldAdaptor adaptor) {
       if (!result)
         return nullptr;
 
-      if (!result.isa<UnboundAttr>())
+      if (!isa<UnboundAttr>(result))
         return result;
     }
     return Py::UnboundAttr::get(getContext());
@@ -1013,7 +1013,7 @@ mlir::OpFoldResult pylir::Py::MROLookupOp::fold(FoldAdaptor adaptor) {
     if (!result)
       return nullptr;
 
-    if (!result.isa<UnboundAttr>())
+    if (!isa<UnboundAttr>(result))
       return result;
   }
   return Py::UnboundAttr::get(getContext());
@@ -1055,8 +1055,8 @@ struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp> {
     if (!lhs || !rhs || !lhsMem || !rhsMem ||
         lhs->getAttrDictionary() != rhs->getAttrDictionary() ||
         lhs->getName() != rhs->getName() ||
-        op.getTrueValue().cast<mlir::OpResult>().getResultNumber() !=
-            op.getFalseValue().cast<mlir::OpResult>().getResultNumber() ||
+        cast<mlir::OpResult>(op.getTrueValue()).getResultNumber() !=
+            cast<mlir::OpResult>(op.getFalseValue()).getResultNumber() ||
         lhs->getResultTypes() != rhs->getResultTypes() ||
         lhs->hasTrait<mlir::OpTrait::IsTerminator>() ||
         lhs->getNumRegions() != 0 || rhs->getNumRegions() != 0 ||
@@ -1095,7 +1095,7 @@ struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp> {
     auto* newOp = rewriter.create(state);
     rewriter.replaceOp(
         op, newOp->getResult(
-                op.getTrueValue().cast<mlir::OpResult>().getResultNumber()));
+                cast<mlir::OpResult>(op.getTrueValue()).getResultNumber()));
     return mlir::success();
   }
 };
@@ -1224,7 +1224,7 @@ mlir::IntegerAttr toBuiltinInt(mlir::Operation* operation, mlir::Attribute attr,
       mlir::DataLayout::closest(operation).getTypeSizeInBits(integerType);
 
   std::string string =
-      attr.cast<pylir::Py::IntAttrInterface>().getInteger().toString(
+      cast<pylir::Py::IntAttrInterface>(attr).getInteger().toString(
           largestSupportedRadixByBoth);
   llvm::APInt integer(
       llvm::APInt::getSufficientBitsNeeded(string, largestSupportedRadixByBoth),

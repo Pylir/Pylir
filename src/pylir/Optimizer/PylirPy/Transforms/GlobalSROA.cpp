@@ -63,7 +63,7 @@ std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble() {
            eligible, [](auto&& pair) { return pair.second.allDirect; })) {
     // If it is public or just a declaration we cannot set all its uses and
     // hence can't replace it.
-    if (!valueAttr.getInitializer().isa<pylir::Py::SROAAttrInterface>())
+    if (!mlir::isa<pylir::Py::SROAAttrInterface>(valueAttr.getInitializer()))
       continue;
 
     std::vector<pylir::Py::ConstantOp> constantOps;
@@ -129,8 +129,9 @@ void GlobalSROAPass::runOnOperation() {
       llvm::MapVector<std::pair<mlir::Attribute, mlir::SideEffects::Resource*>,
                       LoadStorePlaceHolders>
           placeHolders;
-      aggregate.globalValue.getInitializer()
-          .cast<pylir::Py::SROAAttrInterface>()
+
+      mlir::cast<pylir::Py::SROAAttrInterface>(
+          aggregate.globalValue.getInitializer())
           .destructureAggregate([&](mlir::Attribute key,
                                     mlir::SideEffects::Resource* resource,
                                     mlir::Type type, mlir::Attribute value) {
@@ -185,18 +186,18 @@ void GlobalSROAPass::runOnOperation() {
         // private visibility, and the insert into the symbol table guarantees
         // the uniqueness of the symbol.
         std::string suffix;
-        if (auto str = attr.first.dyn_cast_or_null<mlir::StringAttr>()) {
+        if (auto str = mlir::dyn_cast_or_null<mlir::StringAttr>(attr.first)) {
           suffix = str.getValue();
         } else if (auto pyStr =
-                       attr.first.dyn_cast_or_null<pylir::Py::StrAttr>()) {
+                       mlir::dyn_cast_or_null<pylir::Py::StrAttr>(attr.first)) {
           suffix = pyStr.getValue();
         } else if (auto integer =
-                       attr.first.dyn_cast_or_null<mlir::IntegerAttr>()) {
+                       mlir::dyn_cast_or_null<mlir::IntegerAttr>(attr.first)) {
           llvm::SmallString<10> temp;
           integer.getValue().toStringSigned(temp);
           suffix = temp.str();
         } else if (auto pyInt =
-                       attr.first.dyn_cast_or_null<pylir::Py::IntAttr>()) {
+                       mlir::dyn_cast_or_null<pylir::Py::IntAttr>(attr.first)) {
           suffix = pyInt.getValue().toString();
         }
 

@@ -158,7 +158,7 @@ struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<Py::GlobalOp> {
         typeConverter.getPlatformABI().getAlignOf(
             typeConverter.convertType(op.getType())),
         0, true);
-    if (op.getType().isa<Py::DynamicType>())
+    if (isa<Py::DynamicType>(op.getType()))
       global.setSectionAttr(typeConverter.getRootSection());
 
     rewriter.setInsertionPointToStart(
@@ -1598,7 +1598,7 @@ struct ArithmeticSelectOpConversion
   mlir::LogicalResult
   matchAndRewrite(mlir::arith::SelectOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter& rewriter) const override {
-    if (!op.getType().isa<Py::DynamicType, Mem::MemoryType>())
+    if (!isa<Py::DynamicType, Mem::MemoryType>(op.getType()))
       return mlir::failure();
 
     rewriter.replaceOpWithNewOp<mlir::LLVM::SelectOp>(

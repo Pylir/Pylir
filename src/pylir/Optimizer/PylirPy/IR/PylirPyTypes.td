@@ -19,15 +19,15 @@ def DynamicType : PylirPy_Type<"Dynamic"> {
 def PyFunctionType : Type<
   And<[
     FunctionType.predicate,
-    CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() == 1">,
-    SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)",
+    CPred<"mlir::cast<::mlir::FunctionType>($_self).getNumResults() == 1">,
+    SubstLeaves<"$_self", "mlir::cast<::mlir::FunctionType>($_self).getResult(0)",
       DynamicType.predicate>,
-    CPred<"$_self.cast<::mlir::FunctionType>().getNumInputs() == 3">,
-    SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(0)",
+    CPred<"mlir::cast<::mlir::FunctionType>($_self).getNumInputs() == 3">,
+    SubstLeaves<"$_self", "mlir::cast<::mlir::FunctionType>($_self).getInput(0)",
       DynamicType.predicate>,
-    SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(1)",
+    SubstLeaves<"$_self", "mlir::cast<::mlir::FunctionType>($_self).getInput(1)",
       DynamicType.predicate>,
-    SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(2)",
+    SubstLeaves<"$_self", "mlir::cast<::mlir::FunctionType>($_self).getInput(2)",
       DynamicType.predicate>
   ]>>
 {

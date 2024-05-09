@@ -355,6 +355,9 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner) {
         }
       }
 
+      if (!m_parentDef)
+        return;
+
       // add any non locals from nested functions except if they are local to
       // this function aka the referred to local
       for (const auto& [id, kind] : scope.identifiers) {
@@ -529,27 +532,25 @@ void pylir::SemanticAnalysis::visit(Syntax::ClassDef& classDef) {
       bool valid = match(
           variant,
           [&](const IntrVarPtr<Syntax::SimpleStmt>& simpleStatement) {
-            return llvm::TypeSwitch<Syntax::SimpleStmt&, bool>(*simpleStatement)
-                .Case([&](const Syntax::AssignmentStmt* assignmentStmt)
-                          -> bool {
-                  if (assignmentStmt->targets.size() != 1)
+            return simpleStatement->match(
+                [&](const Syntax::AssignmentStmt& assignmentStmt) -> bool {
+                  if (assignmentStmt.targets.size() != 1)
                     return false;
 
-                  if (assignmentStmt->targets.front().second.getTokenType() !=
+                  if (assignmentStmt.targets.front().second.getTokenType() !=
                       TokenType::Assignment)
                     return false;
 
-                  if (assignmentStmt->maybeExpression)
-                    verifyIsConstant(*assignmentStmt->maybeExpression);
+                  if (assignmentStmt.maybeExpression)
+                    verifyIsConstant(*assignmentStmt.maybeExpression);
                   return llvm::isa<Syntax::Atom>(
-                      *assignmentStmt->targets.front().first);
-                })
-                .Case([&](const Syntax::SingleTokenStmt* singleTokenStmt)
-                          -> bool {
-                  return singleTokenStmt->token.getTokenType() ==
+                      *assignmentStmt.targets.front().first);
+                },
+                [&](const Syntax::SingleTokenStmt& singleTokenStmt) -> bool {
+                  return singleTokenStmt.token.getTokenType() ==
                          TokenType::PassKeyword;
-                })
-                .Default(false);
+                },
+                [](const auto&) { return false; });
           },
           [&](const IntrVarPtr<Syntax::CompoundStmt>& compoundStatement) {
             return llvm::isa<Syntax::FuncDef>(*compoundStatement);

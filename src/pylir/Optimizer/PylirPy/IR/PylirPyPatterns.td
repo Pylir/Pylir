@@ -31,7 +31,7 @@ def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
 									(PylirPy_MakeTupleOp $args, DenseArrayCount<0>)),
       (PylirPy_MakeTupleOp
       (NativeCodeCall<[{ [&]{
-                  auto value = $0.cast<mlir::IntegerAttr>().getValue()
+                  auto value = mlir::cast<mlir::IntegerAttr>($0).getValue()
                     .getZExtValue();
                   auto vector = llvm::to_vector($1);
                   if (vector.size() <= value)
@@ -43,10 +43,10 @@ def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
 
 class BinOpAttrs<string op, Attr attrType, Attr resultAttr = attrType>
 	: NativeCodeCall<!subst("$0",
-		!subst("$_self", "$0.cast<" # attrType.storageType # ">()",
+		!subst("$_self", "mlir::cast<" # attrType.storageType # ">($0)",
 		  attrType.convertFromStorage)
 		# " " # op # " "
-		# !subst("$_self", "$1.cast<" # attrType.storageType # ">()",
+		# !subst("$_self", "mlir::cast<" # attrType.storageType # ">($1)",
 		  attrType.convertFromStorage), resultAttr.constBuilderCall)>;
 
 class PlusAttrs<Attr attrType, Attr resultAttr = attrType>

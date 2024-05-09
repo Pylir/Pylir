@@ -2,7 +2,6 @@
 
 ; RUN: pylir %s -S -o - | FileCheck %s
 
-target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-darwin21.6.0"
 
 @"builtins.next$handle" = private global ptr addrspace(1) null

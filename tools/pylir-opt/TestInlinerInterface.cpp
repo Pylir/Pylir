@@ -32,9 +32,8 @@ protected:
         [&](mlir::CallOpInterface call) { calls.push_back(call); });
     mlir::SymbolTableCollection collection;
     for (auto iter : calls) {
-      auto ref = iter.getCallableForCallee()
-                     .dyn_cast<mlir::SymbolRefAttr>()
-                     .dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+      auto ref = mlir::dyn_cast_or_null<mlir::FlatSymbolRefAttr>(
+          mlir::dyn_cast<mlir::SymbolRefAttr>(iter.getCallableForCallee()));
       if (!ref || !ref.getValue().starts_with("inline"))
         continue;
       auto func = mlir::dyn_cast_or_null<mlir::CallableOpInterface>(

@@ -29,7 +29,7 @@ std::optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr) {
 
   auto mapLayoutType =
       [](mlir::Attribute attribute) -> std::optional<pylir::Mem::LayoutType> {
-    auto ref = attribute.dyn_cast<GlobalValueAttr>();
+    auto ref = dyn_cast<GlobalValueAttr>(attribute);
     if (!ref)
       return std::nullopt;
 

@@ -26,7 +26,7 @@ pylir::WinX64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
   adjustments.originalRetType = returnType;
   adjustments.arguments.resize(parameterTypes.size());
 
-  if (returnType.isa<mlir::LLVM::LLVMStructType>()) {
+  if (mlir::isa<mlir::LLVM::LLVMStructType>(returnType)) {
     auto size = getSizeOf(returnType);
     if (isLegalIntegerSize(size)) {
       adjustments.returnType = IntegerRegister;
@@ -39,7 +39,7 @@ pylir::WinX64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
   }
 
   for (std::size_t i = 0; i < parameterTypes.size(); i++) {
-    if (!parameterTypes[i].isa<mlir::LLVM::LLVMStructType>()) {
+    if (!mlir::isa<mlir::LLVM::LLVMStructType>(parameterTypes[i])) {
       argumentTypes.emplace_back(parameterTypes[i]);
       continue;
     }

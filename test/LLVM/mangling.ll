@@ -4,7 +4,6 @@
 
 ; Needed a target that has mangling. Mach-O targets always use `_` as prefix
 
-target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-darwin21.6.0"
 
 @"builtins.next$handle" = private global ptr addrspace(1) null, section "__TEXT,py_root"

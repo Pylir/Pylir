@@ -37,7 +37,7 @@ private:
   createGlobalValueFromGlobal(pylir::Py::GlobalOp globalOp,
                               pylir::Py::ConcreteObjectAttribute initializer,
                               bool constant) {
-    PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
+    PYLIR_ASSERT(isa<pylir::Py::DynamicType>(globalOp.getType()));
     auto globalValueAttr = pylir::Py::GlobalValueAttr::get(
         globalOp->getContext(), globalOp.getSymName());
     globalValueAttr.setConstant(constant);
@@ -74,14 +74,14 @@ private:
                                  pylir::Py::GlobalOp globalOp,
                                  llvm::ArrayRef<mlir::Operation*> users) {
     mlir::Attribute constantStorage;
-    if (globalOp.getType().isa<pylir::Py::DynamicType>()) {
+    if (isa<pylir::Py::DynamicType>(globalOp.getType())) {
       // If the single store into the global is already a reference to a global
       // value there isn't a lot to be done except replace all loads with such a
       // reference. Otherwise if not unbound, we create a global value with the
       // constant as initializer instead of the handle.
-      constantStorage = attr.dyn_cast<pylir::Py::GlobalValueAttr>();
+      constantStorage = dyn_cast<pylir::Py::GlobalValueAttr>(attr);
       if (!constantStorage)
-        constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
+        constantStorage = dyn_cast<pylir::Py::UnboundAttr>(attr);
 
       if (!constantStorage) {
         // Cast is safe as this is not a `GlobalValueAttr` nor `UnboundAttr`
@@ -113,17 +113,17 @@ private:
 
       // TODO: Make this generic? A "undefined" type interface maybe? Or a
       // poison value of any type?
-      if (type.isa<pylir::Py::DynamicType>())
+      if (isa<pylir::Py::DynamicType>(type))
         return builder.create<pylir::Py::ConstantOp>(
             loc, builder.getAttr<pylir::Py::UnboundAttr>());
 
-      if (type.isa<mlir::IndexType>())
+      if (isa<mlir::IndexType>(type))
         return builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
 
-      if (type.isa<mlir::IntegerType>())
+      if (isa<mlir::IntegerType>(type))
         return builder.create<mlir::arith::ConstantIntOp>(loc, 0, type);
 
-      if (auto ft = type.dyn_cast<mlir::FloatType>())
+      if (auto ft = dyn_cast<mlir::FloatType>(type))
         return builder.create<mlir::arith::ConstantFloatOp>(
             loc, llvm::APFloat::getZero(ft.getFloatSemantics()), ft);
 

@@ -268,10 +268,10 @@ def PylirHIR_CallExOp : CreateExceptionHandlingVariant<PylirHIR_CallOp>;
 def PylirHIR_FunctionType : Type<
   And<[
     FunctionType.predicate,
-    CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() == 1">,
-    SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)",
+    CPred<"mlir::cast<::mlir::FunctionType>($_self).getNumResults() == 1">,
+    SubstLeaves<"$_self", "mlir::cast<::mlir::FunctionType>($_self).getResult(0)",
       DynamicType.predicate>,
-    Concat<"llvm::all_of($_self.cast<::mlir::FunctionType>().getInputs(), "
+    Concat<"llvm::all_of(mlir::cast<::mlir::FunctionType>($_self).getInputs(), "
       "[](mlir::Type t) { return t && (",
         SubstLeaves<"$_self", "t", DynamicType.predicate>, ");"
     "})">,
