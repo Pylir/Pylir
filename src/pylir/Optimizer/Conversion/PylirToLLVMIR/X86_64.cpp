@@ -13,12 +13,12 @@
 namespace {
 llvm::SmallVector<mlir::Type> flatten(mlir::Type type) {
   llvm::SmallVector<mlir::Type> result;
-  if (auto structType = type.dyn_cast<mlir::LLVM::LLVMStructType>()) {
+  if (auto structType = mlir::dyn_cast<mlir::LLVM::LLVMStructType>(type)) {
     for (auto iter : structType.getBody()) {
       auto temp = flatten(iter);
       result.insert(result.end(), temp.begin(), temp.end());
     }
-  } else if (auto arrayType = type.dyn_cast<mlir::LLVM::LLVMArrayType>()) {
+  } else if (auto arrayType = mlir::dyn_cast<mlir::LLVM::LLVMArrayType>(type)) {
     auto temp = flatten(arrayType.getElementType());
     for (std::size_t i = 0; i < arrayType.getNumElements(); i++) {
       result.insert(result.end(), temp.begin(), temp.end());
@@ -56,7 +56,7 @@ pylir::X86_64::flattenSingleArg(mlir::Type type, std::uint8_t* takenIntegers,
         break;
 
       size = temp;
-      if (iter->isa<mlir::IntegerType, mlir::LLVM::LLVMPointerType>()) {
+      if (mlir::isa<mlir::IntegerType, mlir::LLVM::LLVMPointerType>(*iter)) {
         encounteredInteger = true;
       }
       // Special case X86_FP80Ty if ever used here
@@ -69,18 +69,18 @@ pylir::X86_64::flattenSingleArg(mlir::Type type, std::uint8_t* takenIntegers,
       // We encountered at least one integer therefore even if a floating point
       // type was in there it's gotta go into a integer register
       if (takenIntegerRegisters >= availableIntegerRegisters) {
-        if (type.isa<mlir::LLVM::LLVMStructType>())
+        if (mlir::isa<mlir::LLVM::LLVMStructType>(type))
           return {OnStack{}, type, nullptr};
 
         return {Unchanged{}, type, nullptr};
       }
 
       takenIntegerRegisters++;
-      if (type.isa<mlir::LLVM::LLVMStructType>() &&
+      if (mlir::isa<mlir::LLVM::LLVMStructType>(type) &&
           !std::holds_alternative<MultipleArgs>(dest))
         dest = MultipleArgs{};
 
-      if (type.isa<mlir::LLVM::LLVMStructType>())
+      if (mlir::isa<mlir::LLVM::LLVMStructType>(type))
         ret[retIndex++] = mlir::IntegerType::get(type.getContext(), size * 8);
       else
         ret[retIndex++] = type;
@@ -90,12 +90,13 @@ pylir::X86_64::flattenSingleArg(mlir::Type type, std::uint8_t* takenIntegers,
 
       continue;
     }
-    if (std::distance(begin, iter) == 2 && begin->isa<mlir::Float32Type>() &&
-        (begin + 1)->isa<mlir::Float32Type>()) {
-      // Two floats can be packed as a single 64 bit value int oa  xmm register.
+    if (std::distance(begin, iter) == 2 &&
+        mlir::isa<mlir::Float32Type>(*begin) &&
+        mlir::isa<mlir::Float32Type>(*(begin + 1))) {
+      // Two floats can be packed as a single 64 bit value int a xmm register.
       // This is represented as a vector in LLVM IR
       if (takenFloatingPointRegisters >= availableFloatingPointRegisters) {
-        if (type.isa<mlir::LLVM::LLVMStructType>())
+        if (mlir::isa<mlir::LLVM::LLVMStructType>(type))
           return {OnStack{}, type, nullptr};
 
         return {Unchanged{}, type, nullptr};
@@ -113,13 +114,13 @@ pylir::X86_64::flattenSingleArg(mlir::Type type, std::uint8_t* takenIntegers,
     // Must be a floating point type because if it were integer it would have
     // taken the encounteredInteger branch above
     if (takenFloatingPointRegisters >= availableFloatingPointRegisters) {
-      if (type.isa<mlir::LLVM::LLVMStructType>())
+      if (mlir::isa<mlir::LLVM::LLVMStructType>(type))
         return {OnStack{}, type, nullptr};
 
       return {Unchanged{}, type, nullptr};
     }
     takenFloatingPointRegisters++;
-    if (type.isa<mlir::LLVM::LLVMStructType>() &&
+    if (mlir::isa<mlir::LLVM::LLVMStructType>(type) &&
         !std::holds_alternative<MultipleArgs>(dest))
       dest = MultipleArgs{};
 
@@ -146,14 +147,14 @@ pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
 
   mlir::Type retType = returnType;
   llvm::SmallVector<mlir::Type> argumentTypes;
-  if (!returnType.isa<mlir::LLVM::LLVMVoidType>()) {
+  if (!mlir::isa<mlir::LLVM::LLVMVoidType>(returnType)) {
     auto size = getSizeOf(returnType);
     if (size > 16) {
       adjustments.returnType = PointerToTemporary{};
       argumentTypes.push_back(builder.getType<mlir::LLVM::LLVMPointerType>());
       retType = mlir::LLVM::LLVMVoidType::get(builder.getContext());
     } else {
-      bool wasStruct = returnType.isa<mlir::LLVM::LLVMStructType>();
+      bool wasStruct = mlir::isa<mlir::LLVM::LLVMStructType>(returnType);
       std::pair<mlir::Type, mlir::Type> types;
       std::tie(std::ignore, types.first, types.second) =
           flattenSingleArg(returnType);

@@ -247,9 +247,8 @@ public:
   Model(mlir::OpBuilder& builder, mlir::Value pointer, mlir::Type elementType,
         CodeGenState& codeGenState)
       : m_builder(builder), m_pointer(pointer),
-        m_elementType(
-            getElementTypeOr(codeGenState.getTypeConverter(), elementType)
-                .template cast<Type>()),
+        m_elementType(mlir::cast<Type>(
+            getElementTypeOr(codeGenState.getTypeConverter(), elementType))),
         m_codeGenState(codeGenState) {}
 
   /// Convenience constructor for concrete models that do not require specifying
@@ -654,7 +653,7 @@ struct PyTypeModel : PyObjectModelBase<PyTypeModel> {
 inline bool needToBeRuntimeInit(Py::ObjectAttrInterface attr) {
   // Integer attrs currently need to be runtime init due to memory allocation in
   // libtommath Dict attr need to be runtime init due to the hash calculation
-  return attr.isa<Py::IntAttr, Py::BoolAttr, Py::DictAttr>();
+  return mlir::isa<Py::IntAttr, Py::BoolAttr, Py::DictAttr>(attr);
 }
 
 } // namespace pylir

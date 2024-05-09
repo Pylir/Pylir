@@ -117,7 +117,7 @@ struct RefAttrStorage : mlir::AttributeStorage {
   }
 
   [[nodiscard]] KeyTy getAsKey() const {
-    return {identity.cast<mlir::FlatSymbolRefAttr>()};
+    return {mlir::cast<mlir::FlatSymbolRefAttr>(identity)};
   }
 
   mlir::SymbolRefAttr identity;

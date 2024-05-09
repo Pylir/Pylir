@@ -113,7 +113,7 @@ bool GlobalLoadStoreEliminationPass::optimizeBlock(
       // now and instead handle them after having traversed every block. Also
       // making a definition in case this load does remain, so that there are no
       // reloads.
-      if (read.isa<mlir::BlockArgument>()) {
+      if (mlir::isa<mlir::BlockArgument>(read)) {
         map[&block] = load;
         blockArgUsages.candidates.emplace_back(load, read);
         continue;

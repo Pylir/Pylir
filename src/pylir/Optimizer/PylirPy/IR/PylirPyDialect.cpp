@@ -48,7 +48,7 @@ struct PylirPyUndefInterface : public pylir::DialectUndefInterface {
 
   mlir::Value materializeUndefined(mlir::OpBuilder& builder, mlir::Type type,
                                    mlir::Location loc) const override {
-    PYLIR_ASSERT(type.isa<pylir::Py::DynamicType>());
+    PYLIR_ASSERT(mlir::isa<pylir::Py::DynamicType>(type));
     return builder.create<pylir::Py::ConstantOp>(
         loc, builder.getAttr<pylir::Py::UnboundAttr>());
   }
@@ -82,7 +82,7 @@ struct PylirPyOpAsmDialectInterface : public mlir::OpAsmDialectInterface {
 
   AliasResult getAlias(mlir::Attribute attr,
                        llvm::raw_ostream& os) const override {
-    auto globalValue = attr.dyn_cast<pylir::Py::GlobalValueAttr>();
+    auto globalValue = mlir::dyn_cast<pylir::Py::GlobalValueAttr>(attr);
     if (!globalValue)
       return OpAsmDialectInterface::getAlias(attr, os);
 
@@ -107,7 +107,7 @@ void pylir::Py::PylirPyDialect::initialize() {
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(
     ::mlir::OpBuilder& builder, ::mlir::Attribute value, ::mlir::Type type,
     ::mlir::Location loc) {
-  if (type.isa<Py::DynamicType>())
+  if (mlir::isa<Py::DynamicType>(type))
     return builder.create<Py::ConstantOp>(loc, type, value);
 
   if (mlir::arith::ConstantOp::isBuildableWith(value, type))

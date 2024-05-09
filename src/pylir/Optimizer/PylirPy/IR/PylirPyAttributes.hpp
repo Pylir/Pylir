@@ -33,13 +33,13 @@ public:
   operator ObjectAttrInterface() const {
     if (!*this)
       return nullptr;
-    return cast<ObjectAttrInterface>();
+    return mlir::cast<ObjectAttrInterface>(*this);
   }
 
   operator ConstObjectAttrInterface() const {
     if (!*this)
       return nullptr;
-    return cast<ConstObjectAttrInterface>();
+    return mlir::cast<ConstObjectAttrInterface>(*this);
   }
 
   static bool classof(mlir::Attribute attribute);

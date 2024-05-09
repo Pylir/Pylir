@@ -26,7 +26,7 @@ mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value) {
 std::optional<bool> pylir::Py::isUnbound(mlir::Value value) {
   mlir::Attribute constant;
   if (mlir::matchPattern(value, mlir::m_Constant(&constant)))
-    return constant.isa<Py::UnboundAttr>();
+    return isa<Py::UnboundAttr>(constant);
 
   // The region's entry args of an Op marked 'EntryArgsBound' are known to be
   // bound.

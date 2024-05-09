@@ -180,13 +180,14 @@ public:
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
   Py::ConstantOp createConstant(mlir::Attribute constant) {
-    if (auto ref = constant.dyn_cast<Py::GlobalValueAttr>())
+    if (auto ref = mlir::dyn_cast<Py::GlobalValueAttr>(constant))
       return create<Py::ConstantOp>(ref);
 
-    if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
+    if (auto unbound = mlir::dyn_cast<Py::UnboundAttr>(constant))
       return create<Py::ConstantOp>(unbound);
 
-    return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
+    return create<Py::ConstantOp>(
+        mlir::cast<Py::ObjectAttrInterface>(constant));
   }
 
   template <std::size_t n>

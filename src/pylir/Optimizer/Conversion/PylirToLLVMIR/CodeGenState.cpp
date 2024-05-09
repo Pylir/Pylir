@@ -269,7 +269,7 @@ void CodeGenState::initializeGlobal(LLVM::GlobalOp global, OpBuilder& builder,
   for (auto [index, slotName] : llvm::enumerate(
            cast<TypeAttrInterface>(typeObject).getInstanceSlots())) {
     Value value;
-    Attribute element = initMap.get(slotName.cast<Py::StrAttr>().getValue());
+    Attribute element = initMap.get(cast<Py::StrAttr>(slotName).getValue());
     if (!element)
       value = builder.create<LLVM::ZeroOp>(global.getLoc(), m_objectPtrType);
     else
@@ -277,7 +277,7 @@ void CodeGenState::initializeGlobal(LLVM::GlobalOp global, OpBuilder& builder,
 
     auto indices = {
         static_cast<std::int64_t>(
-            global.getType().cast<LLVM::LLVMStructType>().getBody().size() - 1),
+            cast<LLVM::LLVMStructType>(global.getType()).getBody().size() - 1),
         static_cast<std::int64_t>(index)};
     undef = builder.create<LLVM::InsertValueOp>(global.getLoc(), undef, value,
                                                 indices);
@@ -538,7 +538,7 @@ Value CodeGenState::getConstant(Location loc, OpBuilder& builder,
         loc, m_objectPtrType,
         FlatSymbolRefAttr::get(getGlobalValue(builder, value)));
 
-  if (attribute.isa<Py::UnboundAttr>())
+  if (isa<Py::UnboundAttr>(attribute))
     return builder.create<LLVM::ZeroOp>(loc, m_objectPtrType);
 
   return builder.create<LLVM::AddressOfOp>(
