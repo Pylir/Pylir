@@ -87,10 +87,10 @@ void LoadForwardingPass::runOnOperation() {
     changed = true;
     for (auto [foldResult, opResult] :
          llvm::zip(results, memoryFold->getResults())) {
-      if (auto value = dyn_cast<mlir::Value>(foldResult)) {
+      if (auto value = mlir::dyn_cast<mlir::Value>(foldResult)) {
         opResult.replaceAllUsesWith(value);
         m_localLoadsReplaced++;
-      } else if (auto attr = dyn_cast<mlir::Attribute>(foldResult)) {
+      } else if (auto attr = mlir::dyn_cast<mlir::Attribute>(foldResult)) {
         mlir::OpBuilder builder(memoryFold);
         auto* constant = memoryFold->getDialect()->materializeConstant(
             builder, attr, opResult.getType(), memoryFold->getLoc());
