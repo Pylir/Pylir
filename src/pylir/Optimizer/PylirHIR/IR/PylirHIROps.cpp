@@ -680,7 +680,7 @@ LogicalResult InitModuleExOp::verify() {
   return success();
 }
 
-#include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.cpp.inc"
+#include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIROps.cpp.inc"
