@@ -15,7 +15,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 
 include "pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIREnums.td"
-include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.td"
+include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.td"
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
@@ -183,7 +183,8 @@ def PylirHIR_SetAttrExOp
 //===----------------------------------------------------------------------===//
 
 def PylirHIR_CallOp : PylirHIR_Op<"call",
-  [AddableExceptionHandling<"CallExOp", ["Single", "Variadic"]>]> {
+  [AddableExceptionHandling<"CallExOp", ["Single", "Variadic"]>,
+   PylirHIR_CallInterface]> {
   let arguments = (ins DynamicType:$callable,
     Variadic<DynamicType>:$arguments,
     DefaultValuedAttr<StrArrayAttr, "{}">:$keywords,
@@ -221,42 +222,6 @@ def PylirHIR_CallOp : PylirHIR_Op<"call",
   let skipDefaultBuilders = 1;
 
   let hasVerifier = 1;
-
-  let extraClassDeclaration = [{
-  private:
-    friend mlir::ParseResult parseCallArguments(mlir::OpAsmParser& parser,
-      mlir::ArrayAttr& keywords,
-      llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& arguments,
-      mlir::DenseI32ArrayAttr& kindInternal);
-
-    enum Kind {
-      Positional = 1,
-      PosExpansion = 2,
-      MapExpansion = 3,
-      Keyword = 0, // zero and any kind of negative value in reality.
-    };
-
-  public:
-
-    /// Returns true if the argument at the given index is a positional
-    /// expansion.
-    bool isPosExpansion(std::size_t index) {
-      return getKindInternal()[index] == Kind::PosExpansion;
-    }
-
-    /// Returns true if the argument at the given index is a map expansion.
-    bool isMapExpansion(std::size_t index) {
-      return getKindInternal()[index] == Kind::MapExpansion;
-    }
-
-    /// Returns the keyword of the argument at the given index.
-    /// Returns a null attribute if the argument is not a keyword argument.
-    mlir::StringAttr getKeyword(std::size_t index) {
-      if (getKindInternal()[index] > 0)
-        return nullptr;
-      return mlir::cast<mlir::StringAttr>(getKeywords()[-getKindInternal()[index]]);
-    }
-  }];
 }
 
 def PylirHIR_CallExOp : CreateExceptionHandlingVariant<PylirHIR_CallOp>;
@@ -493,6 +458,79 @@ def PylirHIR_ReturnOp : PylirHIR_Op<"return", [Pure, ReturnLike, Terminator,
   }];
 
   let assemblyFormat = "$value attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// Classes
+//===----------------------------------------------------------------------===//
+
+def PylirHIR_ClassOp : PylirHIR_Op<"class", [
+    OpAsmOpInterface, PylirHIR_CallInterface,
+    AddableExceptionHandling<"ClassExOp">,
+]> {
+  let arguments = (ins
+    StrAttr:$name,
+    Variadic<DynamicType>:$arguments,
+    DefaultValuedAttr<StrArrayAttr, "{}">:$keywords,
+    DefaultValuedAttr<DenseI32ArrayAttr, "{}">:$kind_internal
+  );
+
+  let results = (outs DynamicType:$result);
+
+  let regions = (region MinSizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    $name ( `(`
+      custom<CallArguments>($keywords,
+                            $arguments,
+                            $kind_internal)^ `)` )? attr-dict-with-keyword
+    $body
+  }];
+
+  let builders = [
+    OpBuilder<(ins "llvm::StringRef":$className,
+                   "llvm::ArrayRef<CallArgument>":$arguments,
+                   "llvm::function_ref<void(mlir::Block*)>":$bodyBuilder
+    )>
+  ];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+
+    mlir::BlockArgument getDictParameter() {
+      return getBody().front().getArgument(0);
+    }
+
+    //===------------------------------------------------------------------===//
+    // OpAsmOpInterface implementation
+    //===------------------------------------------------------------------===//
+
+    static llvm::StringRef getDefaultDialect() {
+      return pylir::HIR::PylirHIRDialect::getDialectNamespace();
+    }
+
+    void getAsmBlockArgumentNames(mlir::Region& region,
+                                  mlir::OpAsmSetValueNameFn setNameFn) {
+      setNameFn(getDictParameter(), "dict");
+    }
+  }];
+}
+
+def PylirHIR_ClassExOp : CreateExceptionHandlingVariant<PylirHIR_ClassOp,
+  /*name=*/"", /*newline=*/0> {
+  let hasVerifier = 1;
+}
+
+def PylirHIR_ClassReturnOp : PylirHIR_Op<"class_return",
+  [ParentOneOf<["ClassOp", "ClassExOp"]>, Terminator, ReturnLike, Pure]> {
+  let arguments = (ins);
+
+  let description = [{
+    Op used to terminate a `pyHIR.class` body.
+  }];
+
+  let assemblyFormat = "attr-dict";
 }
 
 //===----------------------------------------------------------------------===//

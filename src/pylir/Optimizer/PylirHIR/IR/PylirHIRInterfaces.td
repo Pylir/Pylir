@@ -105,4 +105,50 @@ def PylirHIR_FunctionInterface : OpInterface<"FunctionInterface",
   }];
 }
 
+def PylirHIR_CallInterface : OpInterface<"CallInterface"> {
+  let cppNamespace = "::pylir::HIR";
+
+  let methods = [
+    InterfaceMethod<[{
+
+    }],
+    "::llvm::ArrayRef<int32_t>", "getKindInternal">,
+    InterfaceMethod<[{
+
+    }],
+    "::mlir::ArrayAttr", "getKeywords">,
+  ];
+
+  let extraSharedClassDeclaration = [{
+
+    enum Kind {
+      Positional = 1,
+      PosExpansion = 2,
+      MapExpansion = 3,
+      Keyword = 0, // zero and any kind of negative value in reality.
+    };
+
+    /// Returns true if the argument at the given index is a positional
+    /// expansion.
+    bool isPosExpansion(std::size_t index) {
+      return $_op.getKindInternal()[index] == Kind::PosExpansion;
+    }
+
+    /// Returns true if the argument at the given index is a map expansion.
+    bool isMapExpansion(std::size_t index) {
+      return $_op.getKindInternal()[index] == Kind::MapExpansion;
+    }
+
+    /// Returns the keyword of the argument at the given index.
+    /// Returns a null attribute if the argument is not a keyword argument.
+    mlir::StringAttr getKeyword(std::size_t index) {
+      if ($_op.getKindInternal()[index] > 0)
+        return nullptr;
+      return mlir::cast<mlir::StringAttr>(
+        $_op.getKeywords()[-$_op.getKindInternal()[index]]);
+    }
+  }];
+}
+
+
 #endif

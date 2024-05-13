@@ -87,7 +87,7 @@ def AddableExceptionHandlingInterface : OpInterface<"AddableExceptionHandlingInt
 /// automatically.
 /// If 'opName' is empty, its mnemonic is the mnemonic of 'op' with 'Ex' as
 /// suffix.
-class CreateExceptionHandlingVariant<Op op, string opName = "">
+class CreateExceptionHandlingVariant<Op op, string opName = "", bit newline = 1>
   : Op<op.opDialect, !if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
     !listconcat(!filter(x, op.traits, !not(!isa<AddableExceptionHandling>(x))),
       [Terminator, AttrSizedOperandSegments,
@@ -108,8 +108,9 @@ class CreateExceptionHandlingVariant<Op op, string opName = "">
   let successors = (successor AnySuccessor:$happy_path,
                               AnySuccessor:$exception_path);
 
-  let assemblyFormat = !strconcat(op.assemblyFormat, [{
-    `\n` ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `:` type($normal_dest_operands) `)`)?
+  let assemblyFormat = !strconcat(op.assemblyFormat,
+    !if(newline, [{`\n` ` ` ` `}], " ") # [{
+     `label` $happy_path ( `(` $normal_dest_operands^ `:` type($normal_dest_operands) `)`)?
            `unwind` $exception_path ( `(` $unwind_dest_operands^ `:` type($unwind_dest_operands) `)`)?
   }]);
 

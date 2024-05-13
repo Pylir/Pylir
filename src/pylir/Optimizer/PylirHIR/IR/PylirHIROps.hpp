@@ -24,7 +24,7 @@
 #include "PylirHIRAttributes.hpp"
 #include "PylirHIRDialect.hpp"
 
-#include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.h.inc"
+#include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.h.inc"
 
 namespace pylir::HIR {
 
