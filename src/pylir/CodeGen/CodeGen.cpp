@@ -59,6 +59,10 @@ class CodeGen {
 
   /// Currently active function scope or an empty optional if at module scope.
   std::optional<Scope> m_functionScope;
+  /// Class dictionary to use for lookups within class bodies.
+  Value m_classDictionary;
+  /// Set of non-locals used within a class body.
+  DenseSet<StringRef> m_classNonLocals;
 
   /// Structure containing the currently active loop's break and continue
   /// blocks.
@@ -152,6 +156,22 @@ class CodeGen {
     }
   };
 
+  /// RAII class clearing and restoring the finally stack.
+  class ResetFinallyStack : public RAIIBaseClass<ResetFinallyStack> {
+    std::vector<FinallyCode> m_finallyStack;
+
+  public:
+    explicit ResetFinallyStack(CodeGen& codeGen)
+        : RAIIBaseClass(codeGen),
+          m_finallyStack(std::move(codeGen.m_finallyStack)) {
+      codeGen.m_finallyStack.clear();
+    }
+
+    ~ResetFinallyStack() {
+      m_codeGen.m_finallyStack = std::move(m_finallyStack);
+    }
+  };
+
   /// Adds 'args' as currently active qualifiers. The final qualifier consists
   /// of each component separated by dots.
   /// Resets the qualifier to its previous value on destruction.
@@ -171,13 +191,34 @@ class CodeGen {
     }
   };
 
+  /// RAII class set and resetting the currently active class body dictionary.
+  class ChangeClassDictionary : public RAIIBaseClass<ChangeClassDictionary> {
+    Value m_classDictionary;
+    DenseSet<StringRef> m_classNonLocals;
+
+  public:
+    ChangeClassDictionary(CodeGen& codeGen, Value maybeClassDictionary,
+                          DenseSet<StringRef>&& classNonLocals)
+        : RAIIBaseClass(codeGen), m_classDictionary(codeGen.m_classDictionary),
+          m_classNonLocals(std::move(m_codeGen.m_classNonLocals)) {
+      m_codeGen.m_classDictionary = maybeClassDictionary;
+      m_codeGen.m_classNonLocals = std::move(classNonLocals);
+    }
+
+    ~ChangeClassDictionary() {
+      m_codeGen.m_classDictionary = m_classDictionary;
+      m_codeGen.m_classNonLocals = std::move(m_classNonLocals);
+    }
+  };
+
   /// RAII class used to change all state associated with changing the current
   /// function.
   class ChangeFunction : public RAIIBaseClass<ChangeFunction> {
     AddQualifiers m_addQualifiers;
     ChangeEHHandler m_changeExceptionHandler;
     std::optional<Scope> m_previousScope;
-    std::vector<FinallyCode> m_finallyStack;
+    ChangeClassDictionary m_changeClassDictionary;
+    ResetFinallyStack m_resetFinallyStack;
     OpBuilder::InsertionGuard m_guard;
 
   public:
@@ -186,20 +227,49 @@ class CodeGen {
           m_addQualifiers(codeGen, funcName, "<locals>"),
           m_changeExceptionHandler(codeGen, nullptr),
           m_previousScope(std::move(codeGen.m_functionScope)),
-          m_finallyStack(std::move(codeGen.m_finallyStack)),
-          m_guard(codeGen.m_builder) {
+          m_changeClassDictionary(codeGen, /*maybeClassDictionary=*/nullptr,
+                                  /*classNonLocals=*/{}),
+          m_resetFinallyStack(codeGen), m_guard(codeGen.m_builder) {
       m_codeGen.m_functionScope.emplace(m_codeGen.m_builder);
       m_codeGen.m_builder.setInsertionPointToStart(entryBlock);
     }
 
     ~ChangeFunction() {
       m_codeGen.m_functionScope = std::move(m_previousScope);
-      m_codeGen.m_finallyStack = std::move(m_finallyStack);
     }
 
     /// Returns the function scope prior to the function change.
     std::optional<Scope>& getPreviousScope() {
       return m_previousScope;
+    }
+  };
+
+  /// RAII class used to change all state associated with entering and exiting
+  /// a class definition.
+  class ChangeClass {
+    AddQualifiers m_addQualifiers;
+    ChangeEHHandler m_changeExceptionHandler;
+    ResetFinallyStack m_resetFinallyStack;
+    ChangeClassDictionary m_changeClassDictionary;
+    OpBuilder::InsertionGuard m_guard;
+
+  public:
+    ChangeClass(CodeGen& codeGen, const Syntax::ClassDef& classDef,
+                Block* entryBlock)
+        : m_addQualifiers(codeGen, classDef.className.getValue()),
+          m_changeExceptionHandler(codeGen, nullptr),
+          m_resetFinallyStack(codeGen),
+          m_changeClassDictionary(codeGen, entryBlock->getArgument(0),
+                                  [&] {
+                                    DenseSet<StringRef> result;
+                                    for (auto&& [key, kind] :
+                                         classDef.scope.identifiers)
+                                      if (kind == Syntax::Scope::NonLocal)
+                                        result.insert(key.getValue());
+                                    return result;
+                                  }()),
+          m_guard(codeGen.m_builder) {
+      codeGen.m_builder.setInsertionPointToStart(entryBlock);
     }
   };
 
@@ -293,6 +363,14 @@ class CodeGen {
   /// different procedures required to write to local, nonlocal and global
   /// variables.
   void writeToIdentifier(Value value, llvm::StringRef name) {
+    if (m_classDictionary) {
+      Value string =
+          create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+      Value hash = create<Py::StrHashOp>(string);
+      create<Py::DictSetItemOp>(m_classDictionary, string, hash, value);
+      return;
+    }
+
     if (m_functionScope) {
       auto iter = m_functionScope->identifiers.find(name);
       if (iter != m_functionScope->identifiers.end()) {
@@ -330,37 +408,71 @@ class CodeGen {
       create<Py::RaiseOp>(object);
 
       implementBlock(continueBlock);
+      return value;
     };
 
-    if (m_functionScope) {
-      auto iter = m_functionScope->identifiers.find(name);
-      if (iter != m_functionScope->identifiers.end()) {
-        Value result = match(
-            iter->second,
-            [&](SSABuilder::DefinitionsMap& map) -> Value {
-              return m_functionScope->ssaBuilder.readVariable(
-                  m_builder.getLoc(), m_builder.getType<Py::DynamicType>(), map,
-                  m_builder.getInsertionBlock());
-            },
-            [&](Value cell) -> Value {
-              return create<Py::GetSlotOp>(cell,
-                                           create<arith::ConstantIndexOp>(0));
-            });
-        throwExceptionIfUnbound(result, Builtins::UnboundLocalError);
-        return result;
-      }
-    }
+    auto globalLookup = [&]() -> Value {
+      Value readValue = create<HIR::ModuleGetAttrOp>(m_thisModuleObject, name);
+      auto iter = m_builtinNamespace.find(name);
+      if (iter == m_builtinNamespace.end())
+        return readValue;
 
-    Value readValue = create<HIR::ModuleGetAttrOp>(m_thisModuleObject, name);
-    auto iter = m_builtinNamespace.find(name);
-    if (iter != m_builtinNamespace.end()) {
       Value alternative = create<Py::ConstantOp>(iter->second);
       Value isUnbound = create<Py::IsUnboundValueOp>(readValue);
-      readValue = create<arith::SelectOp>(isUnbound, alternative, readValue);
-    } else {
-      throwExceptionIfUnbound(readValue, Builtins::NameError);
+      return create<arith::SelectOp>(isUnbound, alternative, readValue);
+    };
+
+    auto localLookup = [&]() -> Value {
+      if (!m_functionScope)
+        return nullptr;
+
+      auto iter = m_functionScope->identifiers.find(name);
+      if (iter == m_functionScope->identifiers.end())
+        return nullptr;
+
+      return match(
+          iter->second,
+          [&](SSABuilder::DefinitionsMap& map) -> Value {
+            return m_functionScope->ssaBuilder.readVariable(
+                m_builder.getLoc(), m_builder.getType<Py::DynamicType>(), map,
+                m_builder.getInsertionBlock());
+          },
+          [&](Value cell) -> Value {
+            return create<Py::GetSlotOp>(cell,
+                                         create<arith::ConstantIndexOp>(0));
+          });
+    };
+
+    if (m_classDictionary) {
+      Value string =
+          create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+      Value hash = create<Py::StrHashOp>(string);
+      Value result =
+          create<Py::DictTryGetItemOp>(m_classDictionary, string, hash);
+      Value isUnbound = create<Py::IsUnboundValueOp>(result);
+      Block* otherLookupBlock = addBlock();
+      Block* continueBlock = addBlock(m_builder.getType<Py::DynamicType>());
+      create<cf::CondBranchOp>(isUnbound, otherLookupBlock, continueBlock,
+                               result);
+
+      implementBlock(otherLookupBlock);
+      if (m_classNonLocals.contains(name))
+        // A non-local is guaranteed to be a cell within the enclosing function
+        // scope of the class, making the normal lookup procedure correct.
+        result = localLookup();
+      else
+        result = globalLookup();
+
+      create<cf::BranchOp>(
+          continueBlock, throwExceptionIfUnbound(result, Builtins::NameError));
+      implementBlock(continueBlock);
+      return continueBlock->getArgument(0);
     }
-    return readValue;
+
+    if (Value local = localLookup())
+      return throwExceptionIfUnbound(local, Builtins::UnboundLocalError);
+
+    return throwExceptionIfUnbound(globalLookup(), Builtins::NameError);
   }
 
   /// Creates a new basic block with 'argTypes' as block arguments.
@@ -950,12 +1062,7 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::ClassDef& classDef) {
-    if (!classDef.isConst) {
-      // TODO:
-      PYLIR_UNREACHABLE;
-    }
-
+  void visitConstClass(const Syntax::ClassDef& classDef) {
     std::string qualifiedName = qualify(classDef.className.getValue());
     AddQualifiers addQualifiers(*this, classDef.className.getValue());
 
@@ -1052,6 +1159,29 @@ private:
 
     writeToIdentifier(m_builder.create<Py::ConstantOp>(attr),
                       classDef.className.getValue());
+  }
+
+  void visitImpl(const Syntax::ClassDef& classDef) {
+    if (classDef.isConst) {
+      visitConstClass(classDef);
+      return;
+    }
+
+    SmallVector<HIR::CallArgument> callArguments;
+    if (classDef.inheritance)
+      callArguments = visitArgumentList(classDef.inheritance->argumentList);
+
+    OpResult classOp = create<HIR::ClassOp>(
+        qualify(classDef.className.getValue()), callArguments,
+        [&](Block* entryBlock) {
+          ChangeClass changeClass(*this, classDef, entryBlock);
+
+          visit(classDef.suite);
+
+          create<HIR::ClassReturnOp>();
+        });
+
+    writeToIdentifier(classOp, classDef.className.getValue());
   }
 
   void visitImpl(const Syntax::AssignmentStmt& assignmentStmt) {
@@ -1565,6 +1695,24 @@ private:
     return {};
   }
 
+  SmallVector<HIR::CallArgument>
+  visitArgumentList(ArrayRef<Syntax::Argument> arguments) {
+    SmallVector<HIR::CallArgument> callArguments;
+    for (const Syntax::Argument& arg : arguments) {
+      Value value = visit(arg.expression);
+      if (arg.maybeName)
+        callArguments.push_back(
+            {value, m_builder.getStringAttr(arg.maybeName->getValue())});
+      else if (!arg.maybeExpansionsOrEqual)
+        callArguments.push_back({value, HIR::CallArgument::PositionalTag{}});
+      else if (arg.maybeExpansionsOrEqual->getTokenType() == TokenType::Star)
+        callArguments.push_back({value, HIR::CallArgument::PosExpansionTag{}});
+      else
+        callArguments.push_back({value, HIR::CallArgument::MapExpansionTag{}});
+    }
+    return callArguments;
+  }
+
   Value visitImpl(const Syntax::Call& call) {
     if (auto* intr = call.expression->dyn_cast<Syntax::Intrinsic>()) {
       const auto* args =
@@ -1589,23 +1737,8 @@ private:
           PYLIR_UNREACHABLE;
         },
         [&](ArrayRef<Syntax::Argument> arguments) -> Value {
-          SmallVector<HIR::CallArgument> callArguments;
-          for (const Syntax::Argument& arg : arguments) {
-            Value value = visit(arg.expression);
-            if (arg.maybeName)
-              callArguments.push_back(
-                  {value, m_builder.getStringAttr(arg.maybeName->getValue())});
-            else if (!arg.maybeExpansionsOrEqual)
-              callArguments.push_back(
-                  {value, HIR::CallArgument::PositionalTag{}});
-            else if (arg.maybeExpansionsOrEqual->getTokenType() ==
-                     TokenType::Star)
-              callArguments.push_back(
-                  {value, HIR::CallArgument::PosExpansionTag{}});
-            else
-              callArguments.push_back(
-                  {value, HIR::CallArgument::MapExpansionTag{}});
-          }
+          SmallVector<HIR::CallArgument> callArguments =
+              visitArgumentList(arguments);
           return create<HIR::CallOp>(callable, callArguments);
         });
   }

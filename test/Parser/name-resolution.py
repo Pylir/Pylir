@@ -240,3 +240,15 @@ def outer3():
 # CHECK-NOT: locals:
 # CHECK-NEXT: nonlocals: f
 # CHECK-NOT: cells:
+
+def outer4():
+    y = 0
+
+    class Test:
+        y
+# CHECK-LABEL: function outer4
+# CHECK: locals: Test
+# CHECK-NOT: nonlocals
+# CHECK: cells: y
+# CHECK-LABEL: class Test
+# CHECK-NEXT: nonlocals: y
