@@ -19,10 +19,10 @@ using namespace HIR;
 
 /// arg ::= [`*` | `**` | string-attr `=`] value-use
 /// call-arguments ::= <arg> { `,` <arg> }
-ParseResult HIR::parseCallArguments(
-    OpAsmParser& parser, ArrayAttr& keywords,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand>& arguments,
-    DenseI32ArrayAttr& kindInternal) {
+static ParseResult
+parseCallArguments(OpAsmParser& parser, ArrayAttr& keywords,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand>& arguments,
+                   DenseI32ArrayAttr& kindInternal) {
   SmallVector<Attribute> keywordsStorage;
   SmallVector<std::int32_t> kindInternalStorage;
 
@@ -35,9 +35,9 @@ ParseResult HIR::parseCallArguments(
 
     if (succeeded(parser.parseOptionalStar())) {
       if (succeeded(parser.parseOptionalStar())) {
-        kindInternalStorage.push_back(CallOp::MapExpansion);
+        kindInternalStorage.push_back(CallInterface::MapExpansion);
       } else {
-        kindInternalStorage.push_back(CallOp::PosExpansion);
+        kindInternalStorage.push_back(CallInterface::PosExpansion);
       }
     } else {
       StringAttr temp;
@@ -50,7 +50,7 @@ ParseResult HIR::parseCallArguments(
             -static_cast<std::int32_t>(keywordsStorage.size()));
         keywordsStorage.push_back(temp);
       } else {
-        kindInternalStorage.push_back(CallOp::Positional);
+        kindInternalStorage.push_back(CallInterface::Positional);
       }
     }
 
@@ -63,10 +63,9 @@ ParseResult HIR::parseCallArguments(
   return success();
 }
 
-namespace {
 template <class OpT>
-void printCallArguments(OpAsmPrinter& printer, OpT callOp, ArrayAttr,
-                        ValueRange, DenseI32ArrayAttr) {
+static void printCallArguments(OpAsmPrinter& printer, OpT callOp, ArrayAttr,
+                               ValueRange, DenseI32ArrayAttr) {
   llvm::interleaveComma(
       CallArgumentRange(callOp), printer.getStream(),
       [&](const CallArgument& argument) {
@@ -79,10 +78,10 @@ void printCallArguments(OpAsmPrinter& printer, OpT callOp, ArrayAttr,
         printer << argument.value;
       });
 }
-} // namespace
 
-void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
-                   Value callable, ArrayRef<CallArgument> arguments) {
+template <class OpT>
+static void buildCallArguments(OpBuilder& odsBuilder, OperationState& odsState,
+                               ArrayRef<CallArgument> arguments) {
   SmallVector<std::int32_t> kindInternal;
   SmallVector<Value> argOperands;
   SmallVector<Attribute> keywords;
@@ -91,13 +90,13 @@ void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
     match(
         argument.kind,
         [&](CallArgument::PosExpansionTag) {
-          kindInternal.push_back(PosExpansion);
+          kindInternal.push_back(OpT::PosExpansion);
         },
         [&](CallArgument::MapExpansionTag) {
-          kindInternal.push_back(MapExpansion);
+          kindInternal.push_back(OpT::MapExpansion);
         },
         [&](CallArgument::PositionalTag) {
-          kindInternal.push_back(Positional);
+          kindInternal.push_back(OpT::Positional);
         },
         [&](StringAttr stringAttr) {
           kindInternal.push_back(-static_cast<std::int32_t>(keywords.size()));
@@ -105,13 +104,18 @@ void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
         });
   }
 
+  odsState.addOperands(argOperands);
+  odsState.getOrAddProperties<typename OpT::Properties>().keywords =
+      odsBuilder.getArrayAttr(keywords);
+  odsState.getOrAddProperties<typename OpT::Properties>().kind_internal =
+      odsBuilder.getDenseI32ArrayAttr(kindInternal);
+}
+
+void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
+                   Value callable, ArrayRef<CallArgument> arguments) {
   odsState.addTypes(odsBuilder.getType<Py::DynamicType>());
   odsState.addOperands(callable);
-  odsState.addOperands(argOperands);
-  odsState.getOrAddProperties<Properties>().keywords =
-      odsBuilder.getArrayAttr(keywords);
-  odsState.getOrAddProperties<Properties>().kind_internal =
-      odsBuilder.getDenseI32ArrayAttr(kindInternal);
+  buildCallArguments<CallOp>(odsBuilder, odsState, arguments);
 }
 
 void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
@@ -595,6 +599,43 @@ void FuncOp::print(OpAsmPrinter& p) {
 }
 
 //===----------------------------------------------------------------------===//
+// ClassOp
+//===----------------------------------------------------------------------===//
+
+void ClassOp::build(OpBuilder& odsBuilder, OperationState& odsState,
+                    StringRef className, ArrayRef<CallArgument> arguments,
+                    function_ref<void(Block*)> bodyBuilder) {
+  odsState.addTypes(odsBuilder.getType<Py::DynamicType>());
+  buildCallArguments<ClassOp>(odsBuilder, odsState, arguments);
+  odsState.getOrAddProperties<Properties>().setName(
+      odsBuilder.getStringAttr(className));
+  Region* region = odsState.addRegion();
+  Block* entryBlock = &region->emplaceBlock();
+  entryBlock->addArgument(odsBuilder.getType<Py::DynamicType>(),
+                          odsState.location);
+  bodyBuilder(entryBlock);
+}
+
+template <class OpT>
+static LogicalResult verifyClass(OpT op) {
+  if (op.getRegion().empty() || op.getRegion().front().getNumArguments() != 1 ||
+      !isa<Py::DynamicType>(op.getRegion().front().getArgument(0).getType()))
+    return op.emitOpError("expected entry block of ")
+           << op.getOperationName() << " to have exactly one "
+           << Py::DynamicType::name << " argument";
+
+  return success();
+}
+
+LogicalResult ClassOp::verify() {
+  return verifyClass(*this);
+}
+
+LogicalResult ClassExOp::verify() {
+  return verifyClass(*this);
+}
+
+//===----------------------------------------------------------------------===//
 // InitCallOp
 //===----------------------------------------------------------------------===//
 
@@ -639,7 +680,7 @@ LogicalResult InitModuleExOp::verify() {
   return success();
 }
 
-#include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.cpp.inc"
+#include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIROps.cpp.inc"

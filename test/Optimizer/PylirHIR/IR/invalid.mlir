@@ -75,3 +75,13 @@ pyHIR.globalFunc @wrong_closure_param_2(%closure has_default) {
   %0 = py.constant(#py.int<3>)
   return %0
 }
+
+// -----
+
+pyHIR.globalFunc @wrong_block_args1(%closure) {
+  // expected-error@below {{expected entry block of pyHIR.class to have exactly one py.dynamic argument}}
+  %0 = class "test" {
+    class_return
+  }
+  return %0
+}

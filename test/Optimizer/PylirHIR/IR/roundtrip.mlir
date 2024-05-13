@@ -186,3 +186,24 @@ pyHIR.globalFunc @contains(%container, %item) {
   %0 = contains %item in %container
   return %0
 }
+
+// CHECK-LABEL: pyHIR.globalFunc @class(
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+pyHIR.globalFunc @class(%container, %item) {
+  // CHECK: class "test"(%[[ARG1]], "metaclass"=%[[ARG0]])
+  %0 = class "test"(%item, "metaclass"=%container) {
+  ^bb0(%dict : !py.dynamic):
+    class_return
+  }
+  // CHECK: classEx "test"(%[[ARG1]], "metaclass"=%[[ARG0]]) {
+  // CHECK: } label ^{{[[:alnum:]]+}} unwind ^{{[[:alnum:]]+}}
+  %1 = classEx "test"(%item, "metaclass"=%container) {
+  ^bb0(%dict : !py.dynamic):
+    class_return
+  } label ^bb0 unwind ^bb1
+^bb0:
+  return %0
+^bb1(%e : !py.dynamic):
+  return %e
+}

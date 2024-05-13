@@ -4,14 +4,14 @@
 
 add_pylir_dialect(PylirHIR pyHIR)
 
-add_pylir_interface(OP PylirHIRFunctionInterface)
+add_pylir_interface(OP PylirHIRInterfaces)
 
 add_library(PylirHIRDialect
   PylirHIRDialect.cpp
   PylirHIROps.cpp
 )
 add_dependencies(PylirHIRDialect
-  PylirHIRFunctionInterfaceIncGen
+  PylirHIRInterfacesIncGen
   PylirHIRIncGen
 )
 target_link_libraries(PylirHIRDialect
