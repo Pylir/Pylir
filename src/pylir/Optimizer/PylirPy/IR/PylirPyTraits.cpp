@@ -5,6 +5,7 @@
 #include "PylirPyTraits.hpp"
 
 #include <mlir/IR/Builders.h>
+#include <mlir/IR/IRMapping.h>
 
 #include <pylir/Support/Macros.hpp>
 
@@ -58,5 +59,12 @@ mlir::Operation* pylir::Py::details::cloneWithExceptionHandlingImpl(
                             builder.getDenseI32ArrayAttr(values));
   }
   state.addAttributes(attributes);
+  // Reuse the capacity of the IR maps across different regions. Avoids memory
+  // reallocations.
+  mlir::IRMapping mapping;
+  for (mlir::Region& region : operation->getRegions()) {
+    mapping.clear();
+    region.cloneInto(state.addRegion(), mapping);
+  }
   return builder.create(state);
 }

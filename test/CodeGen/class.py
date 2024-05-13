@@ -66,3 +66,12 @@ def foo():
         # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
         # CHECK: py.dict_setItem %[[DICT]][%[[STR]] hash(%[[HASH]])] to %[[INIT]]
         # CHECK: class_return
+
+    try:
+        # CHECK-LABEL: classEx "__main__.foo.<locals>.Test" {
+        # CHECK: class_return
+        # CHECK: } label ^{{.*}} unwind ^{{.*}}
+        class Test:
+            pass
+    except:
+        pass
