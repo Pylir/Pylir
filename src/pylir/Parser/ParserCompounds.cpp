@@ -600,7 +600,8 @@ pylir::Parser::parseParameterList() {
         return std::nullopt;
       maybeDefault = std::move(*defaultVal);
     }
-    if (!maybeDefault && seenDefaultParam) {
+    if (currentKind != Syntax::Parameter::KeywordRest && !maybeDefault &&
+        seenDefaultParam) {
       createError(
           *identifier,
           Diag::
