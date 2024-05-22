@@ -5,6 +5,7 @@
 add_pylir_passes(Passes Transform PREFIX PylirHIR)
 
 add_library(PylirHIRTransforms
+  ClassBodyOutlining.cpp
   FuncOutlining.cpp
 )
 add_dependencies(PylirHIRTransforms
@@ -16,7 +17,9 @@ target_link_libraries(PylirHIRTransforms
 
   PRIVATE
   PylirHIRDialect
+  PylirPyTransformsUtil
 
   MLIRArithDialect
+  MLIRTransformUtils
 )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirHIRTransforms)

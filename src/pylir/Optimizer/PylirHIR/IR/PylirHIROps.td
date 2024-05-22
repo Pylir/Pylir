@@ -533,6 +533,48 @@ def PylirHIR_ClassReturnOp : PylirHIR_Op<"class_return",
   let assemblyFormat = "attr-dict";
 }
 
+def PylirHIR_BuildClassOp : PylirHIR_Op<"buildClass",
+  [PylirHIR_CallInterface, AddableExceptionHandling<"BuildClassExOp",
+    ["Single", "Variadic"]>]> {
+
+  let description = [{
+    Op corresponding to CPython's internal `__build_class__` function.
+    Creates a new type instance with the given name and initializes its
+    dictionary by calling `function` using a dictionary that must be modified
+    in-place.
+
+    The base-class list is derived from all positional arguments.
+    The keyword arguments, with the exception of the key `"metaclass"`, are
+    passed to various methods during class creation.
+
+    :::{admonition} TODO
+    :class: note
+
+    * Describe the the class creation procedure in detail.
+    :::
+  }];
+
+  let arguments = (ins
+    DynamicType:$function,
+    StrAttr:$name,
+    Variadic<DynamicType>:$arguments,
+    DefaultValuedAttr<StrArrayAttr, "{}">:$keywords,
+    DefaultValuedAttr<DenseI32ArrayAttr, "{}">:$kind_internal
+  );
+
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+     `(` $function `,` $name (`,`
+      custom<CallArguments>($keywords,
+                            $arguments,
+                            $kind_internal)^ )? `)` attr-dict-with-keyword
+  }];
+}
+
+def PylirHIR_BuildClassExOp
+  : CreateExceptionHandlingVariant<PylirHIR_BuildClassOp>;
+
 //===----------------------------------------------------------------------===//
 // Modules
 //===----------------------------------------------------------------------===//
