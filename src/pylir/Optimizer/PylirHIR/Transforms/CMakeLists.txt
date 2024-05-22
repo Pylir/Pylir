@@ -17,6 +17,7 @@ target_link_libraries(PylirHIRTransforms
 
   PRIVATE
   PylirHIRDialect
+  PylirPyTransformsUtil
 
   MLIRArithDialect
   MLIRTransformUtils
