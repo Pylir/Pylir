@@ -19,5 +19,6 @@ target_link_libraries(PylirHIRTransforms
   PylirHIRDialect
 
   MLIRArithDialect
+  MLIRTransformUtils
 )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirHIRTransforms)

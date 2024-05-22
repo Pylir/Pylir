@@ -9,8 +9,8 @@ add_library(PylirPyTransformsUtil
 target_link_libraries(PylirPyTransformsUtil
   PUBLIC
   MLIRCallInterfaces
+  MLIRControlFlowDialect
   
   PRIVATE
   PylirPyDialect
-  MLIRControlFlowDialect
 )
