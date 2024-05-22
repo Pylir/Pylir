@@ -5,6 +5,7 @@
 add_pylir_passes(Passes Transform PREFIX PylirHIR)
 
 add_library(PylirHIRTransforms
+  ClassBodyOutlining.cpp
   FuncOutlining.cpp
 )
 add_dependencies(PylirHIRTransforms

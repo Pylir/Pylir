@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_library(PylirPyTransformsUtil
+  ExceptionRewriter.cpp
   InlinerUtil.cpp
 )
 target_link_libraries(PylirPyTransformsUtil

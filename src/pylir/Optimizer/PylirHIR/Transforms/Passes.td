@@ -18,4 +18,13 @@ def FuncOutliningPass : Pass<"pylir-func-outlining", "mlir::ModuleOp"> {
   }];
 }
 
+def ClassBodyOutliningPass : Pass<"pylir-class-body-outlining", "mlir::ModuleOp"> {
+  let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+  let description = [{
+    Converts all `pyHIR.class` ops to by outlining the bodies to `pyHIR.func`
+    ops and replacing them with `pyHIR.buildClass` ops.
+  }];
+}
+
 #endif
