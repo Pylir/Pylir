@@ -154,6 +154,10 @@ public:
   [[nodiscard]] PyTuple& getInstanceSlots() const noexcept {
     return *m_instanceSlots;
   }
+
+  [[nodiscard]] PyTypeObject& getLayoutType() const noexcept {
+    return *m_layoutType;
+  }
 };
 
 using PyUniversalCC = PyObject& (*)(PyFunction&, PyTuple&, PyDict&);

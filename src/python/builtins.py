@@ -45,6 +45,14 @@ def binary_method_call(method, self, other):
 class type:
     __slots__ = pylir.intr.type.__slots__
 
+    def __new__(cls, name, bases, dict, **kwargs):
+        # TODO: Assign instance slots from 'dict', assign slots of instance
+        #  from dict, create instance of metatype not 'type', add '__dict__'
+        #  and '__weakref__' slots by default, allow 0 len 'bases', set
+        #  dictionary, call '__set_name__' of descriptors and
+        #  '__init_subclass__' of 'super()'.
+        return pylir.intr.makeType(name, bases, ())
+
     def __call__(self, *args, **kwargs):
         # I usually try to avoid intrinsics where possible to have as much of a
         # readable and normal python code as possible but due to special
@@ -693,3 +701,14 @@ def next(*args):
         if len(args) == 2:
             return args[1]
         raise e
+
+
+@pylir.intr.const_export
+def __build_class__(func, name, /, *bases, metaclass=type, **kwds):
+    # TODO: Compute MRO order, compute metatype,
+
+    # TODO: Initialize dictionary with __prepare__.
+    d = {}
+    func(d)
+    bases = *bases, object
+    return metaclass(name, bases, d)

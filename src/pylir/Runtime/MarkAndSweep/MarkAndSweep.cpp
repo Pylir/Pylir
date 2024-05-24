@@ -35,6 +35,8 @@ void mark(pylir::rt::PyObject* object) {
 
 template <class F>
 void introspectObject(pylir::rt::PyObject* object, F f) {
+  f(&type(*object));
+
   if (auto* tuple = object->dyn_cast<pylir::rt::PyTuple>()) {
     for (auto* iter : *tuple)
       if (iter)
@@ -52,7 +54,12 @@ void introspectObject(pylir::rt::PyObject* object, F f) {
       if (value)
         f(value);
     }
+  } else if (auto* type = object->dyn_cast<pylir::rt::PyTypeObject>()) {
+    f(&type->getLayoutType());
+    f(&type->getMROTuple());
+    f(&type->getInstanceSlots());
   }
+
   auto& slots = type(*object).getInstanceSlots();
   for (std::size_t i = 0; i < slots.len(); i++)
     if (auto* slot = object->getSlot(i))

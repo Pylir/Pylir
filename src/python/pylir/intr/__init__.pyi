@@ -22,3 +22,7 @@ def isUnboundValue(obj: object) -> bool:
 
 def mroLookup(mro_tuple, slot: int):
     pass
+
+
+def makeType(name: str, bases: tuple, slots: tuple):
+    pass

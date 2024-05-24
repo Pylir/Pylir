@@ -25,6 +25,7 @@ void pylir::registerOptimizationPipelines() {
       "Minimum pass pipeline to fully lower 'py' dialect, up until (exclusive) "
       "conversion to LLVM",
       [](mlir::OpPassManager& pm) {
+        pm.addPass(HIR::createClassBodyOutliningPass());
         pm.addPass(HIR::createFuncOutliningPass());
         mlir::OpPassManager* nested = &pm.nestAny();
         // This is supposed to be the minimum pipeline, so shouldn't really
@@ -46,6 +47,7 @@ void pylir::registerOptimizationPipelines() {
       "Optimization pipeline used by the compiler with lowering up until "
       "(exclusive) conversion to LLVM",
       [](mlir::OpPassManager& pm) {
+        pm.addPass(HIR::createClassBodyOutliningPass());
         pm.addPass(HIR::createFuncOutliningPass());
         pm.nestAny().addPass(mlir::createCanonicalizerPass());
         pm.addPass(createConvertPylirHIRToPylirPyPass());
