@@ -138,7 +138,7 @@ public:
     PYLIR_ASSERT(lowerBlockSizeLimit >= sizeof(Node));
   }
 
-  ~BestFitTree();
+  ~BestFitTree() = default;
   BestFitTree(BestFitTree&&) noexcept = default;
   BestFitTree& operator=(BestFitTree&&) noexcept = default;
   BestFitTree(const BestFitTree&) = delete;
@@ -149,6 +149,8 @@ public:
   void free(PyObject* object);
 
   void sweep();
+
+  void finalize();
 };
 
 } // namespace pylir::rt
