@@ -249,4 +249,23 @@ def PylirMem_InitObjectOp : PylirMem_Op<"initObject", [AlwaysBound,
   let assemblyFormat = "$memory attr-dict";
 }
 
+def PylirMem_InitTypeOp : PylirMem_Op<"initType", [AlwaysBound]> {
+
+  let arguments = (ins
+    Arg<MemoryType, "", [MemWrite]>:$memory,
+    DynamicType:$name,
+    Arg<MemoryType, "", [MemWrite]>:$mro_tuple_memory,
+    DynamicType:$mro_tuple,
+    DynamicType:$slots_tuple
+  );
+
+  let results = (outs DynamicType:$result);
+
+  let assemblyFormat = [{
+    $memory `(` `name` `=` $name `,`
+                `mro` `=` $mro_tuple_memory `to` $mro_tuple `,`
+                `slots` `=` $slots_tuple `)` attr-dict
+  }];
+}
+
 #endif

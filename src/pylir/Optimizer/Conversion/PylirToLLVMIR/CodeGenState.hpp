@@ -406,6 +406,12 @@ struct Array : Model<Array<ElementModel>, mlir::LLVM::LLVMArrayType> {
                 this->m_pointer, llvm::ArrayRef<mlir::LLVM::GEPArg>{0, index}),
             this->m_elementType.getElementType(), this->m_codeGenState};
   }
+
+  template <class T>
+  std::enable_if_t<std::is_enum_v<T>, ElementModel> at(mlir::Location loc,
+                                                       T index) const {
+    return at(loc, static_cast<std::underlying_type_t<T>>(index));
+  }
 };
 
 struct PyTypeModel;
@@ -647,6 +653,12 @@ struct PyTypeModel : PyObjectModelBase<PyTypeModel> {
   auto instanceSlotsPtr(mlir::Location loc) const {
     return field<Pointer<PyTupleModel, TbaaAccessType::TypeSlotsMember>>(loc,
                                                                          4);
+  }
+
+  /// Returns a model for accessing the slots of the function.
+  auto slotsArray(mlir::Location loc) const {
+    return field<Array<Pointer<PyObjectModel, TbaaAccessType::TupleElements>>>(
+        loc, 5);
   }
 };
 

@@ -810,6 +810,36 @@ def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound,
 // Type Ops
 //===----------------------------------------------------------------------===//
 
+def PylirPy_MakeTypeOp : PylirPy_Op<"makeType", [AlwaysBound,
+  KnownType<"Type">,
+]> {
+
+  let description = [{
+    Creates a new type object with the given name, MRO tuple and slots tuple.
+    The MRO tuple must be a tuple of type objects.
+    It is not captured, but rather copied with the result of the `makeType`
+    operation prepended.
+    The slots tuple must be a tuple of strings and is captured.
+  }];
+
+  let arguments = (ins
+    DynamicType:$name,
+    DynamicType:$mro_tuple,
+    DynamicType:$slots_tuple
+  );
+
+  let results = (outs
+    Res<DynamicType, "", [MemAlloc,
+      MemWrite<ObjectResource>,
+      MemWrite<ListResource>]>:$result);
+
+  let assemblyFormat = [{
+    `(` `name` `=` $name `,`
+        `mro` `=` $mro_tuple `,`
+        `slots` `=` $slots_tuple `)` attr-dict
+  }];
+}
+
 def PylirPy_TypeMROOp : PylirPy_Op<"type_mro", [NoMemoryEffect, AlwaysBound,
   ReturnsImmutable, KnownType<"Tuple">, NoCaptures]> {
   let arguments = (ins DynamicType:$type_object);
