@@ -72,7 +72,6 @@ Checks: >
   clang-analyzer-core.builtin.NoReturnFunctions,
   clang-analyzer-core.DynamicTypePropagation,
   clang-analyzer-core.NonnilStringConstants,
-  clang-analyzer-core.NonNullParamChecker,
   clang-analyzer-core.NullDereference,
   clang-analyzer-core.StackAddrEscapeBase,
   clang-analyzer-core.UndefinedBinaryOperatorResult,

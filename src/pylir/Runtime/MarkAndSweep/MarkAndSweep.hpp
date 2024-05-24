@@ -22,6 +22,14 @@ class MarkAndSweep {
   BestFitTree m_tree{8 * alignof(MaxAligned)};
 
 public:
+  ~MarkAndSweep() {
+    m_unit2.finalize();
+    m_unit4.finalize();
+    m_unit6.finalize();
+    m_unit8.finalize();
+    m_tree.finalize();
+  }
+
   PyObject* alloc(std::size_t count);
 
   void collect();

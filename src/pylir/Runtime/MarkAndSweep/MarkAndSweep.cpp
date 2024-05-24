@@ -108,6 +108,13 @@ void pylir::rt::MarkAndSweep::collect() {
     });
   }
   mark(stackLower, stackUpper, std::move(roots));
+
+  m_unit2.finalize();
+  m_unit4.finalize();
+  m_unit6.finalize();
+  m_unit8.finalize();
+  m_tree.finalize();
+
   m_unit2.sweep();
   m_unit4.sweep();
   m_unit6.sweep();

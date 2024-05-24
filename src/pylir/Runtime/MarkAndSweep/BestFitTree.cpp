@@ -364,7 +364,6 @@ pylir::rt::PyObject* pylir::rt::BestFitTree::alloc(std::size_t size) {
 }
 
 void pylir::rt::BestFitTree::free(PyObject* object) {
-  destroyPyObject(*object);
   auto* blockHeader = reinterpret_cast<BlockHeader*>(
       reinterpret_cast<std::byte*>(object) - sizeof(BlockHeader));
 
@@ -420,17 +419,6 @@ void pylir::rt::BestFitTree::free(PyObject* object) {
   insert(leftMostBlock);
 }
 
-pylir::rt::BestFitTree::~BestFitTree() {
-  for (auto& iter : m_pages) {
-    for (auto* block = reinterpret_cast<BlockHeader*>(iter.get()); block->size;
-         block = block->getNextBlock()) {
-      if (!block->isAllocated())
-        continue;
-      destroyPyObject(*reinterpret_cast<PyObject*>(block->getCell()));
-    }
-  }
-}
-
 void pylir::rt::BestFitTree::verifyTree() {
   auto checkHeight = [](auto& f, BlockHeader* node) -> int {
     if (!node)
@@ -455,12 +443,28 @@ void pylir::rt::BestFitTree::verifyTree() {
   checkHeight(checkHeight, m_root);
 }
 
-void pylir::rt::BestFitTree::sweep() {
+void pylir::rt::BestFitTree::finalize() {
   for (auto& iter : m_pages) {
     for (auto* block = reinterpret_cast<BlockHeader*>(iter.get()); block->size;
          block = block->getNextBlock()) {
       if (!block->isAllocated())
         continue;
+      auto* object = reinterpret_cast<PyObject*>(block->getCell());
+      if (object->getMark<bool>())
+        continue;
+
+      destroyPyObject(*object);
+    }
+  }
+}
+
+void pylir::rt::BestFitTree::sweep() {
+  for (PagePtr& iter : m_pages) {
+    for (auto* block = reinterpret_cast<BlockHeader*>(iter.get()); block->size;
+         block = block->getNextBlock()) {
+      if (!block->isAllocated())
+        continue;
+
       auto* object = reinterpret_cast<PyObject*>(block->getCell());
       if (object->getMark<bool>()) {
         object->clearMarking();
