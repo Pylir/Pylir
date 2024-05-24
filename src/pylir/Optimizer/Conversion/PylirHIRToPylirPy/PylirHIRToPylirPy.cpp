@@ -510,6 +510,32 @@ struct ModuleSetAttrOpConversionPattern : OpRewritePattern<ModuleSetAttrOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// Class Conversion Patterns
+//===----------------------------------------------------------------------===//
+
+struct BuildClassOpConversionPattern
+    : OpExRewritePattern<BuildClassOpConversionPattern, BuildClassOp> {
+  using OpExRewritePattern<BuildClassOpConversionPattern,
+                           BuildClassOp>::OpExRewritePattern;
+
+  template <class OpT>
+  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+    Value name = rewriter.create<Py::ConstantOp>(
+        op.getLoc(), rewriter.getAttr<Py::StrAttr>(op.getName()));
+    Value callee = rewriter.create<Py::ConstantOp>(
+        op.getLoc(),
+        rewriter.getAttr<Py::GlobalValueAttr>(Builtins::BuildClass.name));
+
+    SmallVector<CallArgument> arguments;
+    arguments.push_back({op.getFunction(), CallArgument::PositionalTag{}});
+    arguments.push_back({name, CallArgument::PositionalTag{}});
+    llvm::append_range(arguments, CallArgumentRange(op));
+    rewriter.replaceOpWithNewOp<HIR::CallOp>(op, callee, arguments);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Compiler helper functions
 //===----------------------------------------------------------------------===//
 
@@ -923,16 +949,16 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
   target.addIllegalDialect<HIR::PylirHIRDialect>();
 
   RewritePatternSet patterns(&getContext());
-  patterns
-      .add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
-           ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
-           CallOpConversionPattern, BinOpConversionPattern,
-           BinAssignOpConversionPattern, InitModuleOpConversionPattern,
-           GetItemOpConversionPattern, SetItemOpConversionPattern,
-           DelItemOpConversionPattern, ContainsOpConversionPattern,
-           GetAttributeOpConversionPattern, SetAttrOpConversionPattern,
-           ModuleGetAttrOpConversionPattern, ModuleSetAttrOpConversionPattern>(
-          &getContext());
+  patterns.add<InitOpConversionPattern, ReturnOpLowering<InitReturnOp>,
+               ReturnOpLowering<HIR::ReturnOp>, GlobalFuncOpConversionPattern,
+               CallOpConversionPattern, BinOpConversionPattern,
+               BinAssignOpConversionPattern, InitModuleOpConversionPattern,
+               GetItemOpConversionPattern, SetItemOpConversionPattern,
+               DelItemOpConversionPattern, ContainsOpConversionPattern,
+               GetAttributeOpConversionPattern, SetAttrOpConversionPattern,
+               ModuleGetAttrOpConversionPattern,
+               ModuleSetAttrOpConversionPattern, BuildClassOpConversionPattern>(
+      &getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();
