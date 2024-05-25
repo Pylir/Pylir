@@ -69,7 +69,8 @@ void ConvertPylirPyToPylirMem::runOnOperation() {
       pylir::Py::IntFromSignedOp, pylir::Py::IntFromUnsignedOp,
       pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
       pylir::Py::TupleDropFrontOp, pylir::Py::TuplePrependOp,
-      pylir::Py::IntAddOp, pylir::Py::TupleCopyOp, pylir::Py::FloatFromF64>();
+      pylir::Py::IntAddOp, pylir::Py::TupleCopyOp, pylir::Py::FloatFromF64,
+      pylir::Py::MakeTypeOp>();
 
   mlir::RewritePatternSet patterns(&getContext());
   populateWithGenerated(patterns);

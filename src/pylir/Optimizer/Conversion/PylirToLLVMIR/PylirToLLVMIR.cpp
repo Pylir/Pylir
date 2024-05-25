@@ -1576,6 +1576,61 @@ struct InitFloatOpConversion
   }
 };
 
+struct InitTypeOpConversion
+    : public ConvertPylirOpToLLVMPattern<Mem::InitTypeOp> {
+  using ConvertPylirOpToLLVMPattern<
+      Mem::InitTypeOp>::ConvertPylirOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(Mem::InitTypeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter& rewriter) const override {
+    PyTypeModel model = pyTypeModel(rewriter, adaptor.getMemory());
+    Value typeType = rewriter.create<Py::ConstantOp>(
+        op.getLoc(),
+        rewriter.getAttr<Py::GlobalValueAttr>(Builtins::Type.name));
+    typeType = unrealizedConversion(rewriter, typeType, typeConverter);
+    model.typePtr(op.getLoc()).store(op.getLoc(), typeType);
+
+    Value mroTuple = adaptor.getMroTuple();
+    mroTuple =
+        unrealizedConversion(rewriter, mroTuple, op.getMroTuple().getType());
+    Value element = unrealizedConversion(rewriter, adaptor.getMemory(),
+                                         op.getResult().getType());
+    Value mroTupleMemory = unrealizedConversion(
+        rewriter, adaptor.getMroTupleMemory(), op.getMemory().getType());
+    mroTuple = rewriter.create<Mem::InitTuplePrependOp>(
+        op.getLoc(), mroTupleMemory, element, mroTuple);
+    mroTuple = unrealizedConversion(rewriter, mroTuple, typeConverter);
+    model.mroPtr(op.getLoc()).store(op.getLoc(), mroTuple);
+
+    model.instanceSlotsPtr(op.getLoc())
+        .store(op.getLoc(), adaptor.getSlotsTuple());
+
+    // TODO: Layout and offset need to be computed at some point.
+    //       They seem related, is the offset redundant?
+    Value objectType = rewriter.create<Py::ConstantOp>(
+        op.getLoc(),
+        rewriter.getAttr<Py::GlobalValueAttr>(Builtins::Object.name));
+    Value layout = unrealizedConversion(rewriter, objectType, typeConverter);
+    model.layoutPtr(op.getLoc()).store(op.getLoc(), layout);
+    {
+      Type instanceType = typeConverter.getPyObjectType();
+      auto asCount = rewriter.create<LLVM::ConstantOp>(
+          op.getLoc(), typeConverter.getIndexType(),
+          rewriter.getI32IntegerAttr(
+              typeConverter.getPlatformABI().getSizeOf(instanceType) /
+              (typeConverter.getPointerBitwidth() / 8)));
+      model.offset(op.getLoc()).store(op.getLoc(), asCount);
+    }
+    model.slotsArray(op.getLoc())
+        .at(op.getLoc(), Builtins::TypeSlots::Name)
+        .store(op.getLoc(), adaptor.getName());
+
+    rewriter.replaceOp(op, adaptor.getMemory());
+    return mlir::success();
+  }
+};
+
 struct FloatToF64OpConversion
     : public ConvertPylirOpToLLVMPattern<Py::FloatToF64> {
   using ConvertPylirOpToLLVMPattern<
@@ -1809,7 +1864,8 @@ void ConvertPylirToLLVMPass::runOnOperation() {
       InitTupleCopyOpConversion, MROLookupOpConversion, TypeSlotsOpConversion,
       InitFloatOpConversion, FloatToF64OpConversion, FuncOpConversion,
       ReturnOpConversion, RaiseExOpConversion, GCAllocFunctionOpConversion,
-      FunctionGetClosureArgOpConversion>(converter, codeGenState);
+      FunctionGetClosureArgOpConversion, InitTypeOpConversion>(converter,
+                                                               codeGenState);
   patternSet.insert<GCAllocObjectConstTypeConversion>(converter, codeGenState,
                                                       2);
   if (mlir::failed(mlir::applyFullConversion(module, conversionTarget,

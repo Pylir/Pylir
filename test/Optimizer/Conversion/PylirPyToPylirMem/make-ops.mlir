@@ -214,3 +214,31 @@ py.func @make_float_fromF64(%arg0 : f64) -> !py.dynamic {
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[FLOAT]][%[[LEN]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initFloat %[[MEM]] to %[[ARG]]
 // CHECK-NEXT: return %[[RESULT]]
+
+// -----
+
+// CHECK-DAG: #[[$TYPE_TYPE:.*]] = #py.globalValue<builtins.type{{,|>}}
+// CHECK-DAG: #[[$TUPLE_TYPE:.*]] = #py.globalValue<builtins.tuple{{,|>}}
+
+py.func @make_type(%name : !py.dynamic,
+                            %mro : !py.dynamic,
+                            %slots : !py.dynamic) -> !py.dynamic {
+  %0 = makeType(name=%name, mro=%mro, slots=%slots)
+  return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: @make_type
+// CHECK-SAME: %[[NAME:[[:alnum:]]+]]
+// CHECK-SAME: %[[MRO:[[:alnum:]]+]]
+// CHECK-SAME: %[[INSTANCE_SLOTS:[[:alnum:]]+]]
+// CHECK-NEXT: %[[TYPE:.*]] = constant(#[[$TYPE_TYPE]])
+// CHECK-NEXT: %[[SLOTS:.*]] = type_slots %[[TYPE]]
+// CHECK-NEXT: %[[LEN:.*]] = tuple_len %[[SLOTS]]
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[TYPE]][%[[LEN]]]
+// CHECK-NEXT: %[[TUPLE:.*]] = constant(#[[$TUPLE_TYPE]])
+// CHECK-NEXT: %[[MRO_LEN:.*]] = tuple_len %[[MRO]]
+// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1 : index
+// CHECK-NEXT: %[[INC:.*]] = arith.addi %[[MRO_LEN]], %[[ONE]]
+// CHECK-NEXT: %[[MRO_MEM:.*]] = pyMem.gcAllocObject %[[TUPLE]][%[[INC]]]
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initType %[[MEM]](name = %[[NAME]], mro = %[[MRO_MEM]] to %[[MRO]], slots = %[[INSTANCE_SLOTS]])
+// CHECK-NEXT: return %[[RESULT]]

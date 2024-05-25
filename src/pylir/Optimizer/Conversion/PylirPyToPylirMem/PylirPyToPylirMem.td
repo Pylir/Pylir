@@ -121,4 +121,12 @@ def : Pat<(PylirPy_MakeObjectOp $typeObj),
   (PylirMem_InitObjectOp (PylirMem_GCAllocObjectOp $typeObj,
     (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $typeObj))))>;
 
+def : Pat<(PylirPy_MakeTypeOp $name, $mro_tuple, $slots_tuple),
+  (PylirMem_InitTypeOp GCWithSlots<TypeRef>.result, $name,
+    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp TupleRef),
+      (Arith_AddIOp (PylirPy_TupleLenOp $mro_tuple),
+        (Arith_ConstantOp ConstantAttr<IndexAttr, "1">),
+          WrapOverflowFlag)),
+    $mro_tuple, $slots_tuple)>;
+
 #endif
