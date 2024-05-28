@@ -390,6 +390,25 @@ class CodeGen {
     create<HIR::ModuleSetAttrOp>(m_thisModuleObject, name, value);
   }
 
+  void eraseIdentifier(StringRef name) {
+    // Perform a read of the variable.
+    // This generates the code that throws the appropriate exception if the
+    // variable is not bound.
+    (void)readFromIdentifier(name);
+
+    // Class dictionary behavior differs from assignment of unbound.
+    if (m_classDictionary) {
+      Value string =
+          create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+      Value hash = create<Py::StrHashOp>(string);
+      create<Py::DictDelItemOp>(m_classDictionary, string, hash);
+      return;
+    }
+
+    writeToIdentifier(
+        create<Py::ConstantOp>(m_builder.getAttr<Py::UnboundAttr>()), name);
+  }
+
   /// Reads the identifier given by 'name' and returns its value. Generates code
   /// to throw an appropriate exception if the identifier is unknown.
   /// '#py.unbound' is returned in this case.
@@ -1304,9 +1323,8 @@ private:
     PYLIR_UNREACHABLE;
   }
 
-  void visitImpl([[maybe_unused]] const Syntax::DelStmt& delStmt) {
-    // TODO:
-    PYLIR_UNREACHABLE;
+  void visitImpl(const Syntax::DelStmt& delStmt) {
+    visit(delStmt.targetList, DeleteTag{});
   }
 
   void visitImpl(const Syntax::ImportStmt& importStmt) {
@@ -1913,6 +1931,55 @@ private:
   template <class T, std::enable_if_t<std::is_base_of_v<Syntax::Target, T> &&
                                       !Syntax::validTargetType<T>()>* = nullptr>
   void visitImpl(const T&, Value) {
+    PYLIR_UNREACHABLE;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Target delete overloads
+  //===--------------------------------------------------------------------===//
+
+  struct DeleteTag {};
+
+  void visitImpl(const Syntax::Atom& atom, DeleteTag) {
+    eraseIdentifier(get<std::string>(atom.token.getValue()));
+  }
+
+  void visitImpl(const Syntax::Subscription& subscription, DeleteTag) {
+    Value object = visit(subscription.object);
+    Value index = visit(subscription.index);
+    create<HIR::DelItemOp>(object, index);
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::Slice& slice, DeleteTag) {
+    // TODO:
+    PYLIR_UNREACHABLE;
+  }
+
+  void visitImpl([[maybe_unused]] const Syntax::AttributeRef& attributeRef,
+                 DeleteTag) {
+    // TODO: call delAttr
+    PYLIR_UNREACHABLE;
+  }
+
+  void visitImpl(ArrayRef<Syntax::StarredItem> starredItems, DeleteTag) {
+    for (const Syntax::StarredItem& item : starredItems)
+      visit(item.expression, DeleteTag{});
+  }
+
+  void visitImpl(const Syntax::TupleConstruct& tupleConstruct, DeleteTag) {
+    visit(tupleConstruct.items, DeleteTag{});
+  }
+
+  void visitImpl(const Syntax::ListDisplay& listDisplay, DeleteTag) {
+    visit(pylir::get<std::vector<Syntax::StarredItem>>(listDisplay.variant),
+          DeleteTag{});
+  }
+
+  /// Overload for any construct that is a possible alternative for 'Target' in
+  /// C++, but not allowed by Python's syntax. These are known unreachable.
+  template <class T, std::enable_if_t<std::is_base_of_v<Syntax::Target, T> &&
+                                      !Syntax::validTargetType<T>()>* = nullptr>
+  void visitImpl(const T&, DeleteTag) {
     PYLIR_UNREACHABLE;
   }
 
