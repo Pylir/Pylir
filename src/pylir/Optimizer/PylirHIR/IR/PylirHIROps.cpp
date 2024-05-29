@@ -126,7 +126,7 @@ void CallOp::build(OpBuilder& odsBuilder, OperationState& odsState,
                }));
 }
 
-LogicalResult CallOp::verify() {
+LogicalResult HIR::CallOpInterface::verify() {
   if (getArguments().size() != getKindInternal().size())
     return emitOpError() << getKindInternalAttrName()
                          << " must be the same size as argument operands";
@@ -616,24 +616,16 @@ void ClassOp::build(OpBuilder& odsBuilder, OperationState& odsState,
   bodyBuilder(entryBlock);
 }
 
-template <class OpT>
-static LogicalResult verifyClass(OpT op) {
-  if (op.getRegion().empty() || op.getRegion().front().getNumArguments() != 1 ||
-      !isa<Py::DynamicType>(op.getRegion().front().getArgument(0).getType()))
-    return op.emitOpError("expected entry block of ")
-           << op.getOperationName() << " to have exactly one "
+LogicalResult ClassOpInterface::verify() {
+  if (getBody().empty() || getBody().front().getNumArguments() != 1 ||
+      !isa<Py::DynamicType>(getBody().front().getArgument(0).getType()))
+    return emitOpError("expected entry block of ")
+           << (*this)->getName() << " to have exactly one "
            << Py::DynamicType::name << " argument";
 
   return success();
 }
 
-LogicalResult ClassOp::verify() {
-  return verifyClass(*this);
-}
-
-LogicalResult ClassExOp::verify() {
-  return verifyClass(*this);
-}
 
 //===----------------------------------------------------------------------===//
 // InitCallOp
@@ -668,18 +660,13 @@ InitModuleExOp::verifySymbolUses(SymbolTableCollection& symbolTable) {
   return verifySymbolUse<InitOp>(*this, getModuleAttr(), symbolTable);
 }
 
-LogicalResult InitModuleOp::verify() {
+LogicalResult InitModuleOpInterface::verify() {
   if (getModule() == "__main__")
     return emitOpError("cannot initialize '__main__' module");
   return success();
 }
 
-LogicalResult InitModuleExOp::verify() {
-  if (getModule() == "__main__")
-    return emitOpError("cannot initialize '__main__' module");
-  return success();
-}
-
+#include "pylir/Optimizer/PylirHIR/IR/PylirHIRDerivedInterfaces.cpp.inc"
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.cpp.inc"
 
 #define GET_OP_CLASSES

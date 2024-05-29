@@ -16,20 +16,58 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIREnums.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.td"
+include "pylir/Optimizer/PylirHIR/IR/PylirHIRDerivedInterfaces.td"
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
-include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 
 class PylirHIR_Op<string mneomic, list<Trait> traits = []>
   : Op<PylirHIR_Dialect, mneomic, traits>;
+
+/// Trait that should be added to operations that have an exception handling
+/// version. 'name' must be the name of the op's C++ class.
+///
+/// Note: This trait must come last in the trait list due to interface
+/// inheritance restrictions.
+class PylirHIR_WithExceptionHandling<string name, list<string> shape = []>
+  : TraitList<[
+  OpInterfaceTrait<"pylir::HIR::" # name # "Interface">,
+  AddableExceptionHandling<!substr(name, 0, !sub(!size(name), !size("Op")))
+    # "ExOp", shape>,
+]> {
+  assert !eq(!substr(name, !sub(!size(name), !size("Op"))), "Op"),
+    "code assumes all operations have a 'Op' suffix in their name";
+}
+
+/// Multiclass used to define the derived interface and exception handling
+/// variant of 'op'.
+multiclass PylirHIR_ExceptionHandlingVariant<Op op,
+  // If 1, the interface will contain a 'verify' method that must be implemented
+  // by the user. This should be used rather than the Op's verifier to share a
+  // single verifier for both the normal and exception handling op.
+  bit hasVerifier = 0,
+  bit newline = 1> {
+
+  def NAME : CreateExceptionHandlingVariant<op, "", newline>;
+
+  def : DeriveInterface<op> {
+    let extraClassDeclaration = !if(hasVerifier, [{
+      mlir::LogicalResult verify();
+    }], "");
+
+    let verify = !if(hasVerifier, [{
+      return mlir::cast<}] # cppNamespace # "::" # cppInterfaceName # [{>
+        ($_op).verify();
+    }], "");
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Basic Operations
 //===----------------------------------------------------------------------===//
 
 def PylirHIR_BinOp : PylirHIR_Op<"binOp",
-  [AddableExceptionHandling<"BinExOp">]> {
+  [PylirHIR_WithExceptionHandling<"BinOp">]> {
   let arguments = (ins PylirHIR_BinaryOperationAttr:$binaryOperation,
                        DynamicType:$lhs, DynamicType:$rhs);
   let results = (outs DynamicType:$result);
@@ -43,11 +81,10 @@ def PylirHIR_BinOp : PylirHIR_Op<"binOp",
   }];
 }
 
-def PylirHIR_BinExOp : CreateExceptionHandlingVariant<PylirHIR_BinOp>;
-
+defm PylirHIR_BinExOp : PylirHIR_ExceptionHandlingVariant<PylirHIR_BinOp>;
 
 def PylirHIR_BinAssignOp : PylirHIR_Op<"binAssignOp",
-  [AddableExceptionHandling<"BinAssignExOp">]> {
+  [PylirHIR_WithExceptionHandling<"BinAssignOp">]> {
   let arguments = (ins PylirHIR_BinaryAssignmentAttr:$binaryAssignment,
                        DynamicType:$lhs, DynamicType:$rhs);
   let results = (outs DynamicType:$result);
@@ -61,11 +98,11 @@ def PylirHIR_BinAssignOp : PylirHIR_Op<"binAssignOp",
   }];
 }
 
-def PylirHIR_BinAssignExOp
-  : CreateExceptionHandlingVariant<PylirHIR_BinAssignOp>;
+defm PylirHIR_BinAssignExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_BinAssignOp>;
 
 def PylirHIR_ContainsOp : PylirHIR_Op<"contains",
-  [AddableExceptionHandling<"ContainsExOp">]> {
+  [PylirHIR_WithExceptionHandling<"ContainsOp">]> {
   let arguments = (ins DynamicType:$container, DynamicType:$item);
   let results = (outs DynamicType:$result);
 
@@ -97,15 +134,15 @@ def PylirHIR_ContainsOp : PylirHIR_Op<"contains",
   }];
 }
 
-def PylirHIR_ContainsExOp
-  : CreateExceptionHandlingVariant<PylirHIR_ContainsOp>;
+defm PylirHIR_ContainsExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_ContainsOp>;
 
 //===----------------------------------------------------------------------===//
 // Subscription Operations
 //===----------------------------------------------------------------------===//
 
 def PylirHIR_GetItemOp : PylirHIR_Op<"getItem",
-  [AddableExceptionHandling<"GetItemExOp">]> {
+  [PylirHIR_WithExceptionHandling<"GetItemOp">]> {
   let arguments = (ins DynamicType:$object, DynamicType:$index);
   let results = (outs DynamicType:$result);
 
@@ -114,11 +151,11 @@ def PylirHIR_GetItemOp : PylirHIR_Op<"getItem",
   }];
 }
 
-def PylirHIR_GetItemExOp
-  : CreateExceptionHandlingVariant<PylirHIR_GetItemOp>;
+defm PylirHIR_GetItemExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_GetItemOp>;
 
 def PylirHIR_SetItemOp : PylirHIR_Op<"setItem",
-  [AddableExceptionHandling<"SetItemExOp">]> {
+  [PylirHIR_WithExceptionHandling<"SetItemOp">]> {
   let arguments = (ins DynamicType:$object,
                        DynamicType:$index,
                        DynamicType:$value);
@@ -129,11 +166,11 @@ def PylirHIR_SetItemOp : PylirHIR_Op<"setItem",
   }];
 }
 
-def PylirHIR_SetItemExOp
-  : CreateExceptionHandlingVariant<PylirHIR_SetItemOp>;
+defm PylirHIR_SetItemExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_SetItemOp>;
 
 def PylirHIR_DelItemOp : PylirHIR_Op<"delItem",
-  [AddableExceptionHandling<"DelItemExOp">]> {
+  [PylirHIR_WithExceptionHandling<"DelItemOp">]> {
   let arguments = (ins DynamicType:$object, DynamicType:$index);
   let results = (outs DynamicType:$result);
 
@@ -142,15 +179,15 @@ def PylirHIR_DelItemOp : PylirHIR_Op<"delItem",
   }];
 }
 
-def PylirHIR_DelItemExOp
-  : CreateExceptionHandlingVariant<PylirHIR_DelItemOp>;
+defm PylirHIR_DelItemExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_DelItemOp>;
 
 //===----------------------------------------------------------------------===//
 // Attribute Operations
 //===----------------------------------------------------------------------===//
 
 def PylirHIR_GetAttributeOp : PylirHIR_Op<"getAttribute",
-  [AddableExceptionHandling<"GetAttributeExOp">]> {
+  [PylirHIR_WithExceptionHandling<"GetAttributeOp">]> {
   let arguments = (ins DynamicType:$object, StrAttr:$attribute);
   let results = (outs DynamicType:$result);
 
@@ -159,11 +196,11 @@ def PylirHIR_GetAttributeOp : PylirHIR_Op<"getAttribute",
   }];
 }
 
-def PylirHIR_GetAttributeExOp
-  : CreateExceptionHandlingVariant<PylirHIR_GetAttributeOp>;
+defm PylirHIR_GetAttributeExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_GetAttributeOp>;
 
 def PylirHIR_SetAttrOp : PylirHIR_Op<"setAttr",
-  [AddableExceptionHandling<"SetAttrExOp">]> {
+  [PylirHIR_WithExceptionHandling<"SetAttrOp">]> {
   let arguments = (ins DynamicType:$object,
                        StrAttr:$attribute,
                        DynamicType:$value);
@@ -175,16 +212,16 @@ def PylirHIR_SetAttrOp : PylirHIR_Op<"setAttr",
   }];
 }
 
-def PylirHIR_SetAttrExOp
-  : CreateExceptionHandlingVariant<PylirHIR_SetAttrOp>;
+defm PylirHIR_SetAttrExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_SetAttrOp>;
 
 //===----------------------------------------------------------------------===//
 // Call Operations
 //===----------------------------------------------------------------------===//
 
 def PylirHIR_CallOp : PylirHIR_Op<"call",
-  [AddableExceptionHandling<"CallExOp", ["Single", "Variadic"]>,
-   PylirHIR_CallInterface]> {
+  [PylirHIR_CallInterface,
+   PylirHIR_WithExceptionHandling<"CallOp", ["Single", "Variadic"]>]> {
   let arguments = (ins DynamicType:$callable,
     Variadic<DynamicType>:$arguments,
     DefaultValuedAttr<StrArrayAttr, "{}">:$keywords,
@@ -220,11 +257,10 @@ def PylirHIR_CallOp : PylirHIR_Op<"call",
   ];
 
   let skipDefaultBuilders = 1;
-
-  let hasVerifier = 1;
 }
 
-def PylirHIR_CallExOp : CreateExceptionHandlingVariant<PylirHIR_CallOp>;
+defm PylirHIR_CallExOp : PylirHIR_ExceptionHandlingVariant<PylirHIR_CallOp,
+  /*hasVerifier=*/1>;
 
 //===----------------------------------------------------------------------===//
 // Functions
@@ -466,7 +502,7 @@ def PylirHIR_ReturnOp : PylirHIR_Op<"return", [Pure, ReturnLike, Terminator,
 
 def PylirHIR_ClassOp : PylirHIR_Op<"class", [
     OpAsmOpInterface, PylirHIR_CallInterface,
-    AddableExceptionHandling<"ClassExOp">,
+    PylirHIR_WithExceptionHandling<"ClassOp">,
 ]> {
   let arguments = (ins
     StrAttr:$name,
@@ -494,8 +530,6 @@ def PylirHIR_ClassOp : PylirHIR_Op<"class", [
     )>
   ];
 
-  let hasVerifier = 1;
-
   let extraClassDeclaration = [{
 
     mlir::BlockArgument getDictParameter() {
@@ -517,10 +551,8 @@ def PylirHIR_ClassOp : PylirHIR_Op<"class", [
   }];
 }
 
-def PylirHIR_ClassExOp : CreateExceptionHandlingVariant<PylirHIR_ClassOp,
-  /*name=*/"", /*newline=*/0> {
-  let hasVerifier = 1;
-}
+defm PylirHIR_ClassExOp : PylirHIR_ExceptionHandlingVariant<PylirHIR_ClassOp,
+  /*hasVerifier=*/1, /*newline=*/0>;
 
 def PylirHIR_ClassReturnOp : PylirHIR_Op<"class_return",
   [ParentOneOf<["ClassOp", "ClassExOp"]>, Terminator, ReturnLike, Pure]> {
@@ -534,7 +566,7 @@ def PylirHIR_ClassReturnOp : PylirHIR_Op<"class_return",
 }
 
 def PylirHIR_BuildClassOp : PylirHIR_Op<"buildClass",
-  [PylirHIR_CallInterface, AddableExceptionHandling<"BuildClassExOp",
+  [PylirHIR_CallInterface, PylirHIR_WithExceptionHandling<"BuildClassOp",
     ["Single", "Variadic"]>]> {
 
   let description = [{
@@ -572,8 +604,8 @@ def PylirHIR_BuildClassOp : PylirHIR_Op<"buildClass",
   }];
 }
 
-def PylirHIR_BuildClassExOp
-  : CreateExceptionHandlingVariant<PylirHIR_BuildClassOp>;
+defm PylirHIR_BuildClassExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_BuildClassOp>;
 
 //===----------------------------------------------------------------------===//
 // Modules
@@ -621,8 +653,8 @@ def PylirHIR_InitReturnOp : PylirHIR_Op<"init_return", [HasParent<"InitOp">,
 }
 
 def PylirHIR_InitModuleOp : PylirHIR_Op<"initModule",
-  [AddableExceptionHandling<"InitModuleExOp">,
-   DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+   PylirHIR_WithExceptionHandling<"InitModuleOp">]> {
   let arguments = (ins FlatSymbolRefAttr:$module);
 
   let description = [{
@@ -632,14 +664,11 @@ def PylirHIR_InitModuleOp : PylirHIR_Op<"initModule",
   }];
 
   let assemblyFormat = "$module attr-dict";
-
-  let hasVerifier = 1;
 }
 
-def PylirHIR_InitModuleExOp
-  : CreateExceptionHandlingVariant<PylirHIR_InitModuleOp> {
-  let hasVerifier = 1;
-}
+defm PylirHIR_InitModuleExOp
+  : PylirHIR_ExceptionHandlingVariant<PylirHIR_InitModuleOp,
+    /*hasVerifier=*/1>;
 
 def PylirHIR_ModuleGetAttrOp : PylirHIR_Op<"module_getAttr"> {
   let arguments = (ins

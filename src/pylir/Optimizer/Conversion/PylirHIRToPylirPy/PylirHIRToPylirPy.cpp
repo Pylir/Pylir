@@ -38,167 +38,134 @@ public:
   using Base::Base;
 };
 
+/// Given a class passed as 'normalOpClass', generates the boilerplate to
+/// comfortably define a conversion pattern named
+/// 'normalOpClass' + "ConversionPattern".
+///
+/// Typical usage looks as follows:
+/// DEFINE_EX_PATTERN(OpClass, op, ExceptionRewriter& rewriter) {
+///   rewriter.performRewrite(op);
+///   return success();
+/// }
+/// where 'op' and 'rewriter' are parameter names for the body of the method
+/// defined right after.
+#define DEFINE_EX_PATTERN(normalOpClass, ...)                               \
+  struct normalOpClass##ConversionPattern final                             \
+      : OpExRewritePattern<pylir::HIR::normalOpClass##Interface> {          \
+    using Base::Base;                                                       \
+                                                                            \
+    LogicalResult matchAndRewrite(pylir::HIR::normalOpClass##Interface op,  \
+                                  ExceptionRewriter& rewriter) const final; \
+  };                                                                        \
+  LogicalResult normalOpClass##ConversionPattern::matchAndRewrite(          \
+      pylir::HIR::normalOpClass##Interface __VA_ARGS__) const
+
 //===----------------------------------------------------------------------===//
 // Basic Operations Conversion Patterns
 //===----------------------------------------------------------------------===//
 
-struct BinOpConversionPattern
-    : OpExRewritePattern<BinOpConversionPattern, BinOp> {
-  using Base::Base;
+DEFINE_EX_PATTERN(BinOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(),
+      ("pylir" + stringifyEnum(op.getBinaryOperation())).str(),
+      ValueRange{op.getLhs(), op.getRhs()});
+  return success();
+}
 
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(),
-        ("pylir" + stringifyEnum(op.getBinaryOperation())).str(),
-        ValueRange{op.getLhs(), op.getRhs()});
-    return success();
-  }
-};
+DEFINE_EX_PATTERN(BinAssignOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(),
+      ("pylir" + stringifyEnum(op.getBinaryAssignment())).str(),
+      ValueRange{op.getLhs(), op.getRhs()});
+  return success();
+}
 
-struct BinAssignOpConversionPattern
-    : OpExRewritePattern<BinAssignOpConversionPattern, BinAssignOp> {
-  using Base::Base;
+DEFINE_EX_PATTERN(ContainsOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__contains__",
+      ValueRange{op.getContainer(), op.getItem()});
+  return success();
+}
 
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(),
-        ("pylir" + stringifyEnum(op.getBinaryAssignment())).str(),
-        ValueRange{op.getLhs(), op.getRhs()});
-    return success();
-  }
-};
+DEFINE_EX_PATTERN(GetItemOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__getitem__",
+      ValueRange{op.getObject(), op.getIndex()});
+  return success();
+}
 
-struct ContainsOpConversionPattern
-    : OpExRewritePattern<ContainsOpConversionPattern, ContainsOp> {
-  using Base::Base;
+DEFINE_EX_PATTERN(SetItemOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__setitem__",
+      ValueRange{op.getObject(), op.getIndex(), op.getValue()});
+  return success();
+}
 
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__contains__",
-        ValueRange{op.getContainer(), op.getItem()});
-    return success();
-  }
-};
+DEFINE_EX_PATTERN(DelItemOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__delitem__",
+      ValueRange{op.getObject(), op.getIndex()});
+  return success();
+}
 
-struct GetItemOpConversionPattern
-    : OpExRewritePattern<GetItemOpConversionPattern, GetItemOp> {
-  using Base::Base;
+DEFINE_EX_PATTERN(GetAttributeOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__getattribute__",
+      ValueRange{op.getObject(), rewriter.create<Py::ConstantOp>(
+                                     op.getLoc(), rewriter.getAttr<Py::StrAttr>(
+                                                      op.getAttribute()))});
+  return success();
+}
 
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__getitem__",
-        ValueRange{op.getObject(), op.getIndex()});
-    return success();
-  }
-};
-
-struct SetItemOpConversionPattern
-    : OpExRewritePattern<SetItemOpConversionPattern, SetItemOp> {
-  using Base::Base;
-
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__setitem__",
-        ValueRange{op.getObject(), op.getIndex(), op.getValue()});
-    return success();
-  }
-};
-
-struct DelItemOpConversionPattern
-    : OpExRewritePattern<DelItemOpConversionPattern, DelItemOp> {
-  using Base::Base;
-
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__delitem__",
-        ValueRange{op.getObject(), op.getIndex()});
-    return success();
-  }
-};
-
-struct GetAttributeOpConversionPattern
-    : OpExRewritePattern<GetAttributeOpConversionPattern, GetAttributeOp> {
-  using Base::Base;
-
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__getattribute__",
-        ValueRange{op.getObject(),
-                   rewriter.create<Py::ConstantOp>(
-                       op.getLoc(),
-                       rewriter.getAttr<Py::StrAttr>(op.getAttribute()))});
-    return success();
-  }
-};
-
-struct SetAttrOpConversionPattern
-    : OpExRewritePattern<SetAttrOpConversionPattern, SetAttrOp> {
-  using Base::Base;
-
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__setattr__",
-        ValueRange{
-            op.getObject(),
-            rewriter.create<Py::ConstantOp>(
-                op.getLoc(), rewriter.getAttr<Py::StrAttr>(op.getAttribute())),
-            op.getValue()});
-    return success();
-  }
-};
+DEFINE_EX_PATTERN(SetAttrOp, op, ExceptionRewriter& rewriter) {
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__setattr__",
+      ValueRange{
+          op.getObject(),
+          rewriter.create<Py::ConstantOp>(
+              op.getLoc(), rewriter.getAttr<Py::StrAttr>(op.getAttribute())),
+          op.getValue()});
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // Call Conversion Patterns
 //===----------------------------------------------------------------------===//
 
-struct CallOpConversionPattern
-    : OpExRewritePattern<CallOpConversionPattern, HIR::CallOp> {
-  using Base::Base;
-
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    SmallVector<Py::IterArg> iterArgs;
-    SmallVector<Py::DictArg> dictArgs;
-    for (const CallArgument& argument : CallArgumentRange(op)) {
-      pylir::match(
-          argument.kind,
-          [&](CallArgument::PositionalTag) {
-            iterArgs.emplace_back(argument.value);
-          },
-          [&](CallArgument::PosExpansionTag) {
-            iterArgs.emplace_back(Py::IterExpansion{argument.value});
-          },
-          [&](CallArgument::MapExpansionTag) {
-            dictArgs.emplace_back(Py::MappingExpansion{argument.value});
-          },
-          [&](StringAttr keyword) {
-            Value key = rewriter.create<Py::ConstantOp>(
-                op.getLoc(), rewriter.getAttr<Py::StrAttr>(keyword));
-            Value hash = rewriter.create<Py::StrHashOp>(op.getLoc(), key);
-            dictArgs.emplace_back(Py::DictEntry{key, hash, argument.value});
-          });
-    }
-
-    Value tuple = rewriter.create<Py::MakeTupleOp>(op.getLoc(), iterArgs);
-    Value dict =
-        dictArgs.empty()
-            ? (Value)rewriter.create<Py::ConstantOp>(
-                  op.getLoc(), rewriter.getAttr<Py::DictAttr>())
-            : (Value)rewriter.create<Py::MakeDictOp>(op.getLoc(), dictArgs);
-    rewriter.replaceOpWithNewOp<Py::CallOp>(
-        op, op.getType(), "pylir__call__",
-        ValueRange{op.getCallable(), tuple, dict});
-    return success();
+DEFINE_EX_PATTERN(CallOp, op, ExceptionRewriter& rewriter) {
+  SmallVector<Py::IterArg> iterArgs;
+  SmallVector<Py::DictArg> dictArgs;
+  for (const CallArgument& argument : CallArgumentRange(op)) {
+    pylir::match(
+        argument.kind,
+        [&](CallArgument::PositionalTag) {
+          iterArgs.emplace_back(argument.value);
+        },
+        [&](CallArgument::PosExpansionTag) {
+          iterArgs.emplace_back(Py::IterExpansion{argument.value});
+        },
+        [&](CallArgument::MapExpansionTag) {
+          dictArgs.emplace_back(Py::MappingExpansion{argument.value});
+        },
+        [&](StringAttr keyword) {
+          Value key = rewriter.create<Py::ConstantOp>(
+              op.getLoc(), rewriter.getAttr<Py::StrAttr>(keyword));
+          Value hash = rewriter.create<Py::StrHashOp>(op.getLoc(), key);
+          dictArgs.emplace_back(Py::DictEntry{key, hash, argument.value});
+        });
   }
-};
+
+  Value tuple = rewriter.create<Py::MakeTupleOp>(op.getLoc(), iterArgs);
+  Value dict =
+      dictArgs.empty()
+          ? (Value)rewriter.create<Py::ConstantOp>(
+                op.getLoc(), rewriter.getAttr<Py::DictAttr>())
+          : (Value)rewriter.create<Py::MakeDictOp>(op.getLoc(), dictArgs);
+  rewriter.replaceOpWithNewOp<Py::CallOp>(
+      op, op.getType(), "pylir__call__",
+      ValueRange{op.getCallable(), tuple, dict});
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // Function Conversion Patterns
@@ -442,18 +409,12 @@ struct InitOpConversionPattern : OpRewritePattern<InitOp> {
   }
 };
 
-struct InitModuleOpConversionPattern
-    : OpExRewritePattern<InitModuleOpConversionPattern, HIR::InitModuleOp> {
-  using Base::Base;
-
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    rewriter.create<Py::CallOp>(op.getLoc(), ValueRange(),
-                                (op.getModule() + ".__init__").str());
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
+DEFINE_EX_PATTERN(InitModuleOp, op, ExceptionRewriter& rewriter) {
+  rewriter.create<Py::CallOp>(op.getLoc(), ValueRange(),
+                              (op.getModule() + ".__init__").str());
+  rewriter.eraseOp(op);
+  return success();
+}
 
 /// Lowering pattern for any Op that is `ReturnLike` to `py.return`.
 /// Returns ALL its operands.
@@ -513,27 +474,20 @@ struct ModuleSetAttrOpConversionPattern : OpRewritePattern<ModuleSetAttrOp> {
 // Class Conversion Patterns
 //===----------------------------------------------------------------------===//
 
-struct BuildClassOpConversionPattern
-    : OpExRewritePattern<BuildClassOpConversionPattern, BuildClassOp> {
-  using OpExRewritePattern<BuildClassOpConversionPattern,
-                           BuildClassOp>::OpExRewritePattern;
+DEFINE_EX_PATTERN(BuildClassOp, op, ExceptionRewriter& rewriter) {
+  Value name = rewriter.create<Py::ConstantOp>(
+      op.getLoc(), rewriter.getAttr<Py::StrAttr>(op.getName()));
+  Value callee = rewriter.create<Py::ConstantOp>(
+      op.getLoc(),
+      rewriter.getAttr<Py::GlobalValueAttr>(Builtins::BuildClass.name));
 
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
-    Value name = rewriter.create<Py::ConstantOp>(
-        op.getLoc(), rewriter.getAttr<Py::StrAttr>(op.getName()));
-    Value callee = rewriter.create<Py::ConstantOp>(
-        op.getLoc(),
-        rewriter.getAttr<Py::GlobalValueAttr>(Builtins::BuildClass.name));
-
-    SmallVector<CallArgument> arguments;
-    arguments.push_back({op.getFunction(), CallArgument::PositionalTag{}});
-    arguments.push_back({name, CallArgument::PositionalTag{}});
-    llvm::append_range(arguments, CallArgumentRange(op));
-    rewriter.replaceOpWithNewOp<HIR::CallOp>(op, callee, arguments);
-    return success();
-  }
-};
+  SmallVector<CallArgument> arguments;
+  arguments.push_back({op.getFunction(), CallArgument::PositionalTag{}});
+  arguments.push_back({name, CallArgument::PositionalTag{}});
+  llvm::append_range(arguments, CallArgumentRange(op));
+  rewriter.replaceOpWithNewOp<HIR::CallOp>(op, callee, arguments);
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // Compiler helper functions

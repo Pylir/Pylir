@@ -31,11 +31,11 @@ protected:
 };
 
 struct ClassBodyOutliningPattern
-    : Py::OpExRewritePattern<ClassBodyOutliningPattern, HIR::ClassOp> {
+    : Py::OpExRewritePattern<HIR::ClassOpInterface> {
   using Base::Base;
 
-  template <class OpT>
-  LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+  LogicalResult matchAndRewrite(HIR::ClassOpInterface op,
+                                ExceptionRewriter& rewriter) const override {
     auto funcOp = rewriter.create<HIR::FuncOp>(
         op.getLoc(), op.getName(), ArrayRef{HIR::FunctionParameterSpec()});
     // Erase entry block created by the builder.
