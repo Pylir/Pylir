@@ -130,12 +130,13 @@ public:
 /// operation.
 /// Derived-classes should implement:
 ///
-/// template<class OpT>
-/// LogicalResult matchAndRewrite(OpT op, ExceptionRewriter& rewriter) const {
+/// LogicalResult
+/// matchAndRewrite(Interface op, ExceptionRewriter& rewriter) const override {
 ///   ...
 /// }
 ///
-/// Where 'OpT' may then be either 'NormalOp' or its exception handling version.
+/// Where 'Interface' is the interface derived from the accessors of 'NormalOp'
+/// and its exception handling version.
 /// 'ExceptionRewriter' is always used even for 'NormalOp' for consistency.
 ///
 /// The only constraint given is that the rewriter must be written in a way that
@@ -143,51 +144,42 @@ public:
 /// exception handling version. The default insertion point is before the
 /// operation which satisfies this behaviour. Do not place operations after
 /// 'op'!
-template <class Self, class NormalOp>
-struct OpExRewritePattern : public mlir::RewritePattern {
-  using Base = OpExRewritePattern<Self, NormalOp>;
-  using InvokeOp = typename NormalOp::InvokeOpT;
+template <class Interface>
+struct OpExRewritePattern : public mlir::OpInterfaceRewritePattern<Interface> {
+  using Base = OpExRewritePattern<Interface>;
 
   OpExRewritePattern(mlir::MLIRContext* context,
-                     mlir::PatternBenefit benefit = 1,
-                     llvm::ArrayRef<llvm::StringRef> generatedNames = {})
-      : RewritePattern(MatchAnyOpTypeTag{}, benefit, context, generatedNames) {}
+                     mlir::PatternBenefit benefit = 1)
+      : mlir::OpInterfaceRewritePattern<Interface>(context, benefit) {
+    this->setHasBoundedRewriteRecursion();
+  }
+
+  using mlir::OpInterfaceRewritePattern<Interface>::matchAndRewrite;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::Operation* op,
-                  mlir::PatternRewriter& rewriter) const final {
-    // There is no support for 'RewritePattern's that explicitly match two ops
-    // so 'MatchAnyOpTypeTag' is used and failure returned here if the op is
-    // neither 'NormalOp' or 'InvokeOp'.
-    if (auto normal = llvm::dyn_cast<NormalOp>(op)) {
-      ExceptionRewriter exceptionRewriter{rewriter, nullptr, {}};
-      return static_cast<const Self&>(*this).matchAndRewrite(normal,
-                                                             exceptionRewriter);
-    }
-
-    if (auto invokeOp = llvm::dyn_cast<InvokeOp>(op)) {
+  matchAndRewrite(Interface op, mlir::PatternRewriter& rewriter) const final {
+    if (auto invokeOp = llvm::dyn_cast<ExceptionHandlingInterface>(*op)) {
       ExceptionRewriter exceptionRewriter{rewriter, invokeOp.getExceptionPath(),
                                           invokeOp.getUnwindDestOperands()};
-      mlir::Location loc = op->getLoc();
-      mlir::Block* happyPath = invokeOp.getHappyPath();
-      llvm::SmallVector<mlir::Value> happyOperands(
-          invokeOp.getNormalDestOperands());
+      {
+        mlir::OpBuilder::InsertionGuard guard{rewriter};
+        rewriter.setInsertionPointAfter(op);
 
-      mlir::LogicalResult result =
-          static_cast<const Self&>(*this).matchAndRewrite(invokeOp,
-                                                          exceptionRewriter);
-      if (failed(result))
-        return result;
-
-      // WARNING: Using this insertion point is only safe because the conversion
-      // infrastructure doesn't erase operations until the end.
-      rewriter.setInsertionPointAfter(op);
-      rewriter.create<mlir::cf::BranchOp>(loc, happyPath, happyOperands);
-      return mlir::success();
+        mlir::Location loc = op->getLoc();
+        mlir::Block* happyPath = invokeOp.getHappyPath();
+        llvm::SmallVector<mlir::Value> happyOperands(
+            invokeOp.getNormalDestOperands());
+        rewriter.create<mlir::cf::BranchOp>(loc, happyPath, happyOperands);
+      }
+      return this->matchAndRewrite(op, exceptionRewriter);
     }
 
-    return mlir::failure();
+    ExceptionRewriter exceptionRewriter{rewriter, nullptr, {}};
+    return this->matchAndRewrite(op, exceptionRewriter);
   }
+
+  virtual mlir::LogicalResult
+  matchAndRewrite(Interface op, ExceptionRewriter& rewriter) const = 0;
 };
 
 } // namespace pylir::Py

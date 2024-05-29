@@ -24,7 +24,11 @@
 #include "PylirHIRAttributes.hpp"
 #include "PylirHIRDialect.hpp"
 
+// clang-format off
+// Derived interfaces may depend on the other interfaces.
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.h.inc"
+#include "pylir/Optimizer/PylirHIR/IR/PylirHIRDerivedInterfaces.h.inc"
+// clang-format on
 
 namespace pylir::HIR {
 

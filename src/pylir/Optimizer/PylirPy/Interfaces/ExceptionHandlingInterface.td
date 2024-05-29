@@ -82,6 +82,16 @@ def AddableExceptionHandlingInterface : OpInterface<"AddableExceptionHandlingInt
   ];
 }
 
+class RecFilter<Trait trait> {
+  list<Trait> result = !cond(
+    !isa<AddableExceptionHandling>(trait) : [],
+    !isa<TraitList>(trait)
+      : !foldl([]<Trait>, !cast<TraitList>(trait).traits, acc, iter,
+          !listconcat(acc, RecFilter<iter>.result)),
+    true : [trait]
+  );
+}
+
 /// Creates a new Op as a variant of the existing Op 'op', adding the required
 /// arguments, successors, traits, interface implementations and syntax
 /// automatically.
@@ -89,7 +99,7 @@ def AddableExceptionHandlingInterface : OpInterface<"AddableExceptionHandlingInt
 /// suffix.
 class CreateExceptionHandlingVariant<Op op, string opName = "", bit newline = 1>
   : Op<op.opDialect, !if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
-    !listconcat(!filter(x, op.traits, !not(!isa<AddableExceptionHandling>(x))),
+    !listconcat(RecFilter<TraitList<op.traits>>.result,
       [Terminator, AttrSizedOperandSegments,
         DeclareOpInterfaceMethods<BranchOpInterface>,
         DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
