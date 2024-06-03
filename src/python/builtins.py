@@ -46,12 +46,20 @@ class type:
     __slots__ = pylir.intr.type.__slots__
 
     def __new__(cls, name, bases, dict, **kwargs):
-        # TODO: Assign instance slots from 'dict', assign slots of instance
-        #  from dict, create instance of metatype not 'type', add '__dict__'
-        #  and '__weakref__' slots by default, allow 0 len 'bases', set
-        #  dictionary, call '__set_name__' of descriptors and
-        #  '__init_subclass__' of 'super()'.
-        return pylir.intr.makeType(name, bases, ())
+        # TODO: Assign instance slots from 'dict', create instance of metatype
+        #  not 'type', add '__weakref__' slot by default, allow 0 len 'bases',
+        #  call '__set_name__' of descriptors and '__init_subclass__' of
+        #  'super()'.
+
+        try:
+            # TODO: Verify slots are all strings.
+            slots = (*dict['__slots__'],)
+        except KeyError:
+            slots = ('__dict__',)
+
+        result = pylir.intr.makeType(name, bases, slots)
+        pylir.intr.setSlot(result, pylir.intr.type.__dict__, dict)
+        return result
 
     def __call__(self, *args, **kwargs):
         # I usually try to avoid intrinsics where possible to have as much of a
@@ -96,7 +104,19 @@ class type:
 @pylir.intr.const_export
 class object:
     def __new__(cls, *args, **kwargs):
-        return pylir.intr.makeObject(cls)
+        result = pylir.intr.makeObject(cls)
+        slots = pylir.intr.type.slots(cls)
+        # Note: Be very careful that the below code cannot possibly call
+        # 'object.__new__'.
+        i = 0
+        while i < len(slots):
+            if slots[i] == '__dict__':
+                pylir.intr.setSlot(result, i, {})
+                break
+
+            i += 1
+
+        return result
 
     def __init__(self):
         pass
@@ -165,7 +185,7 @@ class object:
                 try:
                     return d[item]
                 except KeyError:
-                    raise AttributeError
+                    pass
             break
 
         if type_lookup is not NOT_FOUND_SENTINEL:
@@ -224,6 +244,7 @@ class object:
             if not pylir.intr.isUnboundValue(d := pylir.intr.getSlot(self, i)):
                 d[key] = value
                 return
+            i += 1
 
         raise AttributeError
 
@@ -387,10 +408,10 @@ class dict:
         # as storing the result and then using it as the argument of a function
         # would not work in the case that 'tryGetItem' returns an unbound value.
         # This way we can pipe the result into both 'res' and the intrinsic
-        success = pylir.intr.isUnboundValue(
+        failed = pylir.intr.isUnboundValue(
             res := pylir.intr.dict.tryGetItem(self, item, hash(item))
         )
-        if not success:
+        if failed:
             raise KeyError
         return res
 
