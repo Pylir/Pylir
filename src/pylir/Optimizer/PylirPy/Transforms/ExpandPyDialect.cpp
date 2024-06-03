@@ -104,6 +104,7 @@ struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp> {
         op.getLoc(), op.getArguments(), op.getIterExpansionAttr(),
         op.getNormalDestOperands(), op.getUnwindDestOperands(),
         op.getHappyPath(), op.getExceptionPath());
+    rewriter.setInsertionPointToStart(list.getHappyPath());
     rewriter.replaceOpWithNewOp<pylir::Py::ListToTupleOp>(op, list);
   }
 
