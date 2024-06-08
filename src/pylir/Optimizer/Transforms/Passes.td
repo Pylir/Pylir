@@ -54,4 +54,13 @@ def ConditionalsImplicationsPass : Pass<"pylir-conditionals-implications"> {
   ];
 }
 
+def DeadCodeEliminationPass : Pass<"pylir-dce"> {
+  let summary = "Remove blocks without predecessors";
+
+  let statistics = [
+    Statistic<"m_blocksRemoved", "Number of blocks removed",
+      "Number of blocks that were removed as they no longer had any predecessors">
+  ];
+}
+
 #endif
