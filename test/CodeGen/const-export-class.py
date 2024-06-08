@@ -24,7 +24,7 @@ class SeqIter:
 
 
 # CHECK: %[[MAIN_SEQ_ITER:.*]] = py.constant(#[[$MAIN_SEQ_ITER]])
-# CHECK: module_setAttr #{{.*}}["SeqIter"] to %[[MAIN_SEQ_ITER]]
+# CHECK: py.dict_setItem %{{.*}}[{{.*}}] to %[[MAIN_SEQ_ITER]]
 
 # CHECK: globalFunc @{{.*}}__init__{{.*}}(
 

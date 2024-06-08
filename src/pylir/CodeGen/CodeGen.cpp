@@ -31,6 +31,7 @@ class CodeGen {
   Diag::DiagnosticsDocManager<>* m_docManager;
   std::string m_qualifiers;
   Py::GlobalValueAttr m_thisModuleObject;
+  Py::GlobalValueAttr m_globalDictionary;
   llvm::DenseMap<llvm::StringRef, Py::GlobalValueAttr> m_builtinNamespace;
 
   /// Struct representing one instance of a scope in Python.
@@ -359,15 +360,28 @@ class CodeGen {
     }
   }
 
+  /// Generates code to insert 'value' into 'dictionary' with the key 'name'.
+  void dictionaryStringInsertion(Value dictionary, StringRef name,
+                                 Value value) {
+    Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+    Value hash = create<Py::StrHashOp>(string);
+    create<Py::DictSetItemOp>(dictionary, string, hash, value);
+  }
+
+  /// Generates code to lookup 'name' inside of 'dictionary'. Returns an unbound
+  /// value if not contained.
+  Value dictionaryStringLookup(Value dictionary, StringRef name) {
+    Value string = create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
+    Value hash = create<Py::StrHashOp>(string);
+    return create<Py::DictTryGetItemOp>(dictionary, string, hash);
+  }
+
   /// Writes 'value' to the identifier given by 'name'. This abstracts the
   /// different procedures required to write to local, nonlocal and global
   /// variables.
   void writeToIdentifier(Value value, llvm::StringRef name) {
     if (m_classDictionary) {
-      Value string =
-          create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
-      Value hash = create<Py::StrHashOp>(string);
-      create<Py::DictSetItemOp>(m_classDictionary, string, hash, value);
+      dictionaryStringInsertion(m_classDictionary, name, value);
       return;
     }
 
@@ -387,7 +401,8 @@ class CodeGen {
       }
     }
 
-    create<HIR::ModuleSetAttrOp>(m_thisModuleObject, name, value);
+    dictionaryStringInsertion(create<Py::ConstantOp>(m_globalDictionary), name,
+                              value);
   }
 
   void eraseIdentifier(StringRef name) {
@@ -431,7 +446,8 @@ class CodeGen {
     };
 
     auto globalLookup = [&]() -> Value {
-      Value readValue = create<HIR::ModuleGetAttrOp>(m_thisModuleObject, name);
+      Value readValue = dictionaryStringLookup(
+          create<Py::ConstantOp>(m_globalDictionary), name);
       auto iter = m_builtinNamespace.find(name);
       if (iter == m_builtinNamespace.end())
         return readValue;
@@ -463,11 +479,7 @@ class CodeGen {
     };
 
     if (m_classDictionary) {
-      Value string =
-          create<Py::ConstantOp>(m_builder.getAttr<Py::StrAttr>(name));
-      Value hash = create<Py::StrHashOp>(string);
-      Value result =
-          create<Py::DictTryGetItemOp>(m_classDictionary, string, hash);
+      Value result = dictionaryStringLookup(m_classDictionary, name);
       Value isUnbound = create<Py::IsUnboundValueOp>(result);
       Block* otherLookupBlock = addBlock();
       Block* continueBlock = addBlock(m_builder.getType<Py::DynamicType>());
@@ -677,14 +689,13 @@ public:
 
     m_thisModuleObject = m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers);
 
-    // TODO:
-    auto globalDictionary =
+    m_globalDictionary =
         m_builder.getAttr<Py::GlobalValueAttr>(m_qualifiers + "$dict");
-    globalDictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
+    m_globalDictionary.setInitializer(m_builder.getAttr<Py::DictAttr>());
     m_thisModuleObject.setInitializer(m_builder.getAttr<Py::ObjectAttr>(
         m_builder.getAttr<Py::GlobalValueAttr>(Builtins::Module.name),
         m_builder.getDictionaryAttr(
-            {{m_builder.getStringAttr("__dict__"), globalDictionary}})));
+            {{m_builder.getStringAttr("__dict__"), m_globalDictionary}})));
 
     // Initialize builtins from main module.
     if (m_options.qualifier == "__main__" && m_options.implicitBuiltinsImport) {

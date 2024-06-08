@@ -17,7 +17,9 @@ def foo():
         # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[GLOBAL_LOOKUP:.*]], ^[[CONTINUE:.*]](%[[LOOKUP]] : !py.dynamic)
 
         # CHECK: ^[[GLOBAL_LOOKUP]]:
-        # CHECK: %[[GLOBAL:.*]] = module_getAttr #{{.*}}["print"]
+        # CHECK: %[[STR:.*]] = py.constant(#py.str<"print">)
+        # CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+        # CHECK: %[[GLOBAL:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
         # CHECK: %[[BUILTIN:.*]] = py.constant
         # CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[GLOBAL]]
         # CHECK: %[[LOOKUP:.*]] = arith.select %[[IS_UNBOUND]], %[[BUILTIN]], %[[GLOBAL]]
