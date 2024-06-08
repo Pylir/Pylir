@@ -26,8 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-2022, cpp-compiler: clang-cl, c-compiler: clang-cl, runtime_lib: "MultiThreaded" }
-          - { os: windows-2022, cpp-compiler: clang-cl, c-compiler: clang-cl, runtime_lib: "MultiThreadedDebug" }
+          # - { os: windows-2022, cpp-compiler: clang-cl, c-compiler: clang-cl, runtime_lib: "MultiThreaded" }
+          # - { os: windows-2022, cpp-compiler: clang-cl, c-compiler: clang-cl, runtime_lib: "MultiThreadedDebug" }
           - { os: windows-2022, cpp-compiler: clang++, c-compiler: clang }
           - { os: windows-2022, cpp-compiler: clang++, c-compiler: clang, sanitizers: "address,undefined" }
           - { os: ubuntu-22.04, cpp-compiler: clang++, c-compiler: clang, shared_libs: "ON" }

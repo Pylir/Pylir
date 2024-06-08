@@ -65,13 +65,6 @@ runs:
       if: ${{ inputs.cpp-compiler == 'clang-cl' }}
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Workaround broken clang-cl in GitHub Actions
-      if: ${{ inputs.cpp-compiler == 'clang-cl' }}
-      shell: pwsh
-      run:
-        # See https://github.com/actions/runner-images/issues/10001
-        choco upgrade llvm
-
     - name: Install clang from MSYS2
       uses: msys2/setup-msys2@v2
       if: ${{ inputs.cpp-compiler == 'clang++' && runner.os == 'Windows' }}
