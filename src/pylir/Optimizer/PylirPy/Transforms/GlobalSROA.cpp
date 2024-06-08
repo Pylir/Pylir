@@ -17,6 +17,10 @@ namespace pylir::Py {
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 } // namespace pylir::Py
 
+using namespace mlir;
+using namespace pylir;
+using namespace pylir::Py;
+
 namespace {
 class GlobalSROAPass
     : public pylir::Py::impl::GlobalSROAPassBase<GlobalSROAPass> {
@@ -24,9 +28,9 @@ protected:
   void runOnOperation() override;
 
   struct Aggregate {
-    pylir::Py::GlobalValueAttr globalValue;
-    std::vector<pylir::Py::ConstantOp> refs;
-    std::vector<pylir::SROAReadWriteOpInterface> uses;
+    GlobalValueAttr globalValue;
+    std::vector<ConstantOp> refs;
+    std::vector<SROAReadWriteOpInterface> uses;
   };
 
   std::vector<GlobalSROAPass::Aggregate> collectReplaceAble();
@@ -37,57 +41,69 @@ public:
 
 std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble() {
   struct Uses {
-    std::vector<pylir::Py::ConstantOp> users;
+    std::vector<ConstantOp> users;
     bool allDirect = true;
   };
 
-  llvm::MapVector<pylir::Py::GlobalValueAttr, Uses> eligible;
-  mlir::AttrTypeWalker walker;
-  walker.addWalk([&](pylir::Py::GlobalValueAttr globalValueAttr) {
-    eligible[globalValueAttr].allDirect = false;
+  llvm::MapVector<GlobalValueAttr, Uses> eligible;
+  AttrTypeWalker walker;
+  walker.addWalk([&](GlobalValueAttr globalValueAttr) {
+    Uses& uses = eligible[globalValueAttr];
+    uses.allDirect = false;
+    uses.users.clear();
+    uses.users.shrink_to_fit();
   });
 
-  getOperation()->walk([&](mlir::Operation* operation) {
-    if (auto constantOp = mlir::dyn_cast<pylir::Py::ConstantOp>(operation)) {
-      if (auto globalValueAttr = mlir::dyn_cast<pylir::Py::GlobalValueAttr>(
-              constantOp.getConstant())) {
-        eligible[globalValueAttr].users.push_back(constantOp);
-        return;
-      }
+  getOperation()->walk([&](Operation* operation) {
+    auto constantOp = dyn_cast<ConstantOp>(operation);
+    if (!constantOp) {
+      walker.walk(operation->getAttrDictionary());
+      return;
     }
-    walker.walk(operation->getAttrDictionary());
+
+    auto globalValueAttr = dyn_cast<GlobalValueAttr>(constantOp.getConstant());
+    if (!globalValueAttr) {
+      walker.walk(operation->getAttrDictionary());
+      return;
+    }
+
+    Uses& uses = eligible[globalValueAttr];
+    if (!uses.allDirect)
+      return;
+
+    uses.users.push_back(constantOp);
   });
 
   std::vector<Aggregate> result;
-  for (auto&& [valueAttr, uses] : llvm::make_filter_range(
-           eligible, [](auto&& pair) { return pair.second.allDirect; })) {
-    // If it is public or just a declaration we cannot set all its uses and
-    // hence can't replace it.
-    if (!mlir::isa<pylir::Py::SROAAttrInterface>(valueAttr.getInitializer()))
+  for (auto&& [valueAttr, uses] : eligible) {
+    if (!uses.allDirect)
       continue;
 
-    std::vector<pylir::Py::ConstantOp> constantOps;
-    std::vector<pylir::SROAReadWriteOpInterface> readWriteOp;
+    // If it is public or just a declaration, we cannot see all its uses and
+    // hence can't replace it.
+    if (!isa_and_nonnull<SROAAttrInterface>(valueAttr.getInitializer()))
+      continue;
 
-    auto canSROAReplace =
-        [&](pylir::Py::ConstantOp constantOp) -> mlir::LogicalResult {
-      if (llvm::all_of(constantOp->getUses(), [](const mlir::OpOperand& use) {
-            return mlir::succeeded(
-                pylir::aggregateUseCanParticipateInSROA(use));
+    std::vector<ConstantOp> constantOps;
+    std::vector<SROAReadWriteOpInterface> readWriteOp;
+
+    auto canSROAReplace = [&](ConstantOp constantOp) -> LogicalResult {
+      if (llvm::all_of(constantOp->getUses(), [](const OpOperand& use) {
+            return succeeded(aggregateUseCanParticipateInSROA(use));
           })) {
         constantOps.push_back(constantOp);
         llvm::transform(constantOp->getUses(), std::back_inserter(readWriteOp),
-                        [](mlir::OpOperand& operand) {
-                          return mlir::cast<pylir::SROAReadWriteOpInterface>(
+                        [](OpOperand& operand) {
+                          return cast<SROAReadWriteOpInterface>(
                               operand.getOwner());
                         });
-        return mlir::success();
+        return success();
       }
-      return mlir::failure();
+      return failure();
     };
 
-    if (llvm::any_of(uses.users, [&](pylir::Py::ConstantOp user) {
-          return mlir::failed(canSROAReplace(user));
+    if (llvm::any_of(uses.users, [&](ConstantOp user) {
+          return failed(canSROAReplace(user));
         }))
       continue;
 
@@ -98,7 +114,7 @@ std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble() {
 }
 
 void GlobalSROAPass::runOnOperation() {
-  mlir::SymbolTable symbolTable(getOperation());
+  SymbolTable symbolTable(getOperation());
   bool changed = false;
   while (true) {
     auto aggregates = collectReplaceAble();
@@ -117,34 +133,33 @@ void GlobalSROAPass::runOnOperation() {
       // read, while the stores have a single operand, which is the value to be
       // stored.
       struct LoadStorePlaceHolders {
-        mlir::Attribute maybeInitializer;
-        mlir::Type maybeType;
-        std::vector<mlir::UnrealizedConversionCastOp> loads;
-        std::vector<mlir::UnrealizedConversionCastOp> stores;
+        Attribute maybeInitializer;
+        Type maybeType;
+        std::vector<UnrealizedConversionCastOp> loads;
+        std::vector<UnrealizedConversionCastOp> stores;
       };
 
       // Destructing here so to say, by replacing all read writes and creating
       // the placeholders. Afterwards we have all the keys to create the actual
       // symbols.
-      llvm::MapVector<std::pair<mlir::Attribute, mlir::SideEffects::Resource*>,
+      llvm::MapVector<std::pair<Attribute, SideEffects::Resource*>,
                       LoadStorePlaceHolders>
           placeHolders;
 
-      mlir::cast<pylir::Py::SROAAttrInterface>(
-          aggregate.globalValue.getInitializer())
-          .destructureAggregate([&](mlir::Attribute key,
-                                    mlir::SideEffects::Resource* resource,
-                                    mlir::Type type, mlir::Attribute value) {
+      cast<SROAAttrInterface>(aggregate.globalValue.getInitializer())
+          .destructureAggregate([&](Attribute key,
+                                    SideEffects::Resource* resource, Type type,
+                                    Attribute value) {
             auto& placeHolder = placeHolders[{key, resource}];
             placeHolder.maybeType = type;
             placeHolder.maybeInitializer = value;
           });
 
       for (auto readWrite : aggregate.uses) {
-        mlir::Attribute key = *readWrite.getSROAKey();
+        Attribute key = *readWrite.getSROAKey();
 
         [[maybe_unused]] auto consistentType =
-            [](LoadStorePlaceHolders& placeHolder, mlir::Type type) -> bool {
+            [](LoadStorePlaceHolders& placeHolder, Type type) -> bool {
           if (placeHolder.maybeType)
             return placeHolder.maybeType == type;
 
@@ -155,53 +170,48 @@ void GlobalSROAPass::runOnOperation() {
                  placeHolder.stores.front().getOperand(0).getType() == type;
         };
 
-        mlir::OpBuilder builder(readWrite);
+        OpBuilder builder(readWrite);
         readWrite.replaceAggregate(
             builder, key,
-            [&](mlir::Attribute key, mlir::SideEffects::Resource* resource,
-                mlir::Type type) -> mlir::Value {
+            [&](Attribute key, SideEffects::Resource* resource,
+                Type type) -> Value {
               auto& placeHolder = placeHolders[{key, resource}];
               PYLIR_ASSERT(consistentType(placeHolder, type));
               return placeHolder.loads
-                  .emplace_back(
-                      builder.create<mlir::UnrealizedConversionCastOp>(
-                          readWrite->getLoc(), type, mlir::ValueRange{}))
+                  .emplace_back(builder.create<UnrealizedConversionCastOp>(
+                      readWrite->getLoc(), type, ValueRange{}))
                   .getResult(0);
             },
-            [&](mlir::Attribute key, mlir::SideEffects::Resource* resource,
-                mlir::Value value) {
+            [&](Attribute key, SideEffects::Resource* resource, Value value) {
               auto& placeHolder = placeHolders[{key, resource}];
               PYLIR_ASSERT(consistentType(placeHolder, value.getType()));
               placeHolder.stores.emplace_back(
-                  builder.create<mlir::UnrealizedConversionCastOp>(
-                      readWrite->getLoc(), mlir::TypeRange{}, value));
+                  builder.create<UnrealizedConversionCastOp>(
+                      readWrite->getLoc(), TypeRange{}, value));
             });
         readWrite.erase();
       }
 
-      auto builder = mlir::OpBuilder::atBlockEnd(getOperation().getBody());
+      auto builder = OpBuilder::atBlockEnd(getOperation().getBody());
       for (auto& [attr, placeHolder] : placeHolders) {
         // The suffix here has no actual semantic meaning, it is just here for
         // the clarity of the generated IR. The produced symbol retains the
         // private visibility, and the insert into the symbol table guarantees
         // the uniqueness of the symbol.
         std::string suffix;
-        if (auto str = mlir::dyn_cast_or_null<mlir::StringAttr>(attr.first)) {
+        if (auto str = dyn_cast_or_null<StringAttr>(attr.first)) {
           suffix = str.getValue();
-        } else if (auto pyStr =
-                       mlir::dyn_cast_or_null<pylir::Py::StrAttr>(attr.first)) {
+        } else if (auto pyStr = dyn_cast_or_null<StrAttr>(attr.first)) {
           suffix = pyStr.getValue();
-        } else if (auto integer =
-                       mlir::dyn_cast_or_null<mlir::IntegerAttr>(attr.first)) {
+        } else if (auto integer = dyn_cast_or_null<IntegerAttr>(attr.first)) {
           llvm::SmallString<10> temp;
           integer.getValue().toStringSigned(temp);
           suffix = temp.str();
-        } else if (auto pyInt =
-                       mlir::dyn_cast_or_null<pylir::Py::IntAttr>(attr.first)) {
+        } else if (auto pyInt = dyn_cast_or_null<IntAttr>(attr.first)) {
           suffix = pyInt.getValue().toString();
         }
 
-        mlir::Type type;
+        Type type;
         if (placeHolder.maybeType)
           type = placeHolder.maybeType;
         else if (!placeHolder.loads.empty())
@@ -209,33 +219,32 @@ void GlobalSROAPass::runOnOperation() {
         else
           type = placeHolder.stores.front().getOperand(0).getType();
 
-        mlir::Location loc = aggregate.refs.front()->getLoc();
-        auto symbol = builder.create<pylir::Py::GlobalOp>(
-            loc,
-            (aggregate.globalValue.getName() +
-             (suffix.empty() ? "" : "$" + suffix))
-                .str(),
-            builder.getStringAttr("private"), type,
-            placeHolder.maybeInitializer);
+        Location loc = aggregate.refs.front()->getLoc();
+        auto symbol =
+            builder.create<GlobalOp>(loc,
+                                     (aggregate.globalValue.getName() +
+                                      (suffix.empty() ? "" : "$" + suffix))
+                                         .str(),
+                                     builder.getStringAttr("private"), type,
+                                     placeHolder.maybeInitializer);
         symbolTable.insert(symbol);
 
-        mlir::OpBuilder::InsertionGuard guard{builder};
+        OpBuilder::InsertionGuard guard{builder};
         for (auto load : placeHolder.loads) {
           builder.setInsertionPoint(load);
           load->replaceAllUsesWith(
-              builder.create<pylir::Py::LoadOp>(load->getLoc(), symbol));
+              builder.create<LoadOp>(load->getLoc(), symbol));
           load->erase();
         }
         for (auto store : placeHolder.stores) {
           builder.setInsertionPoint(store);
-          builder.create<pylir::Py::StoreOp>(
-              store->getLoc(), store.getOperand(0),
-              mlir::FlatSymbolRefAttr::get(symbol));
+          builder.create<StoreOp>(store->getLoc(), store.getOperand(0),
+                                  FlatSymbolRefAttr::get(symbol));
           store->erase();
         }
       }
 
-      llvm::for_each(aggregate.refs, std::mem_fn(&mlir::Operation::erase));
+      llvm::for_each(aggregate.refs, std::mem_fn(&Operation::erase));
     }
   }
 
