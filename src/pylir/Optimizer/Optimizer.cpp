@@ -28,11 +28,7 @@ void pylir::registerOptimizationPipelines() {
         pm.addPass(HIR::createClassBodyOutliningPass());
         pm.addPass(HIR::createFuncOutliningPass());
         mlir::OpPassManager* nested = &pm.nestAny();
-        // This is supposed to be the minimum pipeline, so shouldn't really
-        // contain the canonicalizations, but the dialect conversion framework
-        // currently cannot deal with statically known dead code. Running the
-        // canonicalizer eliminates any such occurrences.
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(pylir::createDeadCodeEliminationPass());
         pm.addPass(createConvertPylirHIRToPylirPyPass());
 
         nested = &pm.nestAny();

@@ -11,6 +11,7 @@ add_library(PylirTransforms
   FixpointPass.cpp
   LoadForwardingPass.cpp
   SROA.cpp
+  DeadCodeElimination.cpp
 )
 add_dependencies(PylirTransforms
   PylirTransformPassIncGen
