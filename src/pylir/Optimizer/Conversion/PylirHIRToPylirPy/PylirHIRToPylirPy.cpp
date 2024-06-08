@@ -431,45 +431,6 @@ struct ReturnOpLowering : OpRewritePattern<OpT> {
   }
 };
 
-// TODO: Both of these patterns assume that `__dict__` is slot 0 which requires
-//       tight coupling to the frontend. This is undesirable.
-struct ModuleGetAttrOpConversionPattern : OpRewritePattern<ModuleGetAttrOp> {
-  using OpRewritePattern<ModuleGetAttrOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ModuleGetAttrOp op,
-                                PatternRewriter& rewriter) const override {
-    Value module =
-        rewriter.create<Py::ConstantOp>(op->getLoc(), op.getModuleAttr());
-    Value index = rewriter.create<arith::ConstantOp>(op->getLoc(),
-                                                     rewriter.getIndexAttr(0));
-    Value dict = rewriter.create<Py::GetSlotOp>(op->getLoc(), module, index);
-    Value key = rewriter.create<Py::ConstantOp>(
-        op->getLoc(), rewriter.getAttr<Py::StrAttr>(op.getAttr()));
-    Value hash = rewriter.create<Py::StrHashOp>(op->getLoc(), key);
-    rewriter.replaceOpWithNewOp<Py::DictTryGetItemOp>(op, dict, key, hash);
-    return success();
-  }
-};
-
-struct ModuleSetAttrOpConversionPattern : OpRewritePattern<ModuleSetAttrOp> {
-  using OpRewritePattern<ModuleSetAttrOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ModuleSetAttrOp op,
-                                PatternRewriter& rewriter) const override {
-    Value module =
-        rewriter.create<Py::ConstantOp>(op->getLoc(), op.getModuleAttr());
-    Value index = rewriter.create<arith::ConstantOp>(op->getLoc(),
-                                                     rewriter.getIndexAttr(0));
-    Value dict = rewriter.create<Py::GetSlotOp>(op->getLoc(), module, index);
-    Value key = rewriter.create<Py::ConstantOp>(
-        op->getLoc(), rewriter.getAttr<Py::StrAttr>(op.getAttr()));
-    Value hash = rewriter.create<Py::StrHashOp>(op->getLoc(), key);
-    rewriter.replaceOpWithNewOp<Py::DictSetItemOp>(op, dict, key, hash,
-                                                   op.getValue());
-    return success();
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Class Conversion Patterns
 //===----------------------------------------------------------------------===//
@@ -910,9 +871,7 @@ void ConvertPylirHIRToPylirPy::runOnOperation() {
                GetItemOpConversionPattern, SetItemOpConversionPattern,
                DelItemOpConversionPattern, ContainsOpConversionPattern,
                GetAttributeOpConversionPattern, SetAttrOpConversionPattern,
-               ModuleGetAttrOpConversionPattern,
-               ModuleSetAttrOpConversionPattern, BuildClassOpConversionPattern>(
-      &getContext());
+               BuildClassOpConversionPattern>(&getContext());
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     return signalPassFailure();

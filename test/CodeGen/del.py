@@ -2,7 +2,9 @@
 
 # CHECK-LABEL: init "__main__"
 
-# CHECK: %[[X:.*]] = module_getAttr #__main__["x"]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"x">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: %[[X:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: %[[UNBOUND:.*]] = py.isUnboundValue %[[X]]
 # CHECK: cf.cond_br %[[UNBOUND]], ^[[RAISE:.*]], ^[[CONT:[[:alnum:]]+]]
 
@@ -13,7 +15,9 @@
 
 # CHECK: ^[[CONT]]:
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: module_setAttr #__main__["x"] to %[[UNBOUND]]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"x">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[UNBOUND]]
 del x
 
 
@@ -38,17 +42,27 @@ def bar():
 
 
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: module_setAttr #__main__["a"] to %[[UNBOUND]]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"a">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[UNBOUND]]
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: module_setAttr #__main__["b"] to %[[UNBOUND]]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"b">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[UNBOUND]]
 del a, b
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: module_setAttr #__main__["x"] to %[[UNBOUND]]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"x">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[UNBOUND]]
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: module_setAttr #__main__["y"] to %[[UNBOUND]]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"y">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[UNBOUND]]
 del [x, y]
 
-# CHECK: %[[BAR:.*]] = module_getAttr #__main__["bar"]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"bar">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: %[[BAR:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: %[[INDEX:.*]] = py.constant(#py.int<0>)
 # CHECK: delItem %[[BAR]][%[[INDEX]]]
 del bar[0]

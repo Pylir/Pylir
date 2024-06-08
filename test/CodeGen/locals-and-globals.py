@@ -1,7 +1,5 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK: #[[$MODULE:.*]] = #py.globalValue<__main__,
-
 # CHECK-LABEL: init "__main__"
 # CHECK: %[[TEST1:.*]] = func "__main__.test1"
 def test1():
@@ -17,9 +15,14 @@ def test1():
         def parameter_use(b=a):
             pass
 
-# CHECK: module_setAttr #[[$MODULE]]["test1"] to %[[TEST1]]
 
-# CHECK: %[[TEST1:.*]] = module_getAttr #[[$MODULE]]["test1"]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"test1">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[TEST1]]
+
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"test1">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: %[[TEST1:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: func "__main__.test2"(%{{.*}} "arg" = %[[TEST1]])
 
 def test2(arg=test1):

@@ -9,7 +9,8 @@ def foo():
     # CHECK: ^[[ELSE]]:
     finally:
         # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-        # CHECK: module_setAttr #{{.*}}["x"] to %[[THREE]]
+        # CHECK: %[[STR:.*]] = py.constant(#py.str<"x">)
+        # CHECK: dict_setItem
         # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
         x = 3
     # CHECK: ^[[THEN]]:
@@ -20,9 +21,10 @@ def foo():
 def foo2():
     global x
     try:
-        # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
-        # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-        # CHECK: module_setAttr #{{.*}}["x"] to %[[THREE]]
+        # CHECK-DAG: %[[FIVE:.*]] = py.constant(#py.int<5>)
+        # CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+        # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+        # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[THREE]]
         # CHECK-NEXT: return %[[FIVE]]
         return 5
     finally:
@@ -38,16 +40,18 @@ def foo3():
             pass
         finally:
             # CHECK: ^[[ELSE]]:
-            # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
-            # CHECK: module_setAttr #{{.*}}["x"] to %[[FIVE]]
+            # CHECK-DAG: %[[FIVE:.*]] = py.constant(#py.int<5>)
+            # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+            # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[FIVE]]
             # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
             x = 5
         # CHECK: ^[[THEN]]:
         # CHECK: cf.br ^[[ELSE:[[:alnum:]]+]]
         # CHECK: ^[[ELSE]]:
     finally:
-        # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-        # CHECK: module_setAttr #{{.*}}["x"] to %[[THREE]]
+        # CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+        # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+        # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[THREE]]
         # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
         x = 3
     # CHECK: ^[[THEN]]:
@@ -64,8 +68,9 @@ def foo4():
             try:
                 break
             finally:
-                # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
-                # CHECK: module_setAttr #{{.*}}["x"] to %[[FIVE]]
+                # CHECK-DAG: %[[FIVE:.*]] = py.constant(#py.int<5>)
+                # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+                # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[FIVE]]
                 # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
                 x = 5
         # CHECK: ^[[ELSE]]:
@@ -74,8 +79,9 @@ def foo4():
         # CHECK: cf.br ^[[FINALLY:[[:alnum:]]+]]
     finally:
         # CHECK: ^[[FINALLY]]:
-        # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-        # CHECK: module_setAttr #{{.*}}["x"] to %[[THREE]]
+        # CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+        # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+        # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[THREE]]
         # CHECK: cf.br ^[[THEN:[[:alnum:]]+]]
         x = 3
     # CHECK: ^[[THEN]]:
@@ -91,8 +97,9 @@ def foo5():
             pass
         finally:
             # ^[[FINALLY]]:
-            # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-            # CHECK: module_setAttr #{{.*}}["x"] to %[[THREE]]
+            # CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+            # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+            # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[THREE]]
             # CHECK-NEXT: return
             return
     finally:
@@ -104,10 +111,12 @@ def foo6():
     global x
     try:
         try:
-            # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
-            # CHECK: module_setAttr #{{.*}}["x"] to %[[FIVE]]
-            # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-            # CHECK: module_setAttr #{{.*}}["x"] to %[[THREE]]
+            # CHECK-DAG: %[[FIVE:.*]] = py.constant(#py.int<5>)
+            # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+            # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[FIVE]]
+            # CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+            # CHECK-DAG: %[[STR:.*]] = py.constant(#py.str<"x">)
+            # CHECK: dict_setItem %{{.*}}[%[[STR]] hash(%{{.*}})] to %[[THREE]]
             # CHECK-NEXT: return
             return
         finally:

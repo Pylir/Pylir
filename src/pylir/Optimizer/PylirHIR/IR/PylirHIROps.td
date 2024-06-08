@@ -18,7 +18,6 @@ include "pylir/Optimizer/PylirHIR/IR/PylirHIREnums.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIRInterfaces.td"
 include "pylir/Optimizer/PylirHIR/IR/PylirHIRDerivedInterfaces.td"
 
-include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 
 class PylirHIR_Op<string mneomic, list<Trait> traits = []>
@@ -669,39 +668,5 @@ def PylirHIR_InitModuleOp : PylirHIR_Op<"initModule",
 defm PylirHIR_InitModuleExOp
   : PylirHIR_ExceptionHandlingVariant<PylirHIR_InitModuleOp,
     /*hasVerifier=*/1>;
-
-def PylirHIR_ModuleGetAttrOp : PylirHIR_Op<"module_getAttr"> {
-  let arguments = (ins
-    PylirPy_GlobalValueAttr:$module,
-    StrAttr:$attr
-  );
-
-  let description = [{
-    Op used to access an attribute of a module.
-    If the attribute was not previously bound an unbound value is returned.
-  }];
-
-  let results = (outs DynamicType:$result);
-
-  let assemblyFormat = [{
-    $module `[` $attr `]` attr-dict
-  }];
-}
-
-def PylirHIR_ModuleSetAttrOp : PylirHIR_Op<"module_setAttr"> {
-  let arguments = (ins
-    PylirPy_GlobalValueAttr:$module,
-    StrAttr:$attr,
-    DynamicType:$value
-  );
-
-  let description = [{
-    Op used to bind a value to an attribute of a module.
-  }];
-
-  let assemblyFormat = [{
-    $module `[` $attr `]` `to` $value attr-dict
-  }];
-}
 
 #endif

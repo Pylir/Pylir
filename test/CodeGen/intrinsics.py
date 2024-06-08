@@ -8,9 +8,14 @@ def foo():
     pass
 
 
-# CHECK: %[[FOO:.*]] = module_getAttr #{{.*}}["foo"]
+# CHECK: py.dict_setItem
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"foo">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: %[[FOO:.*]] = py.dict_tryGetItem %{{.*}}[%[[STR]] hash(%[[HASH]])]
 # CHECK: %[[T:.*]] = py.typeOf %[[FOO]]
-# CHECK: module_setAttr #{{.*}}["t"] to %[[T]]
+# CHECK: %[[STR:.*]] = py.constant(#py.str<"t">)
+# CHECK: %[[HASH:.*]] = py.str_hash %[[STR]]
+# CHECK: py.dict_setItem %{{.*}}[%[[STR]] hash(%[[HASH]])] to %[[T]]
 t = pylir.intr.typeOf(foo)
 
 # CHECK: %[[ZERO:.*]] = py.constant(#py.int<0>)

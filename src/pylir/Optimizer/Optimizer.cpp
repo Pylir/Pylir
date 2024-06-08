@@ -47,6 +47,10 @@ void pylir::registerOptimizationPipelines() {
       "Optimization pipeline used by the compiler with lowering up until "
       "(exclusive) conversion to LLVM",
       [](mlir::OpPassManager& pm) {
+        mlir::OpPassManager* nested = &pm.nestAny();
+        nested->addPass(mlir::createCanonicalizerPass());
+        pm.addPass(Py::createGlobalSROAPass());
+
         pm.addPass(HIR::createClassBodyOutliningPass());
         pm.addPass(HIR::createFuncOutliningPass());
         pm.nestAny().addPass(mlir::createCanonicalizerPass());
@@ -54,7 +58,6 @@ void pylir::registerOptimizationPipelines() {
 
         mlir::OpPassManager inlinerNested;
 
-        mlir::OpPassManager* nested;
         inlinerNested.addPass(mlir::createCanonicalizerPass());
         inlinerNested.nestAny().addPass(
             Py::createGlobalLoadStoreEliminationPass());
