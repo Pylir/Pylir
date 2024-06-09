@@ -284,7 +284,8 @@ void CodeGenState::initializeGlobal(LLVM::GlobalOp global, OpBuilder& builder,
     else
       value = getConstant(global.getLoc(), builder, element);
 
-    undef = builder.create<LLVM::InsertValueOp>(global.getLoc(), undef, value,
+    undef = builder.create<LLVM::InsertValueOp>(
+        global.getLoc(), undef, value,
         ArrayRef<std::int64_t>{slotsInStructIndex,
                                static_cast<std::int64_t>(index)});
   }

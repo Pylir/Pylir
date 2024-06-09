@@ -140,7 +140,8 @@ mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFunctionType(
   if (type.isInitialized())
     return type;
 
-  SmallVector<Type> body{m_objectPtrType,
+  SmallVector<Type> body{
+      m_objectPtrType,
       mlir::LLVM::LLVMPointerType::get(&getContext()),
       IntegerType::get(&getContext(), 32),
   };
