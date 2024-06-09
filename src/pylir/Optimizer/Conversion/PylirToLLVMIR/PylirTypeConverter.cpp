@@ -110,6 +110,18 @@ mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyObjectType(
                             {m_objectPtrType});
 }
 
+unsigned
+pylir::PylirTypeConverter::getClosureArgsBytes(TypeRange closureArgsTypes) {
+  // Note that this is the same calculation as for the size of a struct type
+  // except that we do not care about padding at the end of the struct.
+  unsigned byteCount = 0;
+  for (Type type : closureArgsTypes) {
+    byteCount = llvm::alignTo(byteCount, getPlatformABI().getAlignOf(type));
+    byteCount += getPlatformABI().getSizeOf(type);
+  }
+  return byteCount;
+}
+
 mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFunctionType(
     std::optional<unsigned int> slotSize, TypeRange closureArgsTypes) {
   assert((slotSize || closureArgsTypes.empty()) &&
@@ -128,10 +140,18 @@ mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFunctionType(
   if (type.isInitialized())
     return type;
 
-  SmallVector<Type> body{m_objectPtrType,
-                         mlir::LLVM::LLVMPointerType::get(&getContext())};
+  SmallVector<Type> body{
+      m_objectPtrType,
+      mlir::LLVM::LLVMPointerType::get(&getContext()),
+      IntegerType::get(&getContext(), 32),
+  };
   body.push_back(getSlotEpilogue(&getContext(), slotSize.value_or(0)));
   llvm::append_range(body, closureArgsTypes);
+  body.push_back(LLVM::LLVMArrayType::get(
+      IntegerType::get(&getContext(), 8),
+      llvm::divideCeil(getClosureArgsBytes(closureArgsTypes),
+                       8 * m_cabi->getSizeOf(m_objectPtrType))));
+
   [[maybe_unused]] LogicalResult result =
       type.setBody(body, /*isPacked=*/false);
   PYLIR_ASSERT(succeeded(result));

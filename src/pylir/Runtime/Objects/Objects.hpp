@@ -167,6 +167,42 @@ class PyFunction : public PyObject {
 
   PyObjectStorage m_base;
   PyUniversalCC m_function;
+  std::uint32_t m_closureSizeBytes{};
+
+  // Memory layout after:
+  // * PyObject* m_slots[];
+  // * Closure parameters, which may be of any type.
+  // * std::uint8_t refInClosureBitSet[ceil(m_closureSizeBytes / (8 *
+  // sizeof(void*))];
+  //
+  // where bit 'i' of 'refInClosureBitSet[j]' being set means that
+  // '(std::byte*)this + sizeof(PyFunction) + (8 * j + i) * sizeof(PyObject*)'
+  // contains a 'PyObject*'.
+
+  /// Retuns a pointer to the beginning of the closure arguments.
+  std::byte* getClosureStart() {
+    return reinterpret_cast<std::byte*>(
+        reinterpret_cast<PyObject**>(std::next(this)) +
+        // Using the fact that functions cannot be subclasses and have
+        // known slot count.
+        PyTypeTraits<Builtins::Function>::slotCount);
+  }
+
+  /// Returns a pointer to the beginning of the mask array for references in
+  /// the closure arguments.
+  std::int8_t* mask_begin() {
+    return reinterpret_cast<std::int8_t*>(getClosureStart()) +
+           m_closureSizeBytes;
+  }
+
+  /// Returns a pointer to the end of the mask array for references in
+  /// the closure arguments.
+  std::int8_t* mask_end() {
+    std::uint32_t endMaskOffset = m_closureSizeBytes / (8 * sizeof(void*));
+    if (m_closureSizeBytes % (8 * sizeof(void*)))
+      endMaskOffset++;
+    return mask_begin() + endMaskOffset;
+  }
 
 public:
   constexpr explicit PyFunction(PyUniversalCC function)
@@ -178,6 +214,77 @@ public:
 #define FUNCTION_SLOT(x, y) y,
 #include <pylir/Interfaces/Slots.def>
   };
+
+  class ClosureRefIterator {
+    PyFunction* m_function{};
+    std::uint32_t m_currMask{};
+    std::uint8_t m_index{};
+
+    void advanceToNext() {
+      std::int8_t* mask = m_function->mask_begin();
+      std::int8_t* maskEnd = m_function->mask_end();
+      for (; mask + m_currMask != maskEnd; m_currMask++) {
+        for (; m_index < 8; m_index++)
+          if (mask[m_currMask] & (1 << m_index))
+            return;
+
+        m_index = 0;
+      }
+    }
+
+  public:
+    ClosureRefIterator() = default;
+
+    ClosureRefIterator(PyFunction* function, uint32_t currMask)
+        : m_function(function), m_currMask(currMask) {
+      advanceToNext();
+    }
+
+    using difference_type = std::ptrdiff_t;
+    using value_type = PyObject*;
+    using reference = value_type&;
+    using pointer = value_type*;
+
+    reference operator*() const {
+      return *(reinterpret_cast<PyObject**>(m_function->getClosureStart()) +
+               8 * m_currMask + m_index);
+    }
+
+    pointer operator->() const {
+      return &**this;
+    }
+
+    ClosureRefIterator& operator++() {
+      m_index++;
+      advanceToNext();
+      return *this;
+    }
+
+    ClosureRefIterator operator++(int) {
+      ClosureRefIterator temp = *this;
+      ++*this;
+      return temp;
+    }
+
+    bool operator==(const ClosureRefIterator& rhs) const {
+      return std::tie(m_function, m_currMask) ==
+             std::tie(rhs.m_function, rhs.m_currMask);
+    }
+
+    bool operator!=(const ClosureRefIterator& rhs) const {
+      return !(rhs == *this);
+    }
+  };
+
+  /// Returns an iterator iterating over all 'PyObject*'s within the closure
+  /// arguments of this function object.
+  ClosureRefIterator closure_ref_begin() {
+    return ClosureRefIterator(this, 0);
+  }
+
+  ClosureRefIterator closure_ref_end() {
+    return ClosureRefIterator(this, mask_end() - mask_begin());
+  }
 };
 
 class PyTuple : public PyObject {

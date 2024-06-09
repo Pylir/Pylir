@@ -26,4 +26,6 @@ py.func @bar(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
 // CHECK-NEXT: %[[ADDRESS:.*]] = llvm.mlir.addressof @bar
 // CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[ADDRESS]], %[[UNDEF1]][1]
-// CHECK-NEXT: llvm.return %[[UNDEF2]]
+// CHECK-NEXT: %[[CLOSURE_SIZE:.*]] = llvm.mlir.constant(0 : i32)
+// CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[CLOSURE_SIZE]], %[[UNDEF2]][2]
+// CHECK-NEXT: llvm.return %[[UNDEF3]]

@@ -4,7 +4,7 @@
 py.func @foo(%arg0 : i32, %arg1 : !py.dynamic) -> !pyMem.memory {
   // CHECK: %[[NULL:.*]] = llvm.mlir.zero
   // CHECK: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][1]
-  // CHECK-SAME: !llvm.struct<"{{.*}}", (ptr<{{[0-9]+}}>, ptr, array<{{[0-9]+}} x ptr<{{[0-9]+}}>>, i32, ptr<{{[0-9]+}}>)>
+  // CHECK-SAME: !llvm.struct<"{{.*}}", (ptr<{{[0-9]+}}>, ptr, i32, array<{{[0-9]+}} x ptr<{{[0-9]+}}>>, i32, ptr<{{[0-9]+}}>, array<1 x i8>)>
   // CHECK: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP]]
   // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[SIZE]])
   // CHECK: "llvm.intr.memset"(%[[MEMORY]], %{{.*}}, %[[SIZE]])
