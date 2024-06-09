@@ -583,15 +583,25 @@ struct PyFunctionModel : PyObjectModelBase<PyFunctionModel> {
     return field<Scalar<TbaaAccessType::FunctionPointer>>(loc, 1);
   }
 
+  // Returns a model for accessing the field denoting the size of all closure
+  // arguments combined as laid out in memory.
+  auto closureSizePtr(mlir::Location loc) const {
+    return field<Scalar<>>(loc, 2);
+  }
+
   /// Returns a model for accessing the slots of the function.
   auto slotsArray(mlir::Location loc) const {
     return field<Array<Pointer<PyObjectModel, TbaaAccessType::TupleElements>>>(
-        loc, 2);
+        loc, 3);
   }
 
   /// Returns a model for accessing the closure argument with the given index.
   auto closureArgument(mlir::Location loc, unsigned index) const {
-    return field<Scalar<>>(loc, 3 + index);
+    return field<Scalar<>>(loc, 4 + index);
+  }
+
+  auto refInClosureBitfield(mlir::Location loc, unsigned numClosureArgs) const {
+    return field<Array<Scalar<>>>(loc, 4 + numClosureArgs);
   }
 };
 

@@ -265,6 +265,15 @@ void CodeGenState::initializeGlobal(LLVM::GlobalOp global, OpBuilder& builder,
           })
           .Case([&](ObjectAttr) { return undef; });
 
+  unsigned slotsInStructIndex =
+      cast<LLVM::LLVMStructType>(global.getType()).getBody().size() - 1;
+  // Special case due to functions not having slots as the second last struct
+  // element.
+  // TODO: This will need to be calculated from the 'FunctionAttr' once/if it is
+  // ever capable of representing closure arguments.
+  if (isa<FunctionAttr>(objectAttr))
+    slotsInStructIndex--;
+
   DictionaryAttr initMap = constObjectAttrInterface.getSlots();
   for (auto [index, slotName] : llvm::enumerate(
            cast<TypeAttrInterface>(typeObject).getInstanceSlots())) {
@@ -275,12 +284,9 @@ void CodeGenState::initializeGlobal(LLVM::GlobalOp global, OpBuilder& builder,
     else
       value = getConstant(global.getLoc(), builder, element);
 
-    auto indices = {
-        static_cast<std::int64_t>(
-            cast<LLVM::LLVMStructType>(global.getType()).getBody().size() - 1),
-        static_cast<std::int64_t>(index)};
     undef = builder.create<LLVM::InsertValueOp>(global.getLoc(), undef, value,
-                                                indices);
+        ArrayRef<std::int64_t>{slotsInStructIndex,
+                               static_cast<std::int64_t>(index)});
   }
 
   builder.create<LLVM::ReturnOp>(global.getLoc(), undef);
@@ -528,7 +534,14 @@ Value CodeGenState::initialize(Location loc, OpBuilder& builder,
                                FunctionAttr attr, Value undef, LLVM::GlobalOp) {
   auto address = builder.create<LLVM::AddressOfOp>(
       loc, LLVM::LLVMPointerType::get(builder.getContext()), attr.getValue());
-  return builder.create<LLVM::InsertValueOp>(loc, undef, address, 1);
+  undef = builder.create<LLVM::InsertValueOp>(loc, undef, address, 1);
+
+  // 'FunctionAttr' does not yet support closure arguments making it therefore
+  // 0.
+  auto closureSize =
+      builder.create<LLVM::ConstantOp>(loc, builder.getI32IntegerAttr(0));
+  undef = builder.create<LLVM::InsertValueOp>(loc, undef, closureSize, 2);
+  return undef;
 }
 
 Value CodeGenState::getConstant(Location loc, OpBuilder& builder,

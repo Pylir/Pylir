@@ -58,6 +58,11 @@ void introspectObject(pylir::rt::PyObject* object, F f) {
     f(&type->getLayoutType());
     f(&type->getMROTuple());
     f(&type->getInstanceSlots());
+  } else if (auto* function = object->dyn_cast<pylir::rt::PyFunction>()) {
+    for (auto iter = function->closure_ref_begin(),
+              end = function->closure_ref_end();
+         iter != end; iter++)
+      f(*iter);
   }
 
   auto& slots = type(*object).getInstanceSlots();

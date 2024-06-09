@@ -1539,8 +1539,43 @@ struct InitFuncOpConversion
         rewriter, adaptor.getMemory(), adaptor.getClosureArgs().getTypes());
 
     model.funcPtr(op.getLoc()).store(op.getLoc(), address);
+
+    // Store the closure's size.
+    unsigned byteCount =
+        typeConverter.getClosureArgsBytes(adaptor.getClosureArgs().getTypes());
+    Value byteCountC = rewriter.create<LLVM::ConstantOp>(
+        op.getLoc(), rewriter.getI32IntegerAttr(byteCount));
+    model.closureSizePtr(op.getLoc()).store(op.getLoc(), byteCountC);
+
     for (auto [index, value] : llvm::enumerate(adaptor.getClosureArgs()))
       model.closureArgument(op.getLoc(), index).store(op.getLoc(), value);
+
+    // Note where references live within the closure by populating the 'refMask'
+    // bitset.
+    unsigned pointerBitwidth = typeConverter.getPointerBitwidth();
+    SmallVector<std::uint8_t> refMask(
+        llvm::divideCeil(byteCount, pointerBitwidth));
+    unsigned currentOffset = 0;
+    PlatformABI& platformAbi = typeConverter.getPlatformABI();
+    for (auto [newType, oldType] :
+         llvm::zip_equal(adaptor.getClosureArgs().getTypes(),
+                         op.getClosureArgs().getTypes())) {
+      currentOffset =
+          llvm::alignTo(currentOffset, platformAbi.getAlignOf(newType));
+      if (isa<DynamicType>(oldType)) {
+        unsigned index = currentOffset / (pointerBitwidth / 8);
+        refMask[index / 8] |= 1 << (index % 8);
+      }
+      currentOffset += platformAbi.getSizeOf(newType);
+    }
+
+    auto array = model.refInClosureBitfield(op.getLoc(),
+                                            adaptor.getClosureArgs().size());
+    for (auto [index, value] : llvm::enumerate(refMask)) {
+      Value mask = rewriter.create<LLVM::ConstantOp>(
+          op.getLoc(), rewriter.getI8IntegerAttr(value));
+      array.at(op.getLoc(), index).store(op.getLoc(), mask);
+    }
 
     rewriter.replaceOp(op, adaptor.getMemory());
     return mlir::success();

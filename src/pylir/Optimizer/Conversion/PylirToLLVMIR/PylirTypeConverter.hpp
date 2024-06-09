@@ -45,6 +45,10 @@ public:
   getPyFunctionType(std::optional<unsigned> slotSize = {},
                     mlir::TypeRange closureArgsTypes = {});
 
+  /// Returns the number of bytes 'closureArgsTypes' occupy within a converted
+  /// 'PyFunction'.
+  unsigned getClosureArgsBytes(mlir::TypeRange closureArgsTypes);
+
   /// Returns the LLVM representation for a 'tuple', optionally of the given
   /// length.
   mlir::LLVM::LLVMStructType
