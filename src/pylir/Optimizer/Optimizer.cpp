@@ -11,6 +11,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Pass/PassOptions.h>
 #include <mlir/Pass/PassRegistry.h>
+#include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
@@ -18,6 +19,14 @@
 #include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
+
+static std::unique_ptr<mlir::Pass> createCanonicalizerPass() {
+  mlir::GreedyRewriteConfig config;
+  // This is arguably not a canonicalization, not always beneficial and
+  // expensive.
+  config.enableRegionSimplification = false;
+  return createCanonicalizerPass(config);
+}
 
 void pylir::registerOptimizationPipelines() {
   mlir::PassPipelineRegistration<>(
@@ -46,39 +55,43 @@ void pylir::registerOptimizationPipelines() {
       "(exclusive) conversion to LLVM",
       [](mlir::OpPassManager& pm) {
         mlir::OpPassManager* nested = &pm.nestAny();
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(createCanonicalizerPass());
+        nested->addPass(createDeadCodeEliminationPass());
         pm.addPass(Py::createGlobalSROAPass());
 
         pm.addPass(HIR::createClassBodyOutliningPass());
         pm.addPass(HIR::createFuncOutliningPass());
-        pm.nestAny().addPass(mlir::createCanonicalizerPass());
+        nested = &pm.nestAny();
+        nested->addPass(createCanonicalizerPass());
+        nested->addPass(createDeadCodeEliminationPass());
         pm.addPass(createConvertPylirHIRToPylirPyPass());
 
         mlir::OpPassManager inlinerNested;
 
-        inlinerNested.addPass(mlir::createCanonicalizerPass());
+        inlinerNested.addPass(createCanonicalizerPass());
         inlinerNested.nestAny().addPass(
             Py::createGlobalLoadStoreEliminationPass());
         inlinerNested.addPass(Py::createFoldGlobalsPass());
         inlinerNested.addPass(mlir::createSymbolDCEPass());
         nested = &inlinerNested.nestAny();
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(createCanonicalizerPass());
         nested->addPass(mlir::createCSEPass());
         nested->addPass(pylir::createConditionalsImplicationsPass());
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(createCanonicalizerPass());
         nested->addPass(createLoadForwardingPass());
 
         // TODO: Upstream MLIR has a bug making SCCP that is not module
         //  level not thread-safe. This is caught by TSAN.
         inlinerNested.addPass(mlir::createSCCPPass());
         nested = &inlinerNested.nestAny();
+        nested->addPass(createDeadCodeEliminationPass());
         nested->addPass(Py::createExpandPyDialectPass());
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(createCanonicalizerPass());
         nested->addPass(mlir::createCSEPass());
         nested->addPass(createLoadForwardingPass());
         inlinerNested.addPass(mlir::createSCCPPass());
         nested = &inlinerNested.nestAny();
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(createCanonicalizerPass());
 
         Py::InlinerPassOptions options{};
         std::string pipeline;
@@ -86,12 +99,8 @@ void pylir::registerOptimizationPipelines() {
         inlinerNested.printAsTextualPipeline(ss);
         options.m_optimizationPipeline = std::move(pipeline);
         pm.addPass(Py::createInlinerPass(options));
-
+        pm.nestAny().addPass(createDeadCodeEliminationPass());
         pm.addPass(createConvertPylirPyToPylirMemPass());
-        nested = &pm.nestAny();
-        nested->addPass(mlir::createCanonicalizerPass());
-        // TODO: Re-enable once it properly supports destructors.
-        // nested->addPass(Mem::createHeapToStackPass());
       });
 
   mlir::PassPipelineRegistration<PylirLLVMOptions>(
