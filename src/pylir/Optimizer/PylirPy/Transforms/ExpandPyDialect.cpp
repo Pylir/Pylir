@@ -113,6 +113,37 @@ struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp> {
   }
 };
 
+/// Turns exception handling variants into non-exception handling variants if
+/// they do not have any expansions.
+struct ExRemovePattern
+    : mlir::OpInterfaceRewritePattern<pylir::Py::ExceptionHandlingInterface> {
+  using mlir::OpInterfaceRewritePattern<
+      pylir::Py::ExceptionHandlingInterface>::OpInterfaceRewritePattern;
+
+  void rewrite(pylir::Py::ExceptionHandlingInterface op,
+               mlir::PatternRewriter& rewriter) const override {
+    mlir::Location loc = op.getLoc();
+
+    mlir::Operation* clone = op.cloneWithoutExceptionHandling(rewriter);
+    rewriter.create<mlir::cf::BranchOp>(loc, op.getHappyPath(),
+                                        op.getNormalDestOperands());
+    rewriter.replaceOp(op, clone);
+  }
+
+  mlir::LogicalResult
+  match(pylir::Py::ExceptionHandlingInterface op) const override {
+    return llvm::TypeSwitch<mlir::Operation*, mlir::LogicalResult>(op)
+        .Case([](pylir::Py::MakeDictExOp op) {
+          return mlir::success(op.getMappingExpansionAttr().empty());
+        })
+        .Case<pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp,
+              pylir::Py::MakeSetExOp>([](auto op) {
+          return mlir::success(op.getIterExpansion().empty());
+        })
+        .Default(mlir::failure());
+  }
+};
+
 void raiseException(mlir::Value exception,
                     pylir::Py::ExceptionHandlingInterface exceptionHandler,
                     mlir::PatternRewriter& rewriter, mlir::Location loc) {
@@ -399,6 +430,7 @@ void ExpandPyDialectPass::runOnOperation() {
   patterns.add<ListUnrollPattern<pylir::Py::MakeListExOp>>(&getContext());
   patterns.add<UnpackOpPattern<pylir::Py::UnpackOp>>(&getContext());
   patterns.add<UnpackOpPattern<pylir::Py::UnpackExOp>>(&getContext());
+  patterns.add<ExRemovePattern>(&getContext());
   if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                 std::move(patterns)))) {
     signalPassFailure();

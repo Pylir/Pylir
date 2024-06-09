@@ -18,7 +18,7 @@ def FuncOutliningPass : Pass<"pylir-func-outlining", "mlir::ModuleOp"> {
   }];
 }
 
-def ClassBodyOutliningPass : Pass<"pylir-class-body-outlining", "mlir::ModuleOp"> {
+def ClassBodyOutliningPass : Pass<"pylir-class-body-outlining"> {
   let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
   let description = [{

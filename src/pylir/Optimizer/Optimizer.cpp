@@ -25,16 +25,18 @@ void pylir::registerOptimizationPipelines() {
       "Minimum pass pipeline to fully lower 'py' dialect, up until (exclusive) "
       "conversion to LLVM",
       [](mlir::OpPassManager& pm) {
-        pm.addPass(HIR::createClassBodyOutliningPass());
-        pm.addPass(HIR::createFuncOutliningPass());
         mlir::OpPassManager* nested = &pm.nestAny();
+        nested->addPass(pylir::createDeadCodeEliminationPass());
+        nested->addPass(HIR::createClassBodyOutliningPass());
+        pm.addPass(HIR::createFuncOutliningPass());
+        nested = &pm.nestAny();
         nested->addPass(pylir::createDeadCodeEliminationPass());
         pm.addPass(createConvertPylirHIRToPylirPyPass());
 
         nested = &pm.nestAny();
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(pylir::createDeadCodeEliminationPass());
         nested->addPass(Py::createExpandPyDialectPass());
-        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(pylir::createDeadCodeEliminationPass());
         pm.addPass(createConvertPylirPyToPylirMemPass());
       });
 
@@ -98,6 +100,7 @@ void pylir::registerOptimizationPipelines() {
       "to LLVM",
       [](mlir::OpPassManager& pm, const PylirLLVMOptions& options) {
         auto* nested = &pm.nestAny();
+        nested->addPass(pylir::createDeadCodeEliminationPass());
         nested->addPass(mlir::createArithToLLVMConversionPass());
         pm.addPass(createConvertPylirToLLVMPass(ConvertPylirToLLVMPassOptions{
             options.targetTriple, options.dataLayout}));
